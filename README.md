@@ -6,7 +6,8 @@ Based on [CircuitPython](https://github.com/adafruit/circuitpython)
 
 Requires: 
 
-https://github.com/adafruit/Adafruit_CircuitPython_SSD1306
+* https://github.com/adafruit/Adafruit_CircuitPython_SSD1306
+* https://github.com/adafruit/Adafruit_CircuitPython_BME280
 
 Docs for CP libs:
 https://circuitpython.readthedocs.io/en/latest/shared-bindings/index.html
