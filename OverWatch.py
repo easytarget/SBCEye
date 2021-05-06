@@ -29,7 +29,7 @@ lamp_PIN = 7     # Lamp relay
 # Logging setup
 logInterval = 60
 print("Starting OverWatch")
-logging.basicConfig(filename='overwatch.log', level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
+logging.basicConfig(filename='/var/log/overwatch.log', level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
 logging.info('')
 logging.info("Starting OverWatch")
 logTimer = 0
