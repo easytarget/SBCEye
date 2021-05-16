@@ -1,10 +1,16 @@
 #! /usr/bin/python
 # Animate the SSD1306 display attached to my OctoPrint server
 
+# Start by re-nicing so we dont block anything important
+import os
+os.nice(10)
+
+# Some general functions we will use
 import time
 import subprocess
 import logging
 
+# I2C Comms
 from board import SCL, SDA
 import busio
 

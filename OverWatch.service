@@ -1,5 +1,5 @@
 [Unit]
-Description=My test service
+Description=OverWatch script for PI Hat
 After=multi-user.target
 
 [Service]
