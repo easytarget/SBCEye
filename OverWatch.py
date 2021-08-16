@@ -27,8 +27,9 @@ import RPi.GPIO as GPIO           # Allows us to call our GPIO pins and names it
 # Exit Handler
 import atexit
 
-passes = 4       # number of (1 second) refreshes of a screen before moving to next
-slidespeed = 8   # number of rows to scroll on each animation step
+passtime = 2     # time between read/display cycles
+passes = 3       # number of refreshes of a screen before moving to next
+slidespeed = 16  # number of rows to scroll on each animation step
 button_PIN = 27  # Lamp button
 lamp_PIN = 7     # Lamp relay
 
@@ -181,7 +182,7 @@ while True:
         bmeScreen()
         show()
         logger();
-        time.sleep(1)
+        time.sleep(passtime)
     # Final update and transition to screen 2
     bmeScreen()
     sysScreen(width+margin)
@@ -194,7 +195,7 @@ while True:
         sysScreen()
         show()
         logger();
-        time.sleep(1)
+        time.sleep(passtime)
     # Final update and transition to screen 1
     sysScreen()
     bmeScreen(width+margin)
