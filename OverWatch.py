@@ -154,9 +154,9 @@ def getBmeData():
 def getSysData():
     global CPU, TOP, MEM
     # Shell commands to grab and parse system data
-    CPU = subprocess.check_output(cpuCmd, shell=True).decode("utf-8")
-    TOP = subprocess.check_output(topCmd, shell=True).decode("utf-8")
-    MEM = subprocess.check_output(memCmd, shell=True).decode("utf-8")
+    CPU = subprocess.check_output(cpuCmd, shell=True).decode('utf-8')
+    TOP = subprocess.check_output(topCmd, shell=True).decode('utf-8')
+    MEM = subprocess.check_output(memCmd, shell=True).decode('utf-8')
 
 def getLampState():
         if (GPIO.input(lamp_PIN)):
@@ -176,13 +176,24 @@ def getSunflowerState():
         else:
             return "off"
 
-def buttonInterrupt(channel):
+def setLampState():
     # Read the lamp and toggle it..
-    logging.info('Button pressed')
     if (GPIO.input(lamp_PIN) == True):
         GPIO.output(lamp_PIN,False)
+        return "off"
     else:
         GPIO.output(lamp_PIN,True)
+        return "on"
+
+def buttonInterrupt(channel):
+    # short delay, then re-read input to provide a hold-down
+    # and suppress false triggers from other gpio operations
+    time.sleep(0.050)
+    if (GPIO.input(button_PIN) == True):
+        logging.info('Button pressed')
+        setLampState()
+    else:
+        logging.info('Button GLITCH')
 
 def ServeHTTP():
     # Spawns a http.server.HTTPServer in a separate thread on the given port.
@@ -219,41 +230,70 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-type", "text/html")
         self.end_headers()
 
-    def do_GET(self):
-        getBmeData()
-        getSysData()
+    def _give_head(self):
+        self.wfile.write(bytes('<html>\n<head><meta charset="utf-8">\n', 'utf-8'))
+        self.wfile.write(bytes('<meta name="viewport" content="width=device-width,initial-scale=1">\n', 'utf-8'))
+        self.wfile.write(bytes('<title>%s Overwatch</title>\n' % ServerName, 'utf-8'))
+        self.wfile.write(bytes('<style>\n', 'utf-8'))
+        self.wfile.write(bytes('body {display:flex; flex-direction: column; align-items: center;}\n', 'utf-8'))
+        self.wfile.write(bytes('</style>\n', 'utf-8'))
+        self.wfile.write(bytes('</head>\n', 'utf-8'))
+        self.wfile.write(bytes('<body>\n', 'utf-8'))
+
+    def _give_foot(self,refresh = False):
+            self.wfile.write(bytes('<hr><pre style="color:grey">GET: ' + self.path + ' from: ' + self.client_address[0] + '</pre>\n', 'utf-8'))
+            self.wfile.write(bytes('</body>\n', 'utf-8'))
+            if (refresh):
+                self.wfile.write(bytes("<script>\n", 'utf-8'))
+                self.wfile.write(bytes('setTimeout(function(){location.replace(document.URL);}, 60000);\n', 'utf-8'))
+                self.wfile.write(bytes('</script>\n', 'utf-8'))
+            self.wfile.write(bytes('</html>\n', 'utf-8'))
+
+    def _give_datetime(self):
         timestamp = datetime.datetime.now()
-        self._set_headers()
-        self.wfile.write(bytes('<html>\n<head><meta charset="utf-8">', "utf-8"))
-        self.wfile.write(bytes('<meta name="viewport" content="width=device-width,initial-scale=1">', "utf-8"))
-        self.wfile.write(bytes("<title>%s Overwatch</title>" % ServerName, "utf-8"))
-        self.wfile.write(bytes("<style>", "utf-8"))
-        self.wfile.write(bytes("body {display:flex; flex-direction: column; align-items: center;}", "utf-8"))
-        self.wfile.write(bytes("</style>", "utf-8"))
-        self.wfile.write(bytes("</head>", "utf-8"))
-        self.wfile.write(bytes("<body>", "utf-8"))
-        self.wfile.write(bytes("<h2>%s OverWatch</h2>" % ServerName, "utf-8"))
-        self.wfile.write(bytes('<p style="color:grey">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</p>', "utf-8"))
-        self.wfile.write(bytes('<table style="border-spacing: 1em;">', "utf-8"))
-        self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">Room</th></tr>', "utf-8"))
-        self.wfile.write(bytes('<tr><td>Temperature: </td><td>' + format(TMP, '.1f') + '&deg;</td></tr>', "utf-8"))
-        self.wfile.write(bytes('<tr><td>Humidity: </td><td>' + format(HUM, '.0f') + '%</td></tr>', "utf-8"))
-        self.wfile.write(bytes('<tr><td>Presssure: </td><td>' + format(PRE, '.0f') + 'mb</td></tr>', "utf-8"))
-        self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">Server</th></tr>', "utf-8"))
-        self.wfile.write(bytes('<tr><td>CPU Temperature: </td><td>' + CPU + '&deg;</td></tr>', "utf-8"))
-        self.wfile.write(bytes('<tr><td>CPU Load: </td><td>' + TOP + '</td></tr>', "utf-8"))
-        self.wfile.write(bytes('<tr><td>Memory used: </td><td>' + MEM + '%</td></tr>', "utf-8"))
-        self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">GPIO</th></tr>', "utf-8"))
-        self.wfile.write(bytes('<tr><td>Lamp</td><td>' + getLampState() + '</td></tr>', "utf-8"))
-        self.wfile.write(bytes('<tr><td>Daisy</td><td>' + getDaisyState() + '</td></tr>', "utf-8"))
-        self.wfile.write(bytes('<tr><td>Sunflower</td><td>' + getSunflowerState() + '</td></tr>', "utf-8"))
-        self.wfile.write(bytes('</table>', "utf-8"))
-        self.wfile.write(bytes('<br><pre style="color:grey">GET: %s</pre>' % self.path, "utf-8"))
-        self.wfile.write(bytes("</body>", "utf-8"))
-        self.wfile.write(bytes("<script>", "utf-8"))
-        self.wfile.write(bytes("setTimeout(function(){location.replace(document.URL);}, 60000);", "utf-8"))
-        self.wfile.write(bytes("</script>", "utf-8"))
-        self.wfile.write(bytes("</html>", "utf-8"))
+        self.wfile.write(bytes('<p style="color:grey">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</p>\n', 'utf-8'))
+
+    def do_GET(self):
+        if (self.path == '/log'):
+            log = "Fred"
+            self._set_headers()
+            self._give_head()
+            self.wfile.write(bytes('<h2>System Log:</h2>\n', 'utf-8'))
+            self._give_datetime()
+            self.wfile.write(bytes('<p>Most recent entries first, max 250 lines shown</p>\n', 'utf-8'))
+            self.wfile.write(bytes('<pre>\n' + log + '<pre>\n', 'utf-8'))
+            self._give_foot(refresh=True)
+        elif (self.path == '/led'):
+            state = setLampState()
+            self._set_headers()
+            self._give_head()
+            self.wfile.write(bytes('<h2>Lamp Toggled : ' + state + '</h2>\n', 'utf-8'))
+            self._give_datetime()
+            self._give_foot()
+        elif(self.path == '/'):
+            getBmeData()
+            getSysData()
+            self._set_headers()
+            self._give_head()
+            self.wfile.write(bytes('<h2>%s OverWatch</h2>\n' % ServerName, 'utf-8'))
+            self._give_datetime()
+            self.wfile.write(bytes('<table style="border-spacing: 1em;">\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">Room</th></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Temperature: </td><td>' + format(TMP, '.1f') + '&deg;</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Humidity: </td><td>' + format(HUM, '.0f') + '%</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Presssure: </td><td>' + format(PRE, '.0f') + 'mb</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">Server</th></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>CPU Temperature: </td><td>' + CPU + '&deg;</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>CPU Load: </td><td>' + TOP + '</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Memory used: </td><td>' + MEM + '%</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">GPIO</th></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Lamp</td><td>' + getLampState() + '</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Daisy</td><td>' + getDaisyState() + '</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Sunflower</td><td>' + getSunflowerState() + '</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('</table>\n', 'utf-8'))
+            self._give_foot(refresh=True)
+        else:
+            self.send_error(404, 'No Such Page', 'This site only serves pages at "/", "/log", /temps')
 
     def do_HEAD(self):
         self._set_headers()
@@ -287,7 +327,7 @@ def logger():
         else:
             logging.info('Sunflower OFF')
             sunflowerState = False
-    # Now check if logtimer exceeded, and log parameters if so
+    # Now check if logtimer exceeded, and log sensor readings if so
     if (time.time() > logTimer+logInterval):
         logDetails()
         logTimer = time.time()
