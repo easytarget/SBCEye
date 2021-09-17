@@ -255,10 +255,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         if (self.path == '/log'):
-            log = "Fred"
+            log = "Not Yet Implemented"
             self._set_headers()
             self._give_head()
-            self.wfile.write(bytes('<h2>System Log:</h2>\n', 'utf-8'))
+            self.wfile.write(bytes('<h2>Overwatch Log:</h2>\n', 'utf-8'))
             self._give_datetime()
             self.wfile.write(bytes('<p>Most recent entries first, max 250 lines shown</p>\n', 'utf-8'))
             self.wfile.write(bytes('<pre>\n' + log + '<pre>\n', 'utf-8'))
@@ -293,7 +293,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('</table>\n', 'utf-8'))
             self._give_foot(refresh=True)
         else:
-            self.send_error(404, 'No Such Page', 'This site only serves pages at "/", "/log", /temps')
+            self.send_error(404, 'No Such Page', 'This site only serves pages at "/", "/log" and "/led")
 
     def do_HEAD(self):
         self._set_headers()
