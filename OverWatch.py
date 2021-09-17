@@ -11,6 +11,7 @@ import datetime
 import subprocess
 import logging
 from threading import Thread, current_thread
+from logging.handlers import RotatingFileHandler
 
 # I2C Comms
 from board import SCL, SDA
@@ -52,7 +53,11 @@ slidespeed = 16  # number of rows to scroll on each animation step
 
 # Logging setup
 print("Starting OverWatch")
-logging.basicConfig(filename='/var/log/overwatch.log', level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
+
+log_name = '/var/log/overwatch.log'
+handler = RotatingFileHandler(log_name, maxBytes=1024*1024, backupCount=2)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S', handlers=[handler])
+
 logging.info('')
 logging.info("Starting OverWatch")
 logTimer = 0
@@ -210,7 +215,7 @@ def ServeHTTP():
     threadlog("HTTP server will bind to port " + str(port) + " on host " + hostname)
     httpd.server_bind()
     address = "http://%s:%d" % (httpd.server_name, httpd.server_port)
-    threadlog("HTTP server listening on:" + address)
+    threadlog("Access via: " + address)
     httpd.server_activate()
     def serve_forever(httpd):
         with httpd:  # to make sure httpd.server_close is called
