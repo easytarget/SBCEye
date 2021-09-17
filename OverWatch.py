@@ -37,16 +37,20 @@ import atexit
 #
 hostname = "10.0.0.120"
 port = 7080
-passtime = 2     # time between read/display cycles
-passes = 3       # number of refreshes of a screen before moving to next
-slidespeed = 16  # number of rows to scroll on each animation step
+logInterval = 600
+
+# GPIO pins
 button_PIN = 27  # Lamp button
 lamp_PIN = 7     # Lamp relay
 daisy_PIN = 8      # Temporary, need better solution for multiple pins
 sunflower_PIN = 25 # ..ditto
 
+# Display
+passtime = 2     # time between read/display cycles
+passes = 3       # number of refreshes of a screen before moving to next
+slidespeed = 16  # number of rows to scroll on each animation step
+
 # Logging setup
-logInterval = 60
 print("Starting OverWatch")
 logging.basicConfig(filename='/var/log/overwatch.log', level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
 logging.info('')
@@ -293,7 +297,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('</table>\n', 'utf-8'))
             self._give_foot(refresh=True)
         else:
-            self.send_error(404, 'No Such Page', 'This site only serves pages at "/", "/log" and "/led")
+            self.send_error(404, 'No Such Page', 'This site only serves pages at "/", "/log" and "/led"')
 
     def do_HEAD(self):
         self._set_headers()
