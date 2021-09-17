@@ -36,9 +36,10 @@ import atexit
 #
 # User Settings
 #
-hostname = "10.0.0.120"
-port = 7080
-logInterval = 600
+hostname = "10.0.0.120"  # Hostname for webui
+port = 7080              # Port number for webui
+logInterval = 60         # Logging interval (seconds)
+logLines = 250           # How many lines of logging to show in webui
 
 # GPIO pins
 button_PIN = 27  # Lamp button
@@ -53,13 +54,12 @@ slidespeed = 16  # number of rows to scroll on each animation step
 
 # Logging setup
 print("Starting OverWatch")
-
-log_name = '/var/log/overwatch.log'
-handler = RotatingFileHandler(log_name, maxBytes=1024*1024, backupCount=2)
+logFile = '/var/log/overwatch.log'
+handler = RotatingFileHandler(logFile, maxBytes=1024*1024, backupCount=2)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S', handlers=[handler])
-
 logging.info('')
 logging.info("Starting OverWatch")
+logCmd = f"for a in `ls -tr {logFile}*`;do cat $a ; done | tail -{logLines}"
 logTimer = 0
 
 # Create the I2C interface object
@@ -239,7 +239,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-type", "text/html")
         self.end_headers()
 
-    def _give_head(self):
+    def _give_head(self, scrolldown = False):
         self.wfile.write(bytes('<html>\n<head><meta charset="utf-8">\n', 'utf-8'))
         self.wfile.write(bytes('<meta name="viewport" content="width=device-width,initial-scale=1">\n', 'utf-8'))
         self.wfile.write(bytes('<title>%s Overwatch</title>\n' % ServerName, 'utf-8'))
@@ -247,10 +247,17 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('body {display:flex; flex-direction: column; align-items: center;}\n', 'utf-8'))
         self.wfile.write(bytes('</style>\n', 'utf-8'))
         self.wfile.write(bytes('</head>\n', 'utf-8'))
+        if (scrolldown):
+            self.wfile.write(bytes("<script>\n", 'utf-8'))
+            self.wfile.write(bytes('function down() {\n', 'utf-8'))
+            self.wfile.write(bytes('    window.scrollTo(0,document.body.scrollHeight);\n', 'utf-8'))
+            self.wfile.write(bytes('}\n', 'utf-8'))
+            self.wfile.write(bytes('window.onload = down;\n', 'utf-8'))
+            self.wfile.write(bytes('</script>\n', 'utf-8'))
         self.wfile.write(bytes('<body>\n', 'utf-8'))
 
     def _give_foot(self,refresh = False):
-            self.wfile.write(bytes('<hr><pre style="color:grey">GET: ' + self.path + ' from: ' + self.client_address[0] + '</pre>\n', 'utf-8'))
+            self.wfile.write(bytes('<pre style="color:#888888">GET: ' + self.path + ' from: ' + self.client_address[0] + '</pre>\n', 'utf-8'))
             self.wfile.write(bytes('</body>\n', 'utf-8'))
             if (refresh):
                 self.wfile.write(bytes("<script>\n", 'utf-8'))
@@ -260,17 +267,17 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _give_datetime(self):
         timestamp = datetime.datetime.now()
-        self.wfile.write(bytes('<p style="color:grey">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</p>\n', 'utf-8'))
+        self.wfile.write(bytes('<p style="color:#666666">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</p>\n', 'utf-8'))
 
     def do_GET(self):
         if (self.path == '/log'):
-            log = "Not Yet Implemented"
+            log = subprocess.check_output(logCmd, shell=True).decode('utf-8')
             self._set_headers()
-            self._give_head()
+            self._give_head(scrolldown=True)
             self.wfile.write(bytes('<h2>Overwatch Log:</h2>\n', 'utf-8'))
             self._give_datetime()
-            self.wfile.write(bytes('<p>Most recent entries first, max 250 lines shown</p>\n', 'utf-8'))
             self.wfile.write(bytes('<pre>\n' + log + '<pre>\n', 'utf-8'))
+            self.wfile.write(bytes(f'<p>Latest {logLines} lines shown</p>\n', 'utf-8'))
             self._give_foot(refresh=True)
         elif (self.path == '/led'):
             state = setLampState()
@@ -300,6 +307,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('<tr><td>Daisy</td><td>' + getDaisyState() + '</td></tr>\n', 'utf-8'))
             self.wfile.write(bytes('<tr><td>Sunflower</td><td>' + getSunflowerState() + '</td></tr>\n', 'utf-8'))
             self.wfile.write(bytes('</table>\n', 'utf-8'))
+            self.wfile.write(bytes('<p>\n', 'utf-8'))
+            self.wfile.write(bytes('<a href="./log" style="color:#666666; font-weight: bold; text-decoration: none;">View latest Logs</a>\n', 'utf-8'))
+            self.wfile.write(bytes('</p>\n', 'utf-8'))
             self._give_foot(refresh=True)
         else:
             self.send_error(404, 'No Such Page', 'This site only serves pages at "/", "/log" and "/led"')
