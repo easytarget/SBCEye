@@ -36,18 +36,22 @@ import atexit
 #
 # User Settings
 #
-hostname = "10.0.0.120"  # Hostname for webui
-port = 7080              # Port number for webui
-logInterval = 60         # Logging interval (seconds)
-logLines = 250           # How many lines of logging to show in webui
+
+# Web UI
+host = "10.0.0.120"    # Host ip address for webui
+port = 7080            # Port number for webui
+
+# Logging
+logInterval = 600       # Logging interval (seconds)
+logLines = 512         # How many lines of logging to show in webui
 
 # GPIO pins
-button_PIN = 27  # Lamp button
-lamp_PIN = 7     # Lamp relay
-daisy_PIN = 8      # Temporary, need better solution for multiple pins
-sunflower_PIN = 25 # ..ditto
+button_PIN = 27        # Button
+lamp_PIN = 7           # Lamp relay
+daisy_PIN = 8          # Temporary, need better solution for multiple pins
+sunflower_PIN = 25     # ..ditto
 
-# Display
+# Display animation
 passtime = 2     # time between read/display cycles
 passes = 3       # number of refreshes of a screen before moving to next
 slidespeed = 16  # number of rows to scroll on each animation step
@@ -76,19 +80,19 @@ disp.show()
 bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x76)
 
 # GPIO setup
-GPIO.setmode(GPIO.BCM)           # Set's GPIO pins to BCM GPIO numbering
-GPIO.setup(button_PIN, GPIO.IN)  # Set our button pin to be an input
-GPIO.setup(lamp_PIN, GPIO.OUT)   # Set our lamp pin to be an output
-GPIO.setup(daisy_PIN, GPIO.OUT)       # Set pin to be an output
+GPIO.setmode(GPIO.BCM)                # Set's GPIO pins to BCM GPIO numbering
+GPIO.setup(button_PIN, GPIO.IN)       # Set our button pin to be an input
+GPIO.setup(lamp_PIN, GPIO.OUT)        # Set our lamp pin to be an output
+GPIO.setup(daisy_PIN, GPIO.OUT)       # Set pin to be an output, this wont affect it's state.
 GPIO.setup(sunflower_PIN, GPIO.OUT)   # Set pin to be an output
 
-# Remember the current state of the lamp pin
+# Remember the current state of the pins
 lampState = GPIO.input(lamp_PIN)
 daisyState = GPIO.input(daisy_PIN)
 sunflowerState = GPIO.input(sunflower_PIN)
 
 # Image canvas
-margin = 20   # Space between the screens while transitioning
+margin = 20           # Space between the screens while transitioning
 width  = disp.width
 span   = width*2 + margin
 height = disp.height
@@ -99,8 +103,8 @@ image = Image.new("1", (span, height))
 # Get drawing object so we can easily draw on canvas.
 draw = ImageDraw.Draw(image)
 
-# Nice font.
-# the LiberationMono-Regular font used here is located in:
+# LiberationMono-Regular : nice font that looks clear on the small display
+# This font is located in:
 # /usr/share/fonts/truetype/liberation/ on Raspian.
 # If you get an error that it is not present, install it with:
 #   sudo apt install fonts-liberation
@@ -114,7 +118,7 @@ cpuCmd = "cat /sys/class/thermal/thermal_zone0/temp | awk '{printf \"%.1f\", $1/
 topCmd = "top -bn1 | grep load | awk '{printf \"%.3f\", $(NF-2)}'"
 memCmd = "free -m | awk 'NR==2{printf \"%.1f\", $3*100/$2 }'"
 
-# Initial values for the sensor readings, this is crude (globals) and should be done better..
+# Initial values for the sensor readings
 TMP = "undefined"
 HUM = "undefined"
 PRE = "undefined"
@@ -207,12 +211,12 @@ def buttonInterrupt(channel):
 def ServeHTTP():
     # Spawns a http.server.HTTPServer in a separate thread on the given port.
     handler = _BaseRequestHandler
-    httpd = http.server.HTTPServer((hostname, port), handler, False)
+    httpd = http.server.HTTPServer((host, port), handler, False)
     # Block only for 0.5 seconds max
     httpd.timeout = 0.5
-    # HTTPServer sets this as well; left here to make this more obvious.
+    # HTTPServer sets this as well (left here to make obvious).
     httpd.allow_reuse_address = True
-    threadlog("HTTP server will bind to port " + str(port) + " on host " + hostname)
+    threadlog("HTTP server will bind to port " + str(port) + " on host " + host)
     httpd.server_bind()
     address = "http://%s:%d" % (httpd.server_name, httpd.server_port)
     threadlog("Access via: " + address)
@@ -232,8 +236,6 @@ def threadlog(logline):
     logging.info("[" + current_thread().name + "] : " + logline)
 
 class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
-    # BaseHTTPRequestHandler
-
     def _set_headers(self):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
@@ -378,7 +380,7 @@ if __name__ == "__main__":
     logging.info("Entering main loop")
     atexit.register(goodBye)
 
-    # Main loop runs forever
+    # Main loop now runs forever
     while True:
         # Screen 1
         for i in range(passes):
@@ -387,7 +389,8 @@ if __name__ == "__main__":
             show()
             logger();
             time.sleep(passtime)
-        # Final update and transition to screen 2
+
+        # Update and transition to screen 2
         bmeScreen()
         sysScreen(width+margin)
         logger();
@@ -400,7 +403,8 @@ if __name__ == "__main__":
             show()
             logger();
             time.sleep(passtime)
-        # Final update and transition to screen 1
+
+        # Update and transition to screen 1
         sysScreen()
         bmeScreen(width+margin)
         logger();
