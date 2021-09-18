@@ -11,6 +11,7 @@ Based on [CircuitPython](https://github.com/adafruit/circuitpython)
 ![sys](/docs/pihat-sys-thumb.jpg)
 
 ## Requires:
+* Python3, 
 * https://github.com/adafruit/Adafruit_CircuitPython_SSD1306
 * https://github.com/adafruit/Adafruit_CircuitPython_BME280
 
