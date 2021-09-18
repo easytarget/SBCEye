@@ -5,7 +5,7 @@ After=multi-user.target
 [Service]
 Type=simple
 Restart=always
-ExecStart=/usr/bin/python3 /home/pi/HAT/Transmog-Control/OverWatch.py
+ExecStart=/usr/bin/python3 /home/pi/HAT/pi-overwatch/OverWatch.py
 
 [Install]
 WantedBy=multi-user.target
