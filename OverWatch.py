@@ -45,11 +45,23 @@ port = 7080            # Port number for webui
 logInterval = 600       # Logging interval (seconds)
 logLines = 512         # How many lines of logging to show in webui
 
-# GPIO pins
+# GPIO
+# All pins are defined using BCM GPIO numbering
+# https://raspberrypi.stackexchange.com/a/12967
+
+# Button pin (set to `0` to disable button)
 button_PIN = 27        # Button
-lamp_PIN = 7           # Lamp relay
-daisy_PIN = 8          # Temporary, need better solution for multiple pins
-sunflower_PIN = 25     # ..ditto
+
+# Pin list
+# - List entries consist of ['Name',BCM Pin Number, state]
+# - The button, if enabled, will always control the 1st entry)
+# - The state will be read from the pins at startup and used to log changes
+
+#pinMap = []   # Gpio Disabled
+
+pinMap = [['Lamp',       7, False],
+          ['Sunflower', 25, False],
+          ['Daisy',      8, False]]
 
 # Display animation
 passtime = 2     # time between read/display cycles
@@ -79,17 +91,8 @@ disp.show()
 # Create the I2C BME280 sensor object
 bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x76)
 
-# GPIO setup
-GPIO.setmode(GPIO.BCM)                # Set's GPIO pins to BCM GPIO numbering
-GPIO.setup(button_PIN, GPIO.IN)       # Set our button pin to be an input
-GPIO.setup(lamp_PIN, GPIO.OUT)        # Set our lamp pin to be an output
-GPIO.setup(daisy_PIN, GPIO.OUT)       # Set pin to be an output, this wont affect it's state.
-GPIO.setup(sunflower_PIN, GPIO.OUT)   # Set pin to be an output
-
-# Remember the current state of the pins
-lampState = GPIO.input(lamp_PIN)
-daisyState = GPIO.input(daisy_PIN)
-sunflowerState = GPIO.input(sunflower_PIN)
+# GPIO mode
+GPIO.setmode(GPIO.BCM)  # Set's GPIO pins to BCM GPIO numbering
 
 # Image canvas
 margin = 20           # Space between the screens while transitioning
@@ -171,31 +174,13 @@ def getSysData():
     TOP = subprocess.check_output(topCmd, shell=True).decode('utf-8')
     MEM = subprocess.check_output(memCmd, shell=True).decode('utf-8')
 
-def getLampState():
-        if (GPIO.input(lamp_PIN)):
-            return "on"
-        else:
-            return "off"
-
-def getDaisyState():
-        if (GPIO.input(daisy_PIN)):
-            return "on"
-        else:
-            return "off"
-
-def getSunflowerState():
-        if (GPIO.input(sunflower_PIN)):
-            return "on"
-        else:
-            return "off"
-
-def setLampState():
-    # Read the lamp and toggle it..
-    if (GPIO.input(lamp_PIN) == True):
-        GPIO.output(lamp_PIN,False)
+def toggleButtonPin():
+    # Read the first pin and toggle it..
+    if (GPIO.input(pinMap[0][1]) == True):
+        GPIO.output(pinMap[0][1],False)
         return "off"
     else:
-        GPIO.output(lamp_PIN,True)
+        GPIO.output(pinMap[0][1],True)
         return "on"
 
 def buttonInterrupt(channel):
@@ -204,7 +189,7 @@ def buttonInterrupt(channel):
     time.sleep(0.050)
     if (GPIO.input(button_PIN) == True):
         logging.info('Button pressed')
-        setLampState()
+        toggleButtonPin()
     else:
         logging.info('Button GLITCH')
 
@@ -232,7 +217,7 @@ def ServeHTTP():
     return httpd, address
 
 def threadlog(logline):
-    #Wrapper function around logging.info() that prepends the current thread name
+    # A wrapper function around logging.info() that prepends the current thread name
     logging.info("[" + current_thread().name + "] : " + logline)
 
 class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
@@ -281,11 +266,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('<pre>\n' + log + '<pre>\n', 'utf-8'))
             self.wfile.write(bytes(f'<p>Latest {logLines} lines shown</p>\n', 'utf-8'))
             self._give_foot(refresh=True)
-        elif (self.path == '/led'):
-            state = setLampState()
+        elif (self.path == '/button'):
+            logging.info('Web button triggered by: ' + self.client_address[0])
+            state = toggleButtonPin()
             self._set_headers()
             self._give_head()
-            self.wfile.write(bytes('<h2>Lamp Toggled : ' + state + '</h2>\n', 'utf-8'))
+            self.wfile.write(bytes('<h2>' + pinMap[0][0] + 'Toggled : ' + state + '</h2>\n', 'utf-8'))
             self._give_datetime()
             self._give_foot()
         elif(self.path == '/'):
@@ -296,64 +282,53 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('<h2>%s OverWatch</h2>\n' % ServerName, 'utf-8'))
             self._give_datetime()
             self.wfile.write(bytes('<table style="border-spacing: 1em;">\n', 'utf-8'))
+            # room sensors
             self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">Room</th></tr>\n', 'utf-8'))
             self.wfile.write(bytes('<tr><td>Temperature: </td><td>' + format(TMP, '.1f') + '&deg;</td></tr>\n', 'utf-8'))
             self.wfile.write(bytes('<tr><td>Humidity: </td><td>' + format(HUM, '.0f') + '%</td></tr>\n', 'utf-8'))
             self.wfile.write(bytes('<tr><td>Presssure: </td><td>' + format(PRE, '.0f') + 'mb</td></tr>\n', 'utf-8'))
+            # Internal Sensors
             self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">Server</th></tr>\n', 'utf-8'))
             self.wfile.write(bytes('<tr><td>CPU Temperature: </td><td>' + CPU + '&deg;</td></tr>\n', 'utf-8'))
             self.wfile.write(bytes('<tr><td>CPU Load: </td><td>' + TOP + '</td></tr>\n', 'utf-8'))
             self.wfile.write(bytes('<tr><td>Memory used: </td><td>' + MEM + '%</td></tr>\n', 'utf-8'))
-            self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">GPIO</th></tr>\n', 'utf-8'))
-            self.wfile.write(bytes('<tr><td>Lamp</td><td>' + getLampState() + '</td></tr>\n', 'utf-8'))
-            self.wfile.write(bytes('<tr><td>Daisy</td><td>' + getDaisyState() + '</td></tr>\n', 'utf-8'))
-            self.wfile.write(bytes('<tr><td>Sunflower</td><td>' + getSunflowerState() + '</td></tr>\n', 'utf-8'))
+            # GPIO states
+            if (len(pinMap) > 0): 
+                self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">GPIO</th></tr>\n', 'utf-8'))
+                for pin in pinMap:
+                    if (pin[2]):
+                        self.wfile.write(bytes('<tr><td>' + pin[0] +'</td><td>on</td></tr>\n', 'utf-8'))
+                    else:
+                        self.wfile.write(bytes('<tr><td>' + pin[0] +'</td><td>off</td></tr>\n', 'utf-8'))
             self.wfile.write(bytes('</table>\n', 'utf-8'))
             self.wfile.write(bytes('<p>\n', 'utf-8'))
             self.wfile.write(bytes('<a href="./log" style="color:#666666; font-weight: bold; text-decoration: none;">View latest Logs</a>\n', 'utf-8'))
             self.wfile.write(bytes('</p>\n', 'utf-8'))
             self._give_foot(refresh=True)
         else:
-            self.send_error(404, 'No Such Page', 'This site only serves pages at "/", "/log" and "/led"')
+            self.send_error(404, 'No Such Page', 'This site only serves pages at "/", "/log" and "/button"')
 
     def do_HEAD(self):
         self._set_headers()
 
 def logger():
-    global lampState
-    global daisyState
-    global sunflowerState
+    global pinMap
     global logTimer
-    # Check if the lamp has changed state, and log if so
-    if (GPIO.input(lamp_PIN) != lampState):
-        if (GPIO.input(lamp_PIN) == True):
-            logging.info('Lamp ON')
-            lampState = True
-        else:
-            logging.info('Lamp OFF')
-            lampState = False
-    # Check if daisy has changed state, and log if so
-    if (GPIO.input(daisy_PIN) != daisyState):
-        if (GPIO.input(daisy_PIN) == True):
-            logging.info('Daisy ON')
-            daisyState = True
-        else:
-            logging.info('Daisy OFF')
-            daisyState = False
-    # Check if sunflower has changed state, and log if so
-    if (GPIO.input(sunflower_PIN) != sunflowerState):
-        if (GPIO.input(sunflower_PIN) == True):
-            logging.info('Sunflower ON')
-            sunflowerState = True
-        else:
-            logging.info('Sunflower OFF')
-            sunflowerState = False
+    # Check if any pins have changed state and log if so 
+    for i in range(len(pinMap)):
+        if (GPIO.input(pinMap[i][1]) != pinMap[i][2]):
+            if (GPIO.input(pinMap[i][1]) == True):
+                logging.info(pinMap[i][0] + ' ON')
+                pinMap[i][2] = True
+            else:
+                logging.info(pinMap[i][0] + ' OFF')
+                pinMap[i][2] = False
     # Now check if logtimer exceeded, and log sensor readings if so
     if (time.time() > logTimer+logInterval):
-        logDetails()
+        logSensors()
         logTimer = time.time()
 
-def logDetails():
+def logSensors():
     getBmeData()
     getSysData()
     logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + TOP + ', Mem: ' + MEM + '%')
@@ -369,13 +344,23 @@ if __name__ == "__main__":
     ServerName = "Transmog"
     ServeHTTP()
 
-    # Set up the lamp interrupt
-    GPIO.add_event_detect(button_PIN, GPIO.RISING, buttonInterrupt, bouncetime = 400)
+    # Set all pins to 'output' for the purposes of this script.. 
+    #   this wont affect their current state or prevent other processes accessing and setting them
+    #   necesscary to allow us to read their current state
+    for i in range(len(pinMap)):
+        GPIO.setup(pinMap[i][1], GPIO.OUT)
+        if (GPIO.input(pinMap[i][1])):
+            pinMap[i][2] = True
+            logging.info(pinMap[i][0] + ": on")
+        else:
+            pinMap[i][2] = False
+            logging.info(pinMap[i][0] + ": off")
 
-    # Show initial pin states
-    logging.info('Lamp: ' + getLampState())
-    logging.info('Daisy: ' + getDaisyState())
-    logging.info('Sunflower: ' + getSunflowerState())
+    # Set up the button pin interrupt, otherwise button is disabled
+    if (button_PIN > 0):
+        GPIO.setup(button_PIN, GPIO.IN)       # Set our button pin to be an input
+        GPIO.add_event_detect(button_PIN, GPIO.RISING, buttonInterrupt, bouncetime = 400)
+        logging.info('Button enabled')
 
     logging.info("Entering main loop")
     atexit.register(goodBye)
