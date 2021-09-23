@@ -41,7 +41,7 @@ print("Starting OverWatch")
 #
 
 # Web UI
-host = "10.0.0.120"          # Host ip address for web server
+host = ''                    # Ip address to bind to for web server, '' =  bind to all addresses
 port = 7080                  # Port number for web server
 serverName = 'Pi OverWatch'  # Used for the title and overview page heading
 buttonPath = ''              # Web button url path, leave blank to disable
@@ -244,6 +244,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('<title>%s</title>\n' % serverName, 'utf-8'))
         self.wfile.write(bytes('<style>\n', 'utf-8'))
         self.wfile.write(bytes('body {display:flex; flex-direction: column; align-items: center;}\n', 'utf-8'))
+        self.wfile.write(bytes('table {border-spacing: 0.2em;}\n', 'utf-8'))
+        self.wfile.write(bytes('td {padding-left: 1em;}\n', 'utf-8'))
         self.wfile.write(bytes('</style>\n', 'utf-8'))
         if (scrolldown):
             self.wfile.write(bytes("<script>\n", 'utf-8'))
@@ -294,7 +296,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._give_head()
             self.wfile.write(bytes('<h2>%s</h2>' % serverName, 'utf-8'))
             self._give_datetime()
-            self.wfile.write(bytes('<table style="border-spacing: 0.75em;">\n', 'utf-8'))
+            self.wfile.write(bytes('<table>\n', 'utf-8'))
             # room sensors
             self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">Room</th></tr>\n', 'utf-8'))
             self.wfile.write(bytes('<tr><td>Temperature: </td><td>' + format(TMP, '.1f') + '&deg;</td></tr>\n', 'utf-8'))
@@ -329,7 +331,6 @@ def logger():
     global logTimer
     # Check if any pins have changed state and log if so 
     for i in range(len(pinMap)):
-        print("Checking Pinmaps")
         if (GPIO.input(pinMap[i][1]) != pinMap[i][2]):
             if (GPIO.input(pinMap[i][1]) == True):
                 logging.info(pinMap[i][0] + ' ON')
