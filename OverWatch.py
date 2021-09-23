@@ -33,50 +33,58 @@ import http.server
 # Exit Handler
 import atexit
 
+# Let the console know we are starting
+print("Starting OverWatch")
+
 #
 # User Settings
 #
 
 # Web UI
-host = "10.0.0.120"    # Host ip address for webui
-port = 7080            # Port number for webui
+host = "10.0.0.120"          # Host ip address for web server
+port = 7080                  # Port number for web server
+serverName = 'Pi OverWatch'  # Used for the title and overview page heading
+buttonPath = ''              # Web button url path, leave blank to disable
 
 # Logging
 logInterval = 600       # Logging interval (seconds)
-logLines = 512         # How many lines of logging to show in webui
+logLines = 512          # How many lines of logging to show in webui
 
 # GPIO
 # All pins are defined using BCM GPIO numbering
 # https://raspberrypi.stackexchange.com/a/12967
 
 # Button pin (set to `0` to disable button)
-button_PIN = 27        # Button
+button_PIN = 0          # BCM Pin Number
 
 # Pin list
-# - List entries consist of ['Name',BCM Pin Number, state]
-# - The button, if enabled, will always control the 1st entry)
-# - The state will be read from the pins at startup and used to log changes
+# - List entries consist of ['Name', BCM Pin Number, state]
+# - The state will be read from the pins at startup and used to track changes
+# - The button, if enabled, will always control the 1st entry in the list
+# - An empty list disables the GPIO features
+# - Example: pinMap = [['Lamp', 7, False], ['Printer1', 25, False], ['Printer2', 8, False]]
 
-#pinMap = []   # Gpio Disabled
-
-pinMap = [['Lamp',       7, False],
-          ['Sunflower', 25, False],
-          ['Daisy',      8, False]]
+pinMap = []
 
 # Display animation
-passtime = 2     # time between read/display cycles
+passtime = 2     # time between read/display cycles (seconds)
 passes = 3       # number of refreshes of a screen before moving to next
-slidespeed = 16  # number of rows to scroll on each animation step
+slidespeed = 16  # number of rows to scroll on each animation step between screens
 
-# Logging setup
-print("Starting OverWatch")
+#
+# End of user config
+#
+
+# Logging 
 logFile = '/var/log/overwatch.log'
 handler = RotatingFileHandler(logFile, maxBytes=1024*1024, backupCount=2)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S', handlers=[handler])
-logging.info('')
-logging.info("Starting OverWatch")
 logCmd = f"for a in `ls -tr {logFile}*`;do cat $a ; done | tail -{logLines}"
 logTimer = 0
+
+# Now we have logging, notify we are starting up
+logging.info('')
+logging.info("Starting " + serverName)
 
 # Create the I2C interface object
 i2c = busio.I2C(SCL, SDA)
@@ -92,7 +100,8 @@ disp.show()
 bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x76)
 
 # GPIO mode
-GPIO.setmode(GPIO.BCM)  # Set's GPIO pins to BCM GPIO numbering
+if (len(pinMap) > 0):
+    GPIO.setmode(GPIO.BCM)  # Set's GPIO pins to BCM GPIO numbering
 
 # Image canvas
 margin = 20           # Space between the screens while transitioning
@@ -175,13 +184,16 @@ def getSysData():
     MEM = subprocess.check_output(memCmd, shell=True).decode('utf-8')
 
 def toggleButtonPin():
-    # Read the first pin and toggle it..
-    if (GPIO.input(pinMap[0][1]) == True):
-        GPIO.output(pinMap[0][1],False)
-        return "off"
+    if (len(pinMap) > 0):
+        # Read the first pin and toggle it..
+        if (GPIO.input(pinMap[0][1]) == True):
+            GPIO.output(pinMap[0][1],False)
+            return pinMap[0][0] + 'Toggled : off'
+        else:
+            GPIO.output(pinMap[0][1],True)
+            return pinMap[0][0] + 'Toggled : on'
     else:
-        GPIO.output(pinMap[0][1],True)
-        return "on"
+        return 'Not supported, no output pin defined\n'
 
 def buttonInterrupt(channel):
     # short delay, then re-read input to provide a hold-down
@@ -229,11 +241,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_head(self, scrolldown = False):
         self.wfile.write(bytes('<html>\n<head><meta charset="utf-8">\n', 'utf-8'))
         self.wfile.write(bytes('<meta name="viewport" content="width=device-width,initial-scale=1">\n', 'utf-8'))
-        self.wfile.write(bytes('<title>%s Overwatch</title>\n' % ServerName, 'utf-8'))
+        self.wfile.write(bytes('<title>%s</title>\n' % serverName, 'utf-8'))
         self.wfile.write(bytes('<style>\n', 'utf-8'))
         self.wfile.write(bytes('body {display:flex; flex-direction: column; align-items: center;}\n', 'utf-8'))
         self.wfile.write(bytes('</style>\n', 'utf-8'))
-        self.wfile.write(bytes('</head>\n', 'utf-8'))
         if (scrolldown):
             self.wfile.write(bytes("<script>\n", 'utf-8'))
             self.wfile.write(bytes('function down() {\n', 'utf-8'))
@@ -241,10 +252,11 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('}\n', 'utf-8'))
             self.wfile.write(bytes('window.onload = down;\n', 'utf-8'))
             self.wfile.write(bytes('</script>\n', 'utf-8'))
+        self.wfile.write(bytes('</head>\n', 'utf-8'))
         self.wfile.write(bytes('<body>\n', 'utf-8'))
 
     def _give_foot(self,refresh = False):
-            self.wfile.write(bytes('<pre style="color:#888888">GET: ' + self.path + ' from: ' + self.client_address[0] + '</pre>\n', 'utf-8'))
+            # DEBUG: self.wfile.write(bytes('<pre style="color:#888888">GET: ' + self.path + ' from: ' + self.client_address[0] + '</pre>\n', 'utf-8'))
             self.wfile.write(bytes('</body>\n', 'utf-8'))
             if (refresh):
                 self.wfile.write(bytes("<script>\n", 'utf-8'))
@@ -254,24 +266,25 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _give_datetime(self):
         timestamp = datetime.datetime.now()
-        self.wfile.write(bytes('<p style="color:#666666">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</p>\n', 'utf-8'))
+        self.wfile.write(bytes('<p style="color:#666666">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</p>', 'utf-8'))
 
     def do_GET(self):
         if (self.path == '/log'):
             log = subprocess.check_output(logCmd, shell=True).decode('utf-8')
             self._set_headers()
             self._give_head(scrolldown=True)
-            self.wfile.write(bytes('<h2>Overwatch Log:</h2>\n', 'utf-8'))
+            self.wfile.write(bytes('<h2>%s Log:</h2>' % serverName, 'utf-8'))
             self._give_datetime()
             self.wfile.write(bytes('<pre>\n' + log + '<pre>\n', 'utf-8'))
-            self.wfile.write(bytes(f'<p>Latest {logLines} lines shown</p>\n', 'utf-8'))
+            self.wfile.write(bytes(f'<p>Latest {logLines} lines shown</p>', 'utf-8'))
+            self._give_datetime()
             self._give_foot(refresh=True)
-        elif (self.path == '/button'):
+        elif ((self.path == '/' + buttonPath) and (len(buttonPath) > 0)):
             logging.info('Web button triggered by: ' + self.client_address[0])
             state = toggleButtonPin()
             self._set_headers()
             self._give_head()
-            self.wfile.write(bytes('<h2>' + pinMap[0][0] + 'Toggled : ' + state + '</h2>\n', 'utf-8'))
+            self.wfile.write(bytes('<h2>' + state + '</h2>\n', 'utf-8'))
             self._give_datetime()
             self._give_foot()
         elif(self.path == '/'):
@@ -279,9 +292,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             getSysData()
             self._set_headers()
             self._give_head()
-            self.wfile.write(bytes('<h2>%s OverWatch</h2>\n' % ServerName, 'utf-8'))
+            self.wfile.write(bytes('<h2>%s</h2>' % serverName, 'utf-8'))
             self._give_datetime()
-            self.wfile.write(bytes('<table style="border-spacing: 1em;">\n', 'utf-8'))
+            self.wfile.write(bytes('<table style="border-spacing: 0.75em;">\n', 'utf-8'))
             # room sensors
             self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">Room</th></tr>\n', 'utf-8'))
             self.wfile.write(bytes('<tr><td>Temperature: </td><td>' + format(TMP, '.1f') + '&deg;</td></tr>\n', 'utf-8'))
@@ -300,13 +313,13 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                         self.wfile.write(bytes('<tr><td>' + pin[0] +'</td><td>on</td></tr>\n', 'utf-8'))
                     else:
                         self.wfile.write(bytes('<tr><td>' + pin[0] +'</td><td>off</td></tr>\n', 'utf-8'))
-            self.wfile.write(bytes('</table>\n', 'utf-8'))
-            self.wfile.write(bytes('<p>\n', 'utf-8'))
-            self.wfile.write(bytes('<a href="./log" style="color:#666666; font-weight: bold; text-decoration: none;">View latest Logs</a>\n', 'utf-8'))
+            self.wfile.write(bytes('</table>', 'utf-8'))
+            self.wfile.write(bytes('<p>', 'utf-8'))
+            self.wfile.write(bytes('<a href="./log" style="color:#666666; font-weight: bold; text-decoration: none;">View latest Logs</a>', 'utf-8'))
             self.wfile.write(bytes('</p>\n', 'utf-8'))
             self._give_foot(refresh=True)
         else:
-            self.send_error(404, 'No Such Page', 'This site only serves pages at "/", "/log" and "/button"')
+            self.send_error(404, 'No Such Page', 'This site serves pages at ".../" and ".../log"')
 
     def do_HEAD(self):
         self._set_headers()
@@ -316,6 +329,7 @@ def logger():
     global logTimer
     # Check if any pins have changed state and log if so 
     for i in range(len(pinMap)):
+        print("Checking Pinmaps")
         if (GPIO.input(pinMap[i][1]) != pinMap[i][2]):
             if (GPIO.input(pinMap[i][1]) == True):
                 logging.info(pinMap[i][0] + ' ON')
@@ -338,15 +352,12 @@ def goodBye():
 
 # The fun starts here:
 if __name__ == "__main__":
-    logging.info("Init Complete")
-
     # Web Server
-    ServerName = "Transmog"
     ServeHTTP()
 
     # Set all pins to 'output' for the purposes of this script.. 
-    #   this wont affect their current state or prevent other processes accessing and setting them
-    #   necesscary to allow us to read their current state
+    #   this wont affect their current state or prevent other processes using them
+    #   we need to set them as outputs for this context in order to read their current state
     for i in range(len(pinMap)):
         GPIO.setup(pinMap[i][1], GPIO.OUT)
         if (GPIO.input(pinMap[i][1])):
@@ -362,8 +373,9 @@ if __name__ == "__main__":
         GPIO.add_event_detect(button_PIN, GPIO.RISING, buttonInterrupt, bouncetime = 400)
         logging.info('Button enabled')
 
-    logging.info("Entering main loop")
     atexit.register(goodBye)
+
+    logging.info("Init complete, entering main loop")
 
     # Main loop now runs forever
     while True:
