@@ -378,6 +378,8 @@ if __name__ == "__main__":
 
     logging.info("Init complete, entering main loop")
 
+    logSensors()   # Initial readout
+
     # Main loop now runs forever
     while True:
         # Screen 1
