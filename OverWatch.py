@@ -42,18 +42,19 @@ print("Starting OverWatch")
 #
 
 # Web UI
-host = ''                    # Ip address to bind to for web server, '' =  bind to all addresses
+host = ''                    # Ip address to bind web server to, '' =  bind to all addresses
 port = 7080                  # Port number for web server
 serverName = 'Pi OverWatch'  # Used for the title and overview page heading
 buttonPath = ''              # Web button url path, leave blank to disable
 
 # Logging
 logInterval = 600       # Logging interval (seconds)
-logLines = 512          # How many lines of logging to show in webui
+logLines = 240          # How many lines of logging to show in webui
 
 # GPIO
 # All pins are defined using BCM GPIO numbering
-# https://raspberrypi.stackexchange.com/a/12967
+# https://www.raspberrypi.org/forums/viewtopic.php?t=105200
+# Try running `gpio readall` on the Pi itself ;-)
 
 # Button pin (set to `0` to disable button)
 button_PIN = 0          # BCM Pin Number
@@ -63,7 +64,7 @@ button_PIN = 0          # BCM Pin Number
 # - The state will be read from the pins at startup and used to track changes
 # - The button, if enabled, will always control the 1st entry in the list
 # - An empty list disables the GPIO features
-# - Example: pinMap = [['Lamp', 7, False], ['Printer1', 25, False], ['Printer2', 8, False]]
+# - Example: pinMap = [['Lamp', 16, False], ['Printer', 20, False], ['Enclosure', 21, False]]
 
 pinMap = []
 
