@@ -10,6 +10,7 @@ import time
 import datetime
 import subprocess
 import logging
+import schedule
 from threading import Thread, current_thread
 from logging.handlers import RotatingFileHandler
 
@@ -80,7 +81,6 @@ logFile = '/var/log/overwatch.log'
 handler = RotatingFileHandler(logFile, maxBytes=1024*1024, backupCount=2)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S', handlers=[handler])
 logCmd = f"for a in `ls -tr {logFile}*`;do cat $a ; done | tail -{logLines}"
-logTimer = 0
 
 # Now we have logging, notify we are starting up
 logging.info('')
@@ -327,9 +327,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self._set_headers()
 
 def logger():
-    global pinMap
-    global logTimer
+    # Process scheduled logging
+    schedule.run_pending()
     # Check if any pins have changed state and log if so 
+    global pinMap
     for i in range(len(pinMap)):
         if (GPIO.input(pinMap[i][1]) != pinMap[i][2]):
             if (GPIO.input(pinMap[i][1]) == True):
@@ -338,10 +339,6 @@ def logger():
             else:
                 logging.info(pinMap[i][0] + ' OFF')
                 pinMap[i][2] = False
-    # Now check if logtimer exceeded, and log sensor readings if so
-    if (time.time() > logTimer+logInterval):
-        logSensors()
-        logTimer = time.time()
 
 def logSensors():
     getBmeData()
@@ -373,6 +370,9 @@ if __name__ == "__main__":
         GPIO.setup(button_PIN, GPIO.IN)       # Set our button pin to be an input
         GPIO.add_event_detect(button_PIN, GPIO.RISING, buttonInterrupt, bouncetime = 400)
         logging.info('Button enabled')
+
+    # Schedule logging events
+    schedule.every(logInterval).seconds.do(logSensors)
 
     atexit.register(goodBye)
 

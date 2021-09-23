@@ -12,8 +12,9 @@ Based on [CircuitPython](https://github.com/adafruit/circuitpython)
 
 ## Requires:
 * Python3
-* https://github.com/adafruit/Adafruit_CircuitPython_SSD1306
-* https://github.com/adafruit/Adafruit_CircuitPython_BME280
+* [CircuitPython SSD_1306](https://github.com/adafruit/Adafruit_CircuitPython_SSD1306): `pip install adafruit-circuitpython-bme280`
+* [CircuitPython BME280](https://github.com/adafruit/Adafruit_CircuitPython_BME280): `pip install adafruit-circuitpython-ssd1306`
+* [Schedule](https://github.com/dbader/schedule): `$ pip install schedule`
 
 ## Install:
 __In order to access the GPIO reliably I run this script as root, not ideal, I know.__
