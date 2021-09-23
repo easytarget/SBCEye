@@ -77,7 +77,7 @@ slidespeed = 16  # number of rows to scroll on each animation step between scree
 #
 
 # Logging 
-logFile = '/var/log/overwatch.log'
+logFile = './overwatch.log'
 handler = RotatingFileHandler(logFile, maxBytes=1024*1024, backupCount=2)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S', handlers=[handler])
 logCmd = f"for a in `ls -tr {logFile}*`;do cat $a ; done | tail -{logLines}"
@@ -236,6 +236,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _set_headers(self):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         self.end_headers()
 
     def _give_head(self, scrolldown = False):
