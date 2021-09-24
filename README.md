@@ -1,6 +1,12 @@
 # All hail the PI Python OverWatch
 
-Runs the HAT and printer PSU controls on a RasPI that also runs 2x Octoprint and 2x webcam; my printroom in a box.
+Lets me see my printroom conditions at a glance on a small OLED display and also via an embeddable web interface. 
+
+It logs temperature, pressure and humidity environmental readings, plus the CPU temperature, load and memory useage of the Pi itself.
+
+(Optionally) It also has the ability to monitor and log specified GPIO pins as they are toggled by other programs (eg printer power control pins controlled by Octoprint, etc.)
+
+_Bonus!_ it can control a light connected to a GPIO pin via a button and/or url, useful if you have webcams..
 
 Based on [CircuitPython](https://github.com/adafruit/circuitpython)
 
@@ -9,6 +15,7 @@ Based on [CircuitPython](https://github.com/adafruit/circuitpython)
 ![bme280](/docs/pihat-bme280-thumb.jpg)
 ![env](/docs/pihat-env-thumb.jpg)
 ![sys](/docs/pihat-sys-thumb.jpg)
+![Web](/docs/WebDisplay.png)
 
 ## Wiring
 * Needs a diagram
