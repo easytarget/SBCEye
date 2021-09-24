@@ -50,6 +50,7 @@ buttonPath = ''              # Web button url path, leave blank to disable
 # Logging
 logInterval = 600       # Logging interval (seconds)
 logLines = 240          # How many lines of logging to show in webui
+suppressGlitches=True   # Pin interrupts can produce phantom button presses due to crosstalk, ignore them
 
 # GPIO
 # All pins are defined using BCM GPIO numbering
@@ -203,7 +204,7 @@ def buttonInterrupt(channel):
     if (GPIO.input(button_PIN) == True):
         logging.info('Button pressed')
         toggleButtonPin()
-    else:
+    elif (not suppressGlitches):
         logging.info('Button GLITCH')
 
 def ServeHTTP():
@@ -338,10 +339,10 @@ def logger():
     for i in range(len(pinMap)):
         if (GPIO.input(pinMap[i][1]) != pinMap[i][2]):
             if (GPIO.input(pinMap[i][1]) == True):
-                logging.info(pinMap[i][0] + ' ON')
+                logging.info(pinMap[i][0] + ': on')
                 pinMap[i][2] = True
             else:
-                logging.info(pinMap[i][0] + ' OFF')
+                logging.info(pinMap[i][0] + ': off')
                 pinMap[i][2] = False
 
 def logSensors():
@@ -357,9 +358,16 @@ if __name__ == "__main__":
     # Web Server
     ServeHTTP()
 
-    # Set all pins to 'output' for the purposes of this script.. 
-    #   this wont affect their current state or prevent other processes using them
-    #   we need to set them as outputs for this context in order to read their current state
+    # Set up the button pin interrupt, otherwise button is disabled
+    if (button_PIN > 0):
+        GPIO.setup(button_PIN, GPIO.IN)       # Set our button pin to be an input
+        GPIO.add_event_detect(button_PIN, GPIO.RISING, buttonInterrupt, bouncetime = 400)
+        logging.info('Button enabled')
+
+    # Set all pins to 'output' and record their initial status 
+    #   we need to set them as outputs for this scripts context in order to monitor their state
+    #   so long as we do not try to write to these pins this will not affect their output,
+    #   nor will it prevent other processes (eg octoprint) reading and using them
     for i in range(len(pinMap)):
         GPIO.setup(pinMap[i][1], GPIO.OUT)
         if (GPIO.input(pinMap[i][1])):
@@ -369,12 +377,6 @@ if __name__ == "__main__":
             pinMap[i][2] = False
             logging.info(pinMap[i][0] + ": off")
 
-    # Set up the button pin interrupt, otherwise button is disabled
-    if (button_PIN > 0):
-        GPIO.setup(button_PIN, GPIO.IN)       # Set our button pin to be an input
-        GPIO.add_event_detect(button_PIN, GPIO.RISING, buttonInterrupt, bouncetime = 400)
-        logging.info('Button enabled')
-
     # Schedule logging events
     schedule.every(logInterval).seconds.do(logSensors)
 
@@ -382,7 +384,7 @@ if __name__ == "__main__":
 
     logging.info("Init complete, entering main loop")
 
-    logSensors()   # Initial readout
+    logSensors()   # Provide an initial readout
 
     # Main loop now runs forever
     while True:
