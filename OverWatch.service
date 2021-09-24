@@ -5,7 +5,10 @@ After=multi-user.target
 [Service]
 Type=simple
 Restart=always
+WorkingDirectory=/home/pi/HAT/pi-overwatch/
 ExecStart=/usr/bin/python3 /home/pi/HAT/pi-overwatch/OverWatch.py
+User=pi
+Group=pi
 
 [Install]
 WantedBy=multi-user.target
