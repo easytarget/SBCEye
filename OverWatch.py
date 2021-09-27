@@ -34,6 +34,9 @@ import http.server
 # Exit Handler
 import atexit
 
+# RRD database
+import rrdtool
+
 # Let the console know we are starting
 print("Starting OverWatch")
 
@@ -48,9 +51,13 @@ serverName = 'Pi OverWatch'  # Used for the title and overview page heading
 buttonPath = ''              # Web button url path, leave blank to disable
 
 # Logging
-logInterval = 600       # Logging interval (seconds)
-logLines = 240          # How many lines of logging to show in webui
-suppressGlitches=True   # Pin interrupts can produce phantom button presses due to crosstalk, ignore them
+logFile="./overwatch.log"  # Folder must be writable by the OverWatch process
+logInterval = 600          # Logging interval (seconds)
+logLines = 240             # How many lines of logging to show in webui
+suppressGlitches=True      # Pin interrupts can produce phantom button presses due to crosstalk, ignore them
+
+# Location for RRD database files (folder must be writable by overwatch process)
+rrdFileStore = "./DB/"
 
 # GPIO
 # All pins are defined using BCM GPIO numbering
@@ -67,7 +74,8 @@ button_PIN = 0          # BCM Pin Number
 # - An empty list disables the GPIO features
 # - Example: pinMap = [['Lamp', 16, False], ['Printer', 20, False], ['Enclosure', 21, False]]
 
-pinMap = []
+#['Lamp', 7, False], ['Daisy', 8, False], ['Sunflower', 25, False]
+pinMap = [['Lamp', 7, False]]
 
 # Display animation
 passtime = 2     # time between read/display cycles (seconds)
@@ -79,7 +87,6 @@ slidespeed = 16  # number of rows to scroll on each animation step between scree
 #
 
 # Logging 
-logFile = './overwatch.log'
 handler = RotatingFileHandler(logFile, maxBytes=1024*1024, backupCount=2)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S', handlers=[handler])
 logCmd = f"for a in `ls -tr {logFile}*`;do cat $a ; done | tail -{logLines}"
@@ -139,6 +146,37 @@ PRE = "undefined"
 CPU = "undefined"
 TOP = "undefined"
 MEM = "undefined"
+
+
+# Main RRDtool databases
+rrdtool.create(
+    rrdFileStore + "/env.rrd",
+    "--start", "now",
+    "--step", "60",
+    "RRA:AVERAGE:0.5:60:129600",   # 3 months per minute
+    "RRA:AVERAGE:0.5:3600:17568",  # two years per hour
+    "DS:env-temp:GAUGE:60:U:U",
+    "DS:env-humi:GAUGE:60:U:U",
+    "DS:env-pres:GAUGE:60:U:U")
+rrdtool.create(
+    rrdFileStore + "/cpu.rrd",
+    "--start", "now",
+    "--step", "60",
+    "RRA:AVERAGE:0.5:60:129600",   # 3 months per minute
+    "RRA:AVERAGE:0.5:3600:17568",  # two years per hour
+    "DS:cpu-temp:GAUGE:60:U:U",
+    "DS:cpu-load:GAUGE:60:U:U",
+    "DS:cpu-mem:GAUGE:60:U:U")
+
+# Add RRD database for each GPIO line
+for i in range(len(pinMap)):
+    rrdtool.create(
+        rrdFileStore + "/" + pinMap[i][0] + ".rrd",
+        "--start", "now",
+        "--step", "60",
+        "RRA:AVERAGE:0.5:60:129600",   # 3 months per minute
+        "RRA:AVERAGE:0.5:3600:17568",  # two years per hour
+        "DS:status:GAUGE:60:0:1")
 
 # Local functions
 

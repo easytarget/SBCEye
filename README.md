@@ -28,14 +28,15 @@ Based on [CircuitPython](https://github.com/adafruit/circuitpython)
 * [CircuitPython SSD_1306](https://github.com/adafruit/Adafruit_CircuitPython_SSD1306)
 * [CircuitPython BME280](https://github.com/adafruit/Adafruit_CircuitPython_BME280)
 * [Schedule](https://github.com/dbader/schedule)
+* [pythonRRDtool](https://pythonhosted.org/rrdtool/index.html)
 
 ## Install:
-* Install the Python3 gpio python package
-  * `sudo apt install python3-rpi.gpio`
-* Install the libraries listed above
+* Install the Python3 gpio, schedule and rrdtool packages
+  * `sudo apt install python3-rpi.gpio python3-schedule python3-rrdtool`
+* Install the CircuitPython libraries listed above
+  * These will pull in the python CircuitPython dependencies too
   * `sudo pip3 install adafruit-circuitpython-ssd1306`
   * `sudo pip3 install adafruit-circuitpython-bme280`
-  * `sudo pip3 install schedule`
 * Make sure the `pi` user is in the `gpio` group:
   * `sudo usermod -a -G gpio pi`
 * (As the 'pi' user) make a folder `mkdir ~/HAT` and cd into that `cd ~/HAT` 
