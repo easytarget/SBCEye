@@ -24,7 +24,7 @@ Based on [CircuitPython](https://github.com/adafruit/circuitpython)
 * (Optional) GPIO output(s)
 
 ## Requires:
-* Python3
+* Python3.6+
 * [CircuitPython SSD_1306](https://github.com/adafruit/Adafruit_CircuitPython_SSD1306)
 * [CircuitPython BME280](https://github.com/adafruit/Adafruit_CircuitPython_BME280)
 * [Schedule](https://github.com/dbader/schedule)

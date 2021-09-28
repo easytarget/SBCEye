@@ -1,2 +1,3 @@
 overwatch.log*
-*.rrd
+DB/*.rrd
+DB/*.png

@@ -1,1 +1,0 @@
-# RRD database default location

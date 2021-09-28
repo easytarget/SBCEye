@@ -11,6 +11,7 @@ import datetime
 import subprocess
 import logging
 import schedule
+from pathlib import Path
 from threading import Thread, current_thread
 from logging.handlers import RotatingFileHandler
 
@@ -56,7 +57,7 @@ logInterval = 600          # Logging interval (seconds)
 logLines = 240             # How many lines of logging to show in webui
 suppressGlitches=True      # Pin interrupts can produce phantom button presses due to crosstalk, ignore them
 
-# Location for RRD database files (folder must be writable by overwatch process)
+# Location for RRD database files and graphs (folder must be writable by overwatch process)
 rrdFileStore = "./DB/"
 
 # GPIO
@@ -74,8 +75,7 @@ button_PIN = 0          # BCM Pin Number
 # - An empty list disables the GPIO features
 # - Example: pinMap = [['Lamp', 16, False], ['Printer', 20, False], ['Enclosure', 21, False]]
 
-#['Lamp', 7, False], ['Daisy', 8, False], ['Sunflower', 25, False]
-pinMap = [['Lamp', 7, False]]
+pinMap = []
 
 # Display animation
 passtime = 2     # time between read/display cycles (seconds)
@@ -149,33 +149,44 @@ MEM = "undefined"
 
 
 # Main RRDtool databases
-rrdtool.create(
-    rrdFileStore + "/env.rrd",
-    "--start", "now",
-    "--step", "60",
-    "RRA:AVERAGE:0.5:60:129600",   # 3 months per minute
-    "RRA:AVERAGE:0.5:3600:17568",  # two years per hour
-    "DS:env-temp:GAUGE:60:U:U",
-    "DS:env-humi:GAUGE:60:U:U",
-    "DS:env-pres:GAUGE:60:U:U")
-rrdtool.create(
-    rrdFileStore + "/cpu.rrd",
-    "--start", "now",
-    "--step", "60",
-    "RRA:AVERAGE:0.5:60:129600",   # 3 months per minute
-    "RRA:AVERAGE:0.5:3600:17568",  # two years per hour
-    "DS:cpu-temp:GAUGE:60:U:U",
-    "DS:cpu-load:GAUGE:60:U:U",
-    "DS:cpu-mem:GAUGE:60:U:U")
+envDB = Path(rrdFileStore + "env.rrd")
+if not envDB.is_file():
+    print("Generating " + str(envDB))
+    rrdtool.create(
+        str(envDB),
+        "--start", "now",
+        "--step", "60",
+        "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
+        "RRA:AVERAGE:0.5:60:17568",   # two years per hour
+        "DS:env-temp:GAUGE:60:U:U",
+        "DS:env-humi:GAUGE:60:U:U",
+        "DS:env-pres:GAUGE:60:U:U")
+else:
+    print("Using existing: " + str(envDB))
+
+cpuDB = Path(rrdFileStore + "cpu.rrd")
+if not cpuDB.is_file():
+    print("Generating " + str(cpuDB))
+    rrdtool.create(
+        str(cpuDB),
+        "--start", "now",
+        "--step", "60",
+        "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
+        "RRA:AVERAGE:0.5:60:17568",   # two years per hour
+        "DS:cpu-temp:GAUGE:60:U:U",
+        "DS:cpu-load:GAUGE:60:U:U",
+        "DS:cpu-mem:GAUGE:60:U:U")
+else:
+    print("Using existing: " + str(cpuDB))
 
 # Add RRD database for each GPIO line
 for i in range(len(pinMap)):
     rrdtool.create(
-        rrdFileStore + "/" + pinMap[i][0] + ".rrd",
+        rrdFileStore + pinMap[i][0] + ".rrd",
         "--start", "now",
         "--step", "60",
-        "RRA:AVERAGE:0.5:60:129600",   # 3 months per minute
-        "RRA:AVERAGE:0.5:3600:17568",  # two years per hour
+        "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
+        "RRA:AVERAGE:0.5:60:17568",   # two years per hour
         "DS:status:GAUGE:60:0:1")
 
 # Local functions
@@ -215,6 +226,8 @@ def getBmeData():
     TMP = bme280.temperature
     HUM = bme280.relative_humidity
     PRE = bme280.pressure
+    updateCmd = "N:" + format(TMP, '.3f') + ":" + format(HUM, '.2f') + ":" + format(PRE, '.2f')
+    rrdtool.update(str(envDB), updateCmd)
 
 def getSysData():
     global CPU, TOP, MEM
@@ -222,6 +235,8 @@ def getSysData():
     CPU = subprocess.check_output(cpuCmd, shell=True).decode('utf-8')
     TOP = subprocess.check_output(topCmd, shell=True).decode('utf-8')
     MEM = subprocess.check_output(memCmd, shell=True).decode('utf-8')
+    updateCmd = "N:" + CPU + ":" + TOP + ":" + MEM
+    rrdtool.update(str(cpuDB), updateCmd)
 
 def toggleButtonPin():
     if (len(pinMap) > 0):
@@ -387,6 +402,18 @@ def logSensors():
     getBmeData()
     getSysData()
     logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + TOP + ', Mem: ' + MEM + '%')
+    # RRD graph generation
+    graphWide = 1200
+    graphHigh = 600
+    start = 'end-12h'
+    lineW = 'LINE1:'
+    lineC = '#FF0000'
+    rrdtool.graph(rrdFileStore + "env_temp.png", "--vertical-label", "Room Temperature", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--left-axis-format", "%3.1lf\u00B0C", "DEF:envt=DB/env.rrd:env-temp:AVERAGE", lineW + 'envt' + lineC)
+    rrdtool.graph(rrdFileStore + "env_humi.png", "--vertical-label", "Room Humidity", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--upper-limit", "100", "--lower-limit", "0", "--left-axis-format", "%3.0lf%%", "DEF:envh=DB/env.rrd:env-humi:AVERAGE", lineW + 'envh' + lineC)
+    rrdtool.graph(rrdFileStore + "env_pres.png", "--vertical-label", "Room Pressure", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--units-exponent", "0", "--left-axis-format", "%4.0lfmb", "DEF:envp=DB/env.rrd:env-pres:AVERAGE", lineW + 'envp' + lineC)
+    rrdtool.graph(rrdFileStore + "cpu_temp.png", "--vertical-label", "CPU Temperature", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--left-axis-format", "%3.1lf\u00B0C", "DEF:cput=DB/cpu.rrd:cpu-temp:AVERAGE", lineW + 'cput' + lineC)
+    rrdtool.graph(rrdFileStore + "cpu_load.png", "--vertical-label", "CPU Load Average", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--units-exponent", "0", "--left-axis-format", "%2.3lf", "DEF:cpul=DB/cpu.rrd:cpu-load:AVERAGE", lineW + 'cpul' + lineC)
+    rrdtool.graph(rrdFileStore + "cpu_mem.png", "--vertical-label", "CPU Memory Used", "--width", str(graphWide), "--height", str(graphHigh), "--start", "end-6h", "--end", "now", "--upper-limit", "100", "--lower-limit", "0", "--left-axis-format", "%3.0lf%%", "DEF:cpum=DB/cpu.rrd:cpu-mem:AVERAGE", lineW + 'cpum' + lineC)
 
 def goodBye():
     logging.info('Exiting')
