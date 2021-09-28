@@ -53,12 +53,13 @@ buttonPath = ''              # Web button url path, leave blank to disable
 
 # Logging
 logFile="./overwatch.log"  # Folder must be writable by the OverWatch process
-logInterval = 600          # Logging interval (seconds)
+logInterval = 60          # Logging interval (seconds)
 logLines = 240             # How many lines of logging to show in webui
 suppressGlitches=True      # Pin interrupts can produce phantom button presses due to crosstalk, ignore them
 
 # Location for RRD database files and graphs (folder must be writable by overwatch process)
 rrdFileStore = "./DB/"
+rrdGraphStore = "./Graphs/"
 
 # GPIO
 # All pins are defined using BCM GPIO numbering
@@ -69,11 +70,11 @@ rrdFileStore = "./DB/"
 button_PIN = 0          # BCM Pin Number
 
 # Pin list
-# - List entries consist of ['Name', BCM Pin Number, state]
+# - List entries consist of ['Name', BCM Pin Number]
 # - The state will be read from the pins at startup and used to track changes
 # - The button, if enabled, will always control the 1st entry in the list
 # - An empty list disables the GPIO features
-# - Example: pinMap = [['Lamp', 16, False], ['Printer', 20, False], ['Enclosure', 21, False]]
+# - Example: pinMap = [['Lamp', 16], ['Printer', 20], ['Enclosure', 21]]
 
 pinMap = []
 
@@ -89,6 +90,11 @@ slidespeed = 16  # number of rows to scroll on each animation step between scree
 # Logging 
 handler = RotatingFileHandler(logFile, maxBytes=1024*1024, backupCount=2)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S', handlers=[handler])
+# Scheduler sometimes logs schedule actions to 'INFO' not 'DEBUG', spewing debug into the log, sigh..
+schedule_logger = logging.getLogger('schedule')
+schedule_logger.setLevel(level=logging.WARN)
+# LogCmd is a shell one-liner used to extract the last {logLines} of data from the logs
+# There is probably a more 'python' way to do this, but this is fast, cheap and works..
 logCmd = f"for a in `ls -tr {logFile}*`;do cat $a ; done | tail -{logLines}"
 
 # Now we have logging, notify we are starting up
@@ -108,9 +114,11 @@ disp.show()
 # Create the I2C BME280 sensor object
 bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x76)
 
-# GPIO mode
+# GPIO mode and arrays for the pin database path and current status
 if (len(pinMap) > 0):
     GPIO.setmode(GPIO.BCM)  # Set's GPIO pins to BCM GPIO numbering
+pinState = []
+pinDB = []
 
 # Image canvas
 margin = 20           # Space between the screens while transitioning
@@ -146,48 +154,6 @@ PRE = "undefined"
 CPU = "undefined"
 TOP = "undefined"
 MEM = "undefined"
-
-
-# Main RRDtool databases
-envDB = Path(rrdFileStore + "env.rrd")
-if not envDB.is_file():
-    print("Generating " + str(envDB))
-    rrdtool.create(
-        str(envDB),
-        "--start", "now",
-        "--step", "60",
-        "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-        "RRA:AVERAGE:0.5:60:17568",   # two years per hour
-        "DS:env-temp:GAUGE:60:U:U",
-        "DS:env-humi:GAUGE:60:U:U",
-        "DS:env-pres:GAUGE:60:U:U")
-else:
-    print("Using existing: " + str(envDB))
-
-cpuDB = Path(rrdFileStore + "cpu.rrd")
-if not cpuDB.is_file():
-    print("Generating " + str(cpuDB))
-    rrdtool.create(
-        str(cpuDB),
-        "--start", "now",
-        "--step", "60",
-        "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-        "RRA:AVERAGE:0.5:60:17568",   # two years per hour
-        "DS:cpu-temp:GAUGE:60:U:U",
-        "DS:cpu-load:GAUGE:60:U:U",
-        "DS:cpu-mem:GAUGE:60:U:U")
-else:
-    print("Using existing: " + str(cpuDB))
-
-# Add RRD database for each GPIO line
-for i in range(len(pinMap)):
-    rrdtool.create(
-        rrdFileStore + pinMap[i][0] + ".rrd",
-        "--start", "now",
-        "--step", "60",
-        "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-        "RRA:AVERAGE:0.5:60:17568",   # two years per hour
-        "DS:status:GAUGE:60:0:1")
 
 # Local functions
 
@@ -226,8 +192,6 @@ def getBmeData():
     TMP = bme280.temperature
     HUM = bme280.relative_humidity
     PRE = bme280.pressure
-    updateCmd = "N:" + format(TMP, '.3f') + ":" + format(HUM, '.2f') + ":" + format(PRE, '.2f')
-    rrdtool.update(str(envDB), updateCmd)
 
 def getSysData():
     global CPU, TOP, MEM
@@ -235,8 +199,6 @@ def getSysData():
     CPU = subprocess.check_output(cpuCmd, shell=True).decode('utf-8')
     TOP = subprocess.check_output(topCmd, shell=True).decode('utf-8')
     MEM = subprocess.check_output(memCmd, shell=True).decode('utf-8')
-    updateCmd = "N:" + CPU + ":" + TOP + ":" + MEM
-    rrdtool.update(str(cpuDB), updateCmd)
 
 def toggleButtonPin():
     if (len(pinMap) > 0):
@@ -368,11 +330,11 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             # GPIO states
             if (len(pinMap) > 0): 
                 self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">GPIO</th></tr>\n', 'utf-8'))
-                for pin in pinMap:
-                    if (pin[2]):
-                        self.wfile.write(bytes('<tr><td>' + pin[0] +'</td><td>on</td></tr>\n', 'utf-8'))
+                for i in range(len(pinMap)):
+                    if (pinState[i]):
+                        self.wfile.write(bytes('<tr><td>' + pinMap[i][0] +'</td><td>on</td></tr>\n', 'utf-8'))
                     else:
-                        self.wfile.write(bytes('<tr><td>' + pin[0] +'</td><td>off</td></tr>\n', 'utf-8'))
+                        self.wfile.write(bytes('<tr><td>' + pinMap[i][0] +'</td><td>off</td></tr>\n', 'utf-8'))
             self.wfile.write(bytes('</table>', 'utf-8'))
             self.wfile.write(bytes('<p>', 'utf-8'))
             self.wfile.write(bytes('<a href="./log" style="color:#666666; font-weight: bold; text-decoration: none;">View latest Logs</a>', 'utf-8'))
@@ -384,36 +346,46 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def do_HEAD(self):
         self._set_headers()
 
-def logger():
-    # Process scheduled logging
-    schedule.run_pending()
-    # Check if any pins have changed state and log if so 
-    global pinMap
+def updatePins():
+    # Check if any pins have changed state, and log
     for i in range(len(pinMap)):
-        if (GPIO.input(pinMap[i][1]) != pinMap[i][2]):
-            if (GPIO.input(pinMap[i][1]) == True):
+        thisPinState =  GPIO.input(pinMap[i][1])
+        if (thisPinState != pinState[i]):
+            pinState[i] = thisPinState
+            if (thisPinState):
                 logging.info(pinMap[i][0] + ': on')
-                pinMap[i][2] = True
             else:
                 logging.info(pinMap[i][0] + ': off')
-                pinMap[i][2] = False
+
+def updateDB():
+    updateCmd = "N:" + format(TMP, '.3f') + ":" + format(HUM, '.2f') + ":" + format(PRE, '.2f')
+    rrdtool.update(str(envDB), updateCmd)
+    updateCmd = "N:" + CPU + ":" + TOP + ":" + MEM
+    rrdtool.update(str(cpuDB), updateCmd)
+    for i in range(len(pinDB)):
+        updateCmd = "N:" + str(pinState[i])
+        rrdtool.update(str(pinDB[i]), updateCmd)
 
 def logSensors():
     getBmeData()
     getSysData()
     logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + TOP + ', Mem: ' + MEM + '%')
+
+    # Temporary: We will generate on demand in future:
     # RRD graph generation
     graphWide = 1200
     graphHigh = 600
     start = 'end-12h'
-    lineW = 'LINE1:'
+    lineW = 'LINE2:'
     lineC = '#FF0000'
-    rrdtool.graph(rrdFileStore + "env_temp.png", "--vertical-label", "Room Temperature", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--left-axis-format", "%3.1lf\u00B0C", "DEF:envt=DB/env.rrd:env-temp:AVERAGE", lineW + 'envt' + lineC)
-    rrdtool.graph(rrdFileStore + "env_humi.png", "--vertical-label", "Room Humidity", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--upper-limit", "100", "--lower-limit", "0", "--left-axis-format", "%3.0lf%%", "DEF:envh=DB/env.rrd:env-humi:AVERAGE", lineW + 'envh' + lineC)
-    rrdtool.graph(rrdFileStore + "env_pres.png", "--vertical-label", "Room Pressure", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--units-exponent", "0", "--left-axis-format", "%4.0lfmb", "DEF:envp=DB/env.rrd:env-pres:AVERAGE", lineW + 'envp' + lineC)
-    rrdtool.graph(rrdFileStore + "cpu_temp.png", "--vertical-label", "CPU Temperature", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--left-axis-format", "%3.1lf\u00B0C", "DEF:cput=DB/cpu.rrd:cpu-temp:AVERAGE", lineW + 'cput' + lineC)
-    rrdtool.graph(rrdFileStore + "cpu_load.png", "--vertical-label", "CPU Load Average", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--units-exponent", "0", "--left-axis-format", "%2.3lf", "DEF:cpul=DB/cpu.rrd:cpu-load:AVERAGE", lineW + 'cpul' + lineC)
-    rrdtool.graph(rrdFileStore + "cpu_mem.png", "--vertical-label", "CPU Memory Used", "--width", str(graphWide), "--height", str(graphHigh), "--start", "end-6h", "--end", "now", "--upper-limit", "100", "--lower-limit", "0", "--left-axis-format", "%3.0lf%%", "DEF:cpum=DB/cpu.rrd:cpu-mem:AVERAGE", lineW + 'cpum' + lineC)
+    rrdtool.graph(rrdGraphStore + "env_temp.png", "--vertical-label", "Room Temperature", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--left-axis-format", "%3.1lf\u00B0C", "DEF:envt=DB/env.rrd:env-temp:AVERAGE", lineW + 'envt' + lineC)
+    rrdtool.graph(rrdGraphStore + "env_humi.png", "--vertical-label", "Room Humidity", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--upper-limit", "100", "--lower-limit", "0", "--left-axis-format", "%3.0lf%%", "DEF:envh=DB/env.rrd:env-humi:AVERAGE", lineW + 'envh' + lineC)
+    rrdtool.graph(rrdGraphStore + "env_pres.png", "--vertical-label", "Room Pressure", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--units-exponent", "0", "--left-axis-format", "%4.0lfmb", "DEF:envp=DB/env.rrd:env-pres:AVERAGE", lineW + 'envp' + lineC)
+    rrdtool.graph(rrdGraphStore + "cpu_temp.png", "--vertical-label", "CPU Temperature", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--left-axis-format", "%3.1lf\u00B0C", "DEF:cput=DB/cpu.rrd:cpu-temp:AVERAGE", lineW + 'cput' + lineC)
+    rrdtool.graph(rrdGraphStore + "cpu_load.png", "--vertical-label", "CPU Load Average", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--units-exponent", "0", "--left-axis-format", "%2.3lf", "DEF:cpul=DB/cpu.rrd:cpu-load:AVERAGE", lineW + 'cpul' + lineC)
+    rrdtool.graph(rrdGraphStore + "cpu_mem.png", "--vertical-label", "CPU Memory Used", "--width", str(graphWide), "--height", str(graphHigh), "--start", start, "--end", "now", "--upper-limit", "100", "--lower-limit", "0", "--left-axis-format", "%3.0lf%%", "DEF:cpum=DB/cpu.rrd:cpu-mem:AVERAGE", lineW + 'cpum' + lineC)
+    for i in range(len(pinMap)):
+         rrdtool.graph(rrdGraphStore + "pin_" + pinMap[i][0] + ".png", "--vertical-label", pinMap[i][0] + " Pin State", "--width", str(graphWide), "--height", str(graphHigh/3), "--start", start, "--end", "now", "--upper-limit", "1.1", "--lower-limit", "-0.1", "--left-axis-format", "%3.1lf", "DEF:pinm=" + str(pinDB[i]) + ":status:AVERAGE", lineW + 'pinm' + lineC)
 
 def goodBye():
     logging.info('Exiting')
@@ -423,33 +395,80 @@ if __name__ == "__main__":
     # Web Server
     ServeHTTP()
 
-    # Set up the button pin interrupt, otherwise button is disabled
+# Main RRDtool databases
+    envDB = Path(rrdFileStore + "env.rrd")
+    if not envDB.is_file():
+        print("Generating " + str(envDB))
+        rrdtool.create(
+            str(envDB),
+            "--start", "now",
+            "--step", "60",
+            "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
+            "RRA:AVERAGE:0.5:60:17568",   # two years per hour
+            "DS:env-temp:GAUGE:60:U:U",
+            "DS:env-humi:GAUGE:60:U:U",
+            "DS:env-pres:GAUGE:60:U:U")
+    else:
+        print("Using existing: " + str(envDB))
+
+    cpuDB = Path(rrdFileStore + "cpu.rrd")
+    if not cpuDB.is_file():
+        print("Generating " + str(cpuDB))
+        rrdtool.create(
+            str(cpuDB),
+            "--start", "now",
+            "--step", "60",
+            "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
+            "RRA:AVERAGE:0.5:60:17568",   # two years per hour
+            "DS:cpu-temp:GAUGE:60:U:U",
+            "DS:cpu-load:GAUGE:60:U:U",
+            "DS:cpu-mem:GAUGE:60:U:U")
+    else:
+        print("Using existing: " + str(cpuDB))
+
+    # Add RRD database for each GPIO line
+    for i in range(len(pinMap)):
+        pinDB.append(Path(rrdFileStore + pinMap[i][0] + ".rrd"))
+        if not pinDB[i].is_file():
+            print("Generating " + str(pinDB[i]))
+            rrdtool.create(
+                str(pinDB[i]),
+                "--start", "now",
+                "--step", "60",
+                "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
+                "RRA:AVERAGE:0.5:60:17568",   # two years per hour
+                "DS:status:GAUGE:60:0:1")
+        else:
+            print("Using existing: " + str(pinDB[i]))
+
+    # Set up the button pin interrupt (if defined, otherwise button is disabled)
     if (button_PIN > 0):
         GPIO.setup(button_PIN, GPIO.IN)       # Set our button pin to be an input
         GPIO.add_event_detect(button_PIN, GPIO.RISING, buttonInterrupt, bouncetime = 400)
         logging.info('Button enabled')
 
     # Set all pins to 'output' and record their initial status 
-    #   we need to set them as outputs for this scripts context in order to monitor their state
-    #   so long as we do not try to write to these pins this will not affect their output,
+    #   We need to set them as outputs for this scripts context in order to monitor their state,
+    #   So long as we do not try to write to these pins this will not affect their output,
     #   nor will it prevent other processes (eg octoprint) reading and using them
     for i in range(len(pinMap)):
         GPIO.setup(pinMap[i][1], GPIO.OUT)
-        if (GPIO.input(pinMap[i][1])):
-            pinMap[i][2] = True
+        pinState.append(GPIO.input(pinMap[i][1]))
+        if (pinState[i]):
             logging.info(pinMap[i][0] + ": on")
         else:
-            pinMap[i][2] = False
             logging.info(pinMap[i][0] + ": off")
+
+    logging.info("Init complete, entering main loop")
+    logSensors()   # Provide an initial readout
+    updateDB()     # Initial database update
 
     # Schedule logging events
     schedule.every(logInterval).seconds.do(logSensors)
+    schedule.every(20).seconds.do(updateDB)
+    schedule.every(5).seconds.do(updatePins)
 
     atexit.register(goodBye)
-
-    logging.info("Init complete, entering main loop")
-
-    logSensors()   # Provide an initial readout
 
     # Main loop now runs forever
     while True:
@@ -458,25 +477,28 @@ if __name__ == "__main__":
             clean()
             bmeScreen()
             show()
-            logger();
+            schedule.run_pending()
             time.sleep(passtime)
 
         # Update and transition to screen 2
         bmeScreen()
         sysScreen(width+margin)
-        logger();
         slideout()
+        schedule.run_pending()
+        time.sleep(passtime)
 
         # Screen 2
         for i in range(passes):
             clean()
             sysScreen()
             show()
-            logger();
+            schedule.run_pending()
             time.sleep(passtime)
 
         # Update and transition to screen 1
         sysScreen()
         bmeScreen(width+margin)
-        logger();
         slideout()
+        schedule.run_pending()
+        time.sleep(passtime)
+
