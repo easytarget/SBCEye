@@ -29,6 +29,7 @@ Based on [CircuitPython](https://github.com/adafruit/circuitpython)
 * [CircuitPython BME280](https://github.com/adafruit/Adafruit_CircuitPython_BME280)
 * [Schedule](https://github.com/dbader/schedule)
 * [pythonRRDtool](https://pythonhosted.org/rrdtool/index.html)
+* Liberation Fonts
 
 ## Install:
 * Install the Python3 gpio, schedule and rrdtool packages
@@ -37,6 +38,8 @@ Based on [CircuitPython](https://github.com/adafruit/circuitpython)
   * These will pull in the python CircuitPython dependencies too
   * `sudo pip3 install adafruit-circuitpython-ssd1306`
   * `sudo pip3 install adafruit-circuitpython-bme280`
+* Install liberation fonts (may be already installed)
+  * `sudo apt install fonts-liberation`
 * Make sure the `pi` user is in the `gpio` group:
   * `sudo usermod -a -G gpio pi`
 * (As the 'pi' user) make a folder `mkdir ~/HAT` and cd into that `cd ~/HAT` 
