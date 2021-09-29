@@ -54,10 +54,11 @@ suppressGlitches=True              # Pin interrupts can produce phantom button p
 rrdFileStore = "./DB/"
 rrdGraphStore = "./Graphs/"
 
-# Display animation
-passtime = 2     # time between read/display cycles (seconds)
-passes = 3       # number of refreshes of a screen before moving to next
-slidespeed = 16  # number of rows to scroll on each animation step between screens
+# Display + animation
+invertDisplay = False  # Is the display 'upside down'? generally the ribbon connection from the glass is at the bottom
+passtime = 2           # time between display refresh cycles (seconds)
+passes = 3             # number of refreshes of a screen before moving to next
+slidespeed = 16        # number of rows to scroll on each animation step between screens
 
 #
 # End of user config
@@ -177,8 +178,11 @@ def clean():
     draw.rectangle((0,0,span-1,height-1), outline=0, fill=0)
 
 def show(xpos=0):
-    # Put a specific area of the canvas onto display 
-    disp.image(image.transform((width,height),Image.EXTENT,(xpos,0,xpos+width,height)).transpose(Image.ROTATE_180))
+    # Put a specific area of the canvas onto display
+    if invertDisplay:
+        disp.image(image.transform((width,height),Image.EXTENT,(xpos,0,xpos+width,height)).transpose(Image.ROTATE_180))
+    else:
+        disp.image(image.transform((width,height),Image.EXTENT,(xpos,0,xpos+width,height)))
     disp.show()
 
 def slideout(step=slidespeed):
@@ -213,17 +217,26 @@ def getSysData():
     TOP = subprocess.check_output(topCmd, shell=True).decode('utf-8')
     MEM = subprocess.check_output(memCmd, shell=True).decode('utf-8')
 
-def toggleButtonPin():
+def toggleButtonPin(action="toggle"):
+    # Set the first pin to a specified state or read and toggle it..
     if (len(pinMap) > 0):
-        # Read the first pin and toggle it..
-        if (GPIO.input(pinMap[0][1]) == True):
-            GPIO.output(pinMap[0][1],False)
-            return pinMap[0][0] + 'Toggled : off'
-        else:
+        if (action == 'toggle'):
+            if (GPIO.input(pinMap[0][1]) == True):
+                GPIO.output(pinMap[0][1],False)
+                return pinMap[0][0] + 'Toggled : off'
+            else:
+                GPIO.output(pinMap[0][1],True)
+                return pinMap[0][0] + 'Toggled : on'
+        elif (action == 'on'):
             GPIO.output(pinMap[0][1],True)
-            return pinMap[0][0] + 'Toggled : on'
+            return pinMap[0][0] + 'Switched : on'
+        elif (action == 'off'):
+            GPIO.output(pinMap[0][1],False)
+            return pinMap[0][0] + 'Switched : off'
+        else:
+            return 'I dont know how to "' + action + '" ' + pinMap[0][0] + '!'
     else:
-        return 'Not supported, no output pin defined\n'
+        return 'Not supported, no output pin defined'
 
 def buttonInterrupt(channel):
     # short delay, then re-read input to provide a minimum hold-down time
@@ -361,28 +374,33 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._give_datetime()
             self._give_foot()
         elif ((urlparse(self.path).path == '/' + buttonPath) and (len(buttonPath) > 0)):
-            logging.info('Web button triggered by: ' + self.client_address[0])
-            state = toggleButtonPin()
+            parsed = parse_qs(urlparse(self.path).query).get('state', None)
+            if (not parsed):
+                action = 'toggle'
+            else:
+                action = parsed[0]
+            logging.info('Web button triggered by: ' + self.client_address[0] + ' with action: ' + action)
+            state = toggleButtonPin(action)
             self._set_headers()
             self._give_head()
             self.wfile.write(bytes('<h2>' + state + '</h2>\n', 'utf-8'))
             self._give_datetime()
             self._give_foot()
         elif(urlparse(self.path).path == '/'):
-            views = parse_qs(urlparse(self.path).query).get('view', None)
-            if (not views):
-                views = ["env", "sys", "gpio", "links"]
+            view = parse_qs(urlparse(self.path).query).get('view', None)
+            if (not view):
+                view = ["env", "sys", "gpio", "links"]
             self._set_headers()
             self._give_head()
             self.wfile.write(bytes('<h2>%s</h2>' % serverName, 'utf-8'))
             self._give_datetime()
             self.wfile.write(bytes('<table>\n', 'utf-8'))
-            if "env" in views: self._give_env()
-            if "sys" in views: self._give_sys()
-            if "gpio" in views: self._give_pins()
+            if "env" in view: self._give_env()
+            if "sys" in view: self._give_sys()
+            if "gpio" in view: self._give_pins()
             self.wfile.write(bytes('</table>', 'utf-8'))
-            if "links" in views: self._give_links()
-            if "log" in views: self._give_log()
+            if "links" in view: self._give_links()
+            if "log" in view: self._give_log()
             self.wfile.write(bytes('<hr></div>', 'utf-8'))
             self._give_foot(refresh=True)
         else:
@@ -426,9 +444,6 @@ def drawAllGraphs(period="1d"):
 
 def drawGraph(period,graph):
     # RRD graph generation
-    if (len(graph) == 0):
-        print('Graph error, no graph specified: graph ="' + graph + '"')
-        return
     print('Graph generation: graph ="' + graph + '", period="' + period + '"')
     graphWide = 1200
     graphHigh = 600
@@ -531,6 +546,13 @@ def drawGraph(period,graph):
                               "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
                               "DEF:pinm=" + str(pinDB[i]) + ":status:AVERAGE", lineW + 'pinm' + lineC)
 
+def scheduleRunDelay(seconds):
+    # Approximate delay while checking for pending scheduled jobs every second
+    schedule.run_pending()
+    for t in range(seconds):
+        time.sleep(1)
+        schedule.run_pending()
+
 def goodBye():
     logging.info('Exiting')
 
@@ -591,8 +613,11 @@ if __name__ == "__main__":
         GPIO.add_event_detect(button_PIN, GPIO.RISING, buttonInterrupt, bouncetime = 400)
         logging.info('Button enabled')
 
-    # Set all pins to 'output' and record their initial status 
-    #   We need to set them as outputs for this scripts context in order to monitor their state,
+    # Initial data readings
+    getBmeData()
+    getSysData()
+    # Set all gpio pins to 'output' and record their initial status
+    #   We need to set them as outputs in this scripts context in order to monitor their state.
     #   So long as we do not try to write to these pins this will not affect their output,
     #   nor will it prevent other processes (eg octoprint) reading and using them
     for i in range(len(pinMap)):
@@ -603,21 +628,19 @@ if __name__ == "__main__":
         else:
             logging.info(pinMap[i][0] + ": off")
 
-    getBmeData()  # ensure we have fresh data
-    getSysData()
-    updateDB()     # Initial database update
+    # Exit handler
+    atexit.register(goodBye)
 
-    # Schedule logging events
+    # We got this far... time to start the show
+    logging.info("Init complete, starting schedule and entering main loop")
+
+    # Schedule sensor readings, database updates and logging events
+    schedule.every(sensorInterval).seconds.do(updateData)
+    schedule.every(20).seconds.do(updateDB)
     if (logInterval > 0):
         schedule.every(logInterval).seconds.do(logSensors)
-    schedule.every(20).seconds.do(updateDB)
-    schedule.every(sensorInterval).seconds.do(updateData)
 
-    logging.info("Init complete, entering main loop")
-    if (logInterval > 0):
-        logSensors()   # Provide an initial readout
-
-    atexit.register(goodBye)
+    schedule.run_all() # do an initial log and database update
 
     # Main loop now runs forever
     while True:
@@ -626,28 +649,23 @@ if __name__ == "__main__":
             clean()
             bmeScreen()
             show()
-            schedule.run_pending()
-            time.sleep(passtime)
+            scheduleRunDelay(passtime)
 
         # Update and transition to screen 2
         bmeScreen()
         sysScreen(width+margin)
         slideout()
-        schedule.run_pending()
-        time.sleep(passtime)
+        scheduleRunDelay(passtime)
 
         # Screen 2
         for i in range(passes):
             clean()
             sysScreen()
             show()
-            schedule.run_pending()
-            time.sleep(passtime)
+            scheduleRunDelay(passtime)
 
-        # Update and transition to screen 1
+        # Update and transition back to screen 1
         sysScreen()
         bmeScreen(width+margin)
         slideout()
-        schedule.run_pending()
-        time.sleep(passtime)
-
+        scheduleRunDelay(passtime)
