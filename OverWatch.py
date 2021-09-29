@@ -41,8 +41,19 @@ port = 7080                        # Port number for web server
 serverName = 'Pi OverWatch'        # Used for the title and page heading
 buttonPath = ''                    # Web button url path, leave blank to disable
 
+# Default graph durations presented to user
+# See https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html#TIME%20OFFSET%20SPECIFICATION
+graphDefaults = ['3h','3d','1w','1m','3m','1y','3y']
+graphWide = 1200                   # Pixels
+graphHigh = 600
+# Other graph attributes 
+lineW = 'LINE2:'                   # Line style and width (See: https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html)
+lineC = '#A000A0'                  # Line color (I _like_ purple..)
+areaW = 'AREA:'                    # This gives the shadow effect
+areaC = '#E0D0E0#FFFFFF:gradheight=0'
+
 # Sensor reading update frequency
-sensorInterval = 3                 # Seconds, Minimum 1
+sensorInterval = 3                 # Seconds
 
 # Logging
 logFile = './overwatch.log'        # Folder must be writable by the OverWatch process
@@ -135,7 +146,13 @@ bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=bme280_address)
 if (len(pinMap) > 0):
     GPIO.setmode(GPIO.BCM)  # Set's GPIO pins to BCM GPIO numbering
 pinState = []
+
+# RRD database file locations
+envDB = Path(rrdFileStore + "env.rrd")
+sysDB = Path(rrdFileStore + "sys.rrd")
 pinDB = []
+for i in range(len(pinMap)):
+    pinDB.append(Path(rrdFileStore + pinMap[i][0] + ".rrd"))
 
 # Image canvas
 margin = 20           # Space between the screens while transitioning
@@ -342,10 +359,13 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _give_links(self):
         # Links to other pages
-        self.wfile.write(bytes('<p style="text-align: center;">', 'utf-8'))
-        self.wfile.write(bytes('<a href="./graph" style="color:#666666; font-weight: bold; text-decoration: none;">View Graphs</a><br>', 'utf-8'))
-        self.wfile.write(bytes('<a href="?view=log&lines=' + str(logLines) + '" style="color:#666666; font-weight: bold; text-decoration: none;">View Log</a>', 'utf-8'))
-        self.wfile.write(bytes('</p>\n', 'utf-8'))
+        self.wfile.write(bytes('<br><div style="font-weight: bold; font-size: 110%;">Graphs:<br>', 'utf-8'))
+        for g in graphDefaults:
+            self.wfile.write(bytes('&nbsp;<a style="color:#666666; text-decoration: none;" href="./graph?duration=' + g + '">' + g + '</a>&nbsp;', 'utf-8'))
+        self.wfile.write(bytes('</div>\n', 'utf-8'))
+        self.wfile.write(bytes('<br><div style="font-weight: bold; font-size: 110%;">', 'utf-8'))
+        self.wfile.write(bytes('<a href="?view=log&lines=' + str(logLines) + '" style="color:#666666; font-weight: bold; text-decoration: none;">View Activity Log</a>', 'utf-8'))
+        self.wfile.write(bytes('</div>\n', 'utf-8'))
 
     def _give_log(self,lines = 10):
         parsedLines = parse_qs(urlparse(self.path).query).get('lines', None)
@@ -445,14 +465,10 @@ def drawAllGraphs(period="1d"):
 def drawGraph(period,graph):
     # RRD graph generation
     print('Graph generation: graph ="' + graph + '", period="' + period + '"')
-    graphWide = 1200
-    graphHigh = 600
-    lineW = 'LINE2:'
-    lineC = '#FF00FF'
     start = 'end-' + period
     if (graph == "env-temp"):
         rrdtool.graph(rrdGraphStore + "env-temp-" + period + ".png",
-                      "--vertical-label", "Room Temperature",
+                      "--title", "Environment Temperature: last " + period,
                       "--width", str(graphWide),
                       "--height", str(graphHigh),
                       "--full-size-mode",
@@ -462,10 +478,10 @@ def drawGraph(period,graph):
                       "--lower-limit", "10",
                       "--left-axis-format", "%3.1lf\u00B0C",
                       "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                      "DEF:envt=DB/env.rrd:env-temp:AVERAGE", lineW + 'envt' + lineC)
+                      "DEF:envt=" + str(envDB) + ":env-temp:AVERAGE", areaW + 'envt' + areaC, lineW + 'envt' + lineC)
     elif (graph == "env-humi"):
         rrdtool.graph(rrdGraphStore + "env-humi-" + period + ".png",
-                      "--vertical-label", "Room Humidity",
+                      "--title", "Environment Humidity: last " + period,
                       "--width", str(graphWide),
                       "--height", str(graphHigh),
                       "--full-size-mode",
@@ -475,10 +491,10 @@ def drawGraph(period,graph):
                       "--lower-limit", "0",
                       "--left-axis-format", "%3.0lf%%",
                       "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                      "DEF:envh=DB/env.rrd:env-humi:AVERAGE", lineW + 'envh' + lineC)
+                      "DEF:envh=" + str(envDB) + ":env-humi:AVERAGE", areaW + 'envh' + areaC, lineW + 'envh' + lineC)
     elif (graph == "env-pres"):
         rrdtool.graph(rrdGraphStore + "env-pres-" + period + ".png",
-                      "--vertical-label", "Room Pressure",
+                      "--title", "Environment Pressure: last " + period,
                       "--width", str(graphWide),
                       "--height", str(graphHigh),
                       "--full-size-mode",
@@ -489,10 +505,10 @@ def drawGraph(period,graph):
                       "--units-exponent", "0",
                       "--left-axis-format", "%4.0lfmb",
                       "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                      "DEF:envp=DB/env.rrd:env-pres:AVERAGE", lineW + 'envp' + lineC)
+                      "DEF:envp=" + str(envDB) + ":env-pres:AVERAGE", areaW + 'envp' + areaC, lineW + 'envp' + lineC)
     elif (graph == "sys-temp"):
         rrdtool.graph(rrdGraphStore + "sys-temp-" + period + ".png",
-                      "--vertical-label", "CPU Temperature",
+                      "--title", "CPU Temperature: last " + period,
                       "--width", str(graphWide),
                       "--height", str(graphHigh),
                       "--full-size-mode",
@@ -502,24 +518,24 @@ def drawGraph(period,graph):
                       "--lower-limit", "30",
                       "--left-axis-format", "%3.1lf\u00B0C",
                       "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                      "DEF:syst=DB/sys.rrd:sys-temp:AVERAGE", lineW + 'syst' + lineC)
+                      "DEF:syst=" + str(sysDB) + ":sys-temp:AVERAGE", areaW + 'syst' + areaC, lineW + 'syst' + lineC)
     elif (graph == "sys-load"):
         rrdtool.graph(rrdGraphStore + "sys-load-" + period + ".png",
-                      "--vertical-label", "CPU Load Average",
+                      "--title", "CPU Load Average: last " + period,
                       "--width", str(graphWide),
                       "--height", str(graphHigh),
                       "--full-size-mode",
                       "--start", start,
                       "--end", "now",
-                      "--upper-limit", "5",
+                      "--upper-limit", "3",
                       "--lower-limit", "0",
                       "--units-exponent", "0",
                       "--left-axis-format", "%2.3lf",
                       "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                      "DEF:sysl=DB/sys.rrd:sys-load:AVERAGE", lineW + 'sysl' + lineC)
+                      "DEF:sysl=" + str(sysDB) + ":sys-load:AVERAGE", areaW + 'sysl' + areaC, lineW + 'sysl' + lineC)
     elif (graph == "sys-mem"):
         rrdtool.graph(rrdGraphStore + "sys-mem-" + period + ".png",
-                      "--vertical-label", "CPU Memory Used",
+                      "--title", "System Memory Use: last " + period,
                       "--width", str(graphWide),
                       "--height", str(graphHigh),
                       "--full-size-mode",
@@ -529,12 +545,12 @@ def drawGraph(period,graph):
                       "--lower-limit", "0",
                       "--left-axis-format", "%3.0lf%%",
                       "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                      "DEF:sysm=DB/sys.rrd:sys-mem:AVERAGE", lineW + 'sysm' + lineC)
+                      "DEF:sysm=" + str(sysDB) + ":sys-mem:AVERAGE", areaW + 'sysm' + areaC, lineW + 'sysm' + lineC)
     else:
         for i in range(len(pinMap)):
             if (graph == "pin-" + pinMap[i][0]):
                 rrdtool.graph(rrdGraphStore + "pin-" + pinMap[i][0] + "-" + period + ".png",
-                              "--vertical-label", pinMap[i][0] + " Pin State",
+                              "--title", pinMap[i][0] + " Pin State: last " + period,
                               "--width", str(graphWide),
                               "--height", str(graphHigh/3),
                               "--full-size-mode",
@@ -544,7 +560,7 @@ def drawGraph(period,graph):
                               "--lower-limit", "-0.1",
                               "--left-axis-format", "%3.1lf",
                               "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                              "DEF:pinm=" + str(pinDB[i]) + ":status:AVERAGE", lineW + 'pinm' + lineC)
+                              "DEF:pinv=" + str(pinDB[i]) + ":status:AVERAGE", areaW + 'pinv' + areaC, lineW + 'pinv' + lineC)
 
 def scheduleRunDelay(seconds):
     # Approximate delay while checking for pending scheduled jobs every second
@@ -562,7 +578,6 @@ if __name__ == "__main__":
     ServeHTTP()
 
 # Main RRDtool databases
-    envDB = Path(rrdFileStore + "env.rrd")
     if not envDB.is_file():
         print("Generating " + str(envDB))
         rrdtool.create(
@@ -570,14 +585,13 @@ if __name__ == "__main__":
             "--start", "now",
             "--step", "60",
             "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-            "RRA:AVERAGE:0.5:60:17568",   # two years per hour
+            "RRA:AVERAGE:0.5:60:26352",   # 3 years per hour
             "DS:env-temp:GAUGE:60:U:U",
             "DS:env-humi:GAUGE:60:U:U",
             "DS:env-pres:GAUGE:60:U:U")
     else:
         print("Using existing: " + str(envDB))
 
-    sysDB = Path(rrdFileStore + "sys.rrd")
     if not sysDB.is_file():
         print("Generating " + str(sysDB))
         rrdtool.create(
@@ -585,7 +599,7 @@ if __name__ == "__main__":
             "--start", "now",
             "--step", "60",
             "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-            "RRA:AVERAGE:0.5:60:17568",   # two years per hour
+            "RRA:AVERAGE:0.5:60:26352",   # 3 years per hour
             "DS:sys-temp:GAUGE:60:U:U",
             "DS:sys-load:GAUGE:60:U:U",
             "DS:sys-mem:GAUGE:60:U:U")
@@ -594,7 +608,6 @@ if __name__ == "__main__":
 
     # Add RRD database for each GPIO line
     for i in range(len(pinMap)):
-        pinDB.append(Path(rrdFileStore + pinMap[i][0] + ".rrd"))
         if not pinDB[i].is_file():
             print("Generating " + str(pinDB[i]))
             rrdtool.create(
@@ -602,7 +615,7 @@ if __name__ == "__main__":
                 "--start", "now",
                 "--step", "60",
                 "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-                "RRA:AVERAGE:0.5:60:17568",   # two years per hour
+                "RRA:AVERAGE:0.5:60:26352",   # 3 years per hour
                 "DS:status:GAUGE:60:0:1")
         else:
             print("Using existing: " + str(pinDB[i]))
