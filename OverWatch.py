@@ -83,6 +83,8 @@ os.nice(10)
 import time
 import datetime
 import subprocess
+import tempfile
+
 
 # I2C Comms
 from board import SCL, SDA
@@ -121,9 +123,9 @@ print("Starting OverWatch")
 # Logging 
 handler = RotatingFileHandler(logFile, maxBytes=1024*1024, backupCount=2)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S', handlers=[handler])
-# Scheduler sometimes logs schedule actions to 'INFO' not 'DEBUG', spewing debug into the log, sigh..
-schedule_logger = logging.getLogger('schedule')
-schedule_logger.setLevel(level=logging.WARN)
+# Older scheduler versions sometimes log actions to 'INFO' not 'DEBUG', spewing debug into the log, sigh..
+schedule_logger = logging.getLogger('schedule')  # Oi! Schedule!
+schedule_logger.setLevel(level=logging.WARN)     # Stop it.
 
 # Now we have logging, notify we are starting up
 logging.info('')
@@ -301,10 +303,21 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Expires", "0")
         self.end_headers()
 
-    def _give_head(self):
+    def _set_png_headers(self):
+        self.send_response(200)
+        self.send_header("Content-type", "image/png")
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        self.end_headers()
+
+    def _give_head(self, titleExtra=""):
+        title = serverName
+        if (len(titleExtra) > 0):
+            title= serverName +" :: " + titleExtra
         self.wfile.write(bytes('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n', 'utf-8'))
         self.wfile.write(bytes('<meta name="viewport" content="width=device-width,initial-scale=1">\n', 'utf-8'))
-        self.wfile.write(bytes('<title>%s</title>\n' % serverName, 'utf-8'))
+        self.wfile.write(bytes('<title>%s</title>\n' % title, 'utf-8'))
         self.wfile.write(bytes('<style>\n', 'utf-8'))
         self.wfile.write(bytes('body {display:flex; flex-direction: column; align-items: center;}\n', 'utf-8'))
         self.wfile.write(bytes('table {border-spacing: 0.2em;}\n', 'utf-8'))
@@ -378,18 +391,46 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('<pre>\n' + log + '<pre>\n', 'utf-8'))
         self.wfile.write(bytes(f'<p>Latest {lines} lines shown</p>\n', 'utf-8'))
 
+    def _give_graphs(self,d):
+        allgraphs = ["env-temp","env-humi","env-pres","sys-temp","sys-load","sys-mem"]
+        for p in pinMap:
+            allgraphs.append("pin-" + p[0])
+        for g in allgraphs:
+            self.wfile.write(bytes('<tr><td><a href="graph?graph=' + g + '&duration=' + d + '">', 'utf-8'))
+            self.wfile.write(bytes('<img src="graph?graph=' + g + '&duration=' + d + '">', 'utf-8'))
+            self.wfile.write(bytes('</a></td></tr>\n', 'utf-8'))
+
     def do_GET(self):
-        if (urlparse(self.path).path == '/graphs'):
+        if (urlparse(self.path).path == '/graph'):
+            parsedGraph = parse_qs(urlparse(self.path).query).get('graph', None)
+            parsedDuration = parse_qs(urlparse(self.path).query).get('duration', None)
+            if (not parsedGraph):
+                body = ""
+            elif (not parsedDuration):
+                body = ""
+            else:
+                graph = parsedGraph[0]
+                duration = parsedDuration[0]
+                logging.info('Graph Generation requested for: ' + graph + '(-' + duration + ' -> now) triggered by: ' + self.client_address[0])
+                body = drawGraph(duration,graph)
+            if (len(body) == 0):
+                self.send_error(404, 'Image Unavailable', 'Check your parameters and try again')
+                return
+            self._set_png_headers()
+            self.wfile.write(body)
+        elif (urlparse(self.path).path == '/graphs'):
             parsed = parse_qs(urlparse(self.path).query).get('duration', None)
             if (not parsed):
                 duration = "1d"
             else:
                 duration = parsed[0]
-            logging.info('Graph Generation (-' + duration + ' -> now) triggered by: ' + self.client_address[0])
-            drawAllGraphs(duration)
+            logging.info('Graph Page (-' + duration + ' -> now) requested by: ' + self.client_address[0])
             self._set_headers()
-            self._give_head()
-            self.wfile.write(bytes('<h4>Graphs Generated (-' + duration + ' -> now) </h4>\n', 'utf-8'))
+            self._give_head("graphs-" + duration)
+            self.wfile.write(bytes('<h4>Graphs for: -' + duration + ' -> now) </h4>\n', 'utf-8'))
+            self.wfile.write(bytes('<table style="width:33%;">\n', 'utf-8'))
+            self._give_graphs(duration)
+            self.wfile.write(bytes('</table>', 'utf-8'))
             self._give_datetime()
             self._give_foot(refresh=300)
         elif ((urlparse(self.path).path == '/' + buttonPath) and (len(buttonPath) > 0)):
@@ -401,7 +442,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             logging.info('Web button triggered by: ' + self.client_address[0] + ' with action: ' + action)
             state = toggleButtonPin(action)
             self._set_headers()
-            self._give_head()
+            self._give_head(pinMap[0][0])
             self.wfile.write(bytes('<h2>' + state + '</h2>\n', 'utf-8'))
             self._give_datetime()
             self._give_foot()
@@ -419,8 +460,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('</table>', 'utf-8'))
             if "links" in view: self._give_links()
             if "log" in view: self._give_log()
-            self._give_datetime()
             self.wfile.write(bytes('<hr>\n', 'utf-8'))
+            self._give_datetime()
             if "log" in view:
                 self._give_foot(refresh = 60, scroll = True) 
             else:
@@ -457,112 +498,126 @@ def updateDB():
 def logSensors():
     logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + TOP + ', Mem: ' + MEM + '%')
 
-def drawAllGraphs(period="1d"):
-    allgraphs = ["env-temp","env-humi","env-pres","sys-temp","sys-load","sys-mem"]
-    for p in pinMap:
-        allgraphs.append("pin-" + p[0])
-    for g in allgraphs:
-        drawGraph(period,g)
-
 def drawGraph(period,graph):
     # RRD graph generation
+    # Returns the generated file for sending in the http response
+    tempf = tempfile.NamedTemporaryFile(mode='rb', dir='/tmp', prefix='overwatch_graph')
     print('Graph generation: graph ="' + graph + '", period="' + period + '"')
     start = 'end-' + period
     if (graph == "env-temp"):
-        rrdtool.graph(rrdGraphStore + "env-temp-" + period + ".png",
-                      "--title", "Environment Temperature: last " + period,
-                      "--width", str(graphWide),
-                      "--height", str(graphHigh),
-                      "--full-size-mode",
-                      "--start", start,
-                      "--end", "now",
-                      "--upper-limit", "60",
-                      "--lower-limit", "10",
-                      "--left-axis-format", "%3.1lf\u00B0C",
-                      "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                      "DEF:envt=" + str(envDB) + ":env-temp:AVERAGE", areaW + 'envt' + areaC, lineW + 'envt' + lineC)
+        try:
+            rrdtool.graph(tempf.name, "--title", "Environment Temperature: last " + period,
+                          "--width", str(graphWide),
+                          "--height", str(graphHigh),
+                          "--full-size-mode",
+                          "--start", start,
+                          "--end", "now",
+                          "--upper-limit", "60",
+                          "--lower-limit", "10",
+                          "--left-axis-format", "%3.1lf\u00B0C",
+                          "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
+                          "DEF:envt=" + str(envDB) + ":env-temp:AVERAGE", areaW + 'envt' + areaC, lineW + 'envt' + lineC)
+        except Exception:
+            pass
     elif (graph == "env-humi"):
-        rrdtool.graph(rrdGraphStore + "env-humi-" + period + ".png",
-                      "--title", "Environment Humidity: last " + period,
-                      "--width", str(graphWide),
-                      "--height", str(graphHigh),
-                      "--full-size-mode",
-                      "--start", start,
-                      "--end", "now",
-                      "--upper-limit", "100",
-                      "--lower-limit", "0",
-                      "--left-axis-format", "%3.0lf%%",
-                      "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                      "DEF:envh=" + str(envDB) + ":env-humi:AVERAGE", areaW + 'envh' + areaC, lineW + 'envh' + lineC)
+        try:
+            rrdtool.graph(tempf.name, "--title", "Environment Humidity: last " + period,
+                          "--width", str(graphWide),
+                          "--height", str(graphHigh),
+                          "--full-size-mode",
+                          "--start", start,
+                          "--end", "now",
+                          "--upper-limit", "100",
+                          "--lower-limit", "0",
+                          "--left-axis-format", "%3.0lf%%",
+                          "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
+                          "DEF:envh=" + str(envDB) + ":env-humi:AVERAGE", areaW + 'envh' + areaC, lineW + 'envh' + lineC)
+        except Exception:
+            pass
     elif (graph == "env-pres"):
-        rrdtool.graph(rrdGraphStore + "env-pres-" + period + ".png",
-                      "--title", "Environment Pressure: last " + period,
-                      "--width", str(graphWide),
-                      "--height", str(graphHigh),
-                      "--full-size-mode",
-                      "--start", start,
-                      "--end", "now",
-                      "--upper-limit", "1040",
-                      "--lower-limit", "970",
-                      "--units-exponent", "0",
-                      "--left-axis-format", "%4.0lfmb",
-                      "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                      "DEF:envp=" + str(envDB) + ":env-pres:AVERAGE", areaW + 'envp' + areaC, lineW + 'envp' + lineC)
+        try:
+            rrdtool.graph(tempf.name, "--title", "Environment Pressure: last " + period,
+                          "--width", str(graphWide),
+                          "--height", str(graphHigh),
+                          "--full-size-mode",
+                          "--start", start,
+                          "--end", "now",
+                          "--upper-limit", "1040",
+                          "--lower-limit", "970",
+                          "--units-exponent", "0",
+                          "--left-axis-format", "%4.0lfmb",
+                          "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
+                          "DEF:envp=" + str(envDB) + ":env-pres:AVERAGE", areaW + 'envp' + areaC, lineW + 'envp' + lineC)
+        except Exception:
+            pass
     elif (graph == "sys-temp"):
-        rrdtool.graph(rrdGraphStore + "sys-temp-" + period + ".png",
-                      "--title", "CPU Temperature: last " + period,
-                      "--width", str(graphWide),
-                      "--height", str(graphHigh),
-                      "--full-size-mode",
-                      "--start", start,
-                      "--end", "now",
-                      "--upper-limit", "90",
-                      "--lower-limit", "30",
-                      "--left-axis-format", "%3.1lf\u00B0C",
-                      "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                      "DEF:syst=" + str(sysDB) + ":sys-temp:AVERAGE", areaW + 'syst' + areaC, lineW + 'syst' + lineC)
+        try:
+            rrdtool.graph(tempf.name, "--title", "CPU Temperature: last " + period,
+                          "--width", str(graphWide),
+                          "--height", str(graphHigh),
+                          "--full-size-mode",
+                          "--start", start,
+                          "--end", "now",
+                          "--upper-limit", "90",
+                          "--lower-limit", "30",
+                          "--left-axis-format", "%3.1lf\u00B0C",
+                          "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
+                          "DEF:syst=" + str(sysDB) + ":cpu-temp:AVERAGE", areaW + 'syst' + areaC, lineW + 'syst' + lineC)              # <---- FIXME FOR PRODUCTION
+        except Exception:
+            pass
     elif (graph == "sys-load"):
-        rrdtool.graph(rrdGraphStore + "sys-load-" + period + ".png",
-                      "--title", "CPU Load Average: last " + period,
-                      "--width", str(graphWide),
-                      "--height", str(graphHigh),
-                      "--full-size-mode",
-                      "--start", start,
-                      "--end", "now",
-                      "--upper-limit", "3",
-                      "--lower-limit", "0",
-                      "--units-exponent", "0",
-                      "--left-axis-format", "%2.3lf",
-                      "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                      "DEF:sysl=" + str(sysDB) + ":sys-load:AVERAGE", areaW + 'sysl' + areaC, lineW + 'sysl' + lineC)
+        try:
+            rrdtool.graph(tempf.name, "--title", "CPU Load Average: last " + period,
+                          "--width", str(graphWide),
+                          "--height", str(graphHigh),
+                          "--full-size-mode",
+                          "--start", start,
+                          "--end", "now",
+                          "--upper-limit", "3",
+                          "--lower-limit", "0",
+                          "--units-exponent", "0",
+                          "--left-axis-format", "%2.3lf",
+                          "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
+                          "DEF:sysl=" + str(sysDB) + ":cpu-load:AVERAGE", areaW + 'sysl' + areaC, lineW + 'sysl' + lineC)              # <---- FIXME FOR PRODUCTION
+        except Exception:
+            pass
     elif (graph == "sys-mem"):
-        rrdtool.graph(rrdGraphStore + "sys-mem-" + period + ".png",
-                      "--title", "System Memory Use: last " + period,
-                      "--width", str(graphWide),
-                      "--height", str(graphHigh),
-                      "--full-size-mode",
-                      "--start", start,
-                      "--end", "now",
-                      "--upper-limit", "100",
-                      "--lower-limit", "0",
-                      "--left-axis-format", "%3.0lf%%",
-                      "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                      "DEF:sysm=" + str(sysDB) + ":sys-mem:AVERAGE", areaW + 'sysm' + areaC, lineW + 'sysm' + lineC)
+        try:
+            rrdtool.graph(tempf.name, "--title", "System Memory Use: last " + period,
+                          "--width", str(graphWide),
+                          "--height", str(graphHigh),
+                          "--full-size-mode",
+                          "--start", start,
+                          "--end", "now",
+                          "--upper-limit", "100",
+                          "--lower-limit", "0",
+                          "--left-axis-format", "%3.0lf%%",
+                          "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
+                          "DEF:sysm=" + str(sysDB) + ":cpu-mem:AVERAGE", areaW + 'sysm' + areaC, lineW + 'sysm' + lineC)               # <---- FIXME FOR PRODUCTION
+        except Exception:
+            pass
     else:
         for i in range(len(pinMap)):
             if (graph == "pin-" + pinMap[i][0]):
-                rrdtool.graph(rrdGraphStore + "pin-" + pinMap[i][0] + "-" + period + ".png",
-                              "--title", pinMap[i][0] + " Pin State: last " + period,
-                              "--width", str(graphWide),
-                              "--height", str(graphHigh/3),
-                              "--full-size-mode",
-                              "--start", start,
-                              "--end", "now",
-                              "--upper-limit", "1.1",
-                              "--lower-limit", "-0.1",
-                              "--left-axis-format", "%3.1lf",
-                              "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                              "DEF:pinv=" + str(pinDB[i]) + ":status:AVERAGE", areaW + 'pinv' + areaC, lineW + 'pinv' + lineC)
+                try:
+                    rrdtool.graph(tempf.name, "--title", pinMap[i][0] + " Pin State: last " + period,
+                                  "--width", str(graphWide),
+                                  "--height", str(graphHigh/3),
+                                  "--full-size-mode",
+                                  "--start", start,
+                                  "--end", "now",
+                                  "--upper-limit", "1.1",
+                                  "--lower-limit", "-0.1",
+                                  "--left-axis-format", "%3.1lf",
+                                  "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
+                                  "DEF:pinv=" + str(pinDB[i]) + ":status:AVERAGE", areaW + 'pinv' + areaC, lineW + 'pinv' + lineC)
+                except Exception:
+                    pass
+    response = tempf.read()
+    if (len(response) == 0):
+        print("Error: png file generation failed for : " + graph + " : " + period)
+    tempf.close()
+    return response
 
 def scheduleRunDelay(seconds):
     # Approximate delay while checking for pending scheduled jobs every second
