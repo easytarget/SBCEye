@@ -57,7 +57,7 @@ sensorInterval = 3                 # Seconds
 
 # Logging
 logFile = './overwatch.log'        # Folder must be writable by the OverWatch process
-logInterval = 10                   # Environmental and system log interval (seconds, zero to disable)
+logInterval = 600                  # Environmental and system log interval (seconds, zero to disable)
 logLines = 240                     # How many lines of logging to show in webui by default
 suppressGlitches=True              # Pin interrupts can produce phantom button presses due to crosstalk, ignore them
 
@@ -301,8 +301,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Expires", "0")
         self.end_headers()
 
-    def _give_head(self, scrolldown = False):
-        self.wfile.write(bytes('<html>\n<head><meta charset="utf-8">\n', 'utf-8'))
+    def _give_head(self):
+        self.wfile.write(bytes('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n', 'utf-8'))
         self.wfile.write(bytes('<meta name="viewport" content="width=device-width,initial-scale=1">\n', 'utf-8'))
         self.wfile.write(bytes('<title>%s</title>\n' % serverName, 'utf-8'))
         self.wfile.write(bytes('<style>\n', 'utf-8'))
@@ -310,28 +310,27 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('table {border-spacing: 0.2em;}\n', 'utf-8'))
         self.wfile.write(bytes('td {padding-left: 1em;}\n', 'utf-8'))
         self.wfile.write(bytes('</style>\n', 'utf-8'))
-        if (scrolldown):
-            self.wfile.write(bytes("<script>\n", 'utf-8'))
-            self.wfile.write(bytes('function down() {\n', 'utf-8'))
-            self.wfile.write(bytes('    window.scrollTo(0,document.body.scrollHeight);\n', 'utf-8'))
-            self.wfile.write(bytes('}\n', 'utf-8'))
-            self.wfile.write(bytes('window.onload = down;\n', 'utf-8'))
-            self.wfile.write(bytes('</script>\n', 'utf-8'))
         self.wfile.write(bytes('</head>\n', 'utf-8'))
         self.wfile.write(bytes('<body>\n', 'utf-8'))
 
-    def _give_foot(self,refresh = False):
+    def _give_foot(self,scroll = False, refresh = 0):
             # DEBUG: self.wfile.write(bytes('<pre style="color:#888888">GET: ' + self.path + ' from: ' + self.client_address[0] + '</pre>\n', 'utf-8'))
             self.wfile.write(bytes('</body>\n', 'utf-8'))
-            if (refresh):
-                self.wfile.write(bytes("<script>\n", 'utf-8'))
-                self.wfile.write(bytes('setTimeout(function(){location.replace(document.URL);}, 60000);\n', 'utf-8'))
-                self.wfile.write(bytes('</script>\n', 'utf-8'))
+            self.wfile.write(bytes("<script>\n", 'utf-8'))
+            if (scroll):
+                self.wfile.write(bytes('function down() {\n', 'utf-8'))
+                self.wfile.write(bytes('    window.scrollTo(0,document.body.scrollHeight);\n', 'utf-8'))
+                self.wfile.write(bytes('    console.log("SCROLL" + document.body.scrollHeight);\n', 'utf-8'))
+                self.wfile.write(bytes('}\n', 'utf-8'))
+                self.wfile.write(bytes('window.onload = down;\n', 'utf-8'))
+            if (refresh > 0):
+                self.wfile.write(bytes('setTimeout(function(){location.replace(document.URL);}, ' + str(refresh*1000) + ');\n', 'utf-8'))
+            self.wfile.write(bytes('</script>\n', 'utf-8'))
             self.wfile.write(bytes('</html>\n', 'utf-8'))
 
     def _give_datetime(self):
         timestamp = datetime.datetime.now()
-        self.wfile.write(bytes('<p style="color:#666666">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</p>', 'utf-8'))
+        self.wfile.write(bytes('<p style="color:#666666">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</p>\n', 'utf-8'))
 
     def _give_env(self):
         # room sensors
@@ -361,7 +360,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # Links to other pages
         self.wfile.write(bytes('<br><div style="font-weight: bold; font-size: 110%;">Graphs:<br>', 'utf-8'))
         for g in graphDefaults:
-            self.wfile.write(bytes('&nbsp;<a style="color:#666666; text-decoration: none;" href="./graph?duration=' + g + '">' + g + '</a>&nbsp;', 'utf-8'))
+            self.wfile.write(bytes('&nbsp;<a style="color:#666666; text-decoration: none;" href="./graphs?duration=' + g + '">' + g + '</a>&nbsp;', 'utf-8'))
         self.wfile.write(bytes('</div>\n', 'utf-8'))
         self.wfile.write(bytes('<br><div style="font-weight: bold; font-size: 110%;">', 'utf-8'))
         self.wfile.write(bytes('<a href="?view=log&lines=' + str(logLines) + '" style="color:#666666; font-weight: bold; text-decoration: none;">View Activity Log</a>', 'utf-8'))
@@ -377,10 +376,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         log = subprocess.check_output(logCmd, shell=True).decode('utf-8')
         self.wfile.write(bytes('<div><span style="font-size: 110%; font-weight: bold; text-decoration: none;">Recent log activity:</span><hr>', 'utf-8'))
         self.wfile.write(bytes('<pre>\n' + log + '<pre>\n', 'utf-8'))
-        self.wfile.write(bytes(f'<p>Latest {lines} lines shown</p>', 'utf-8'))
+        self.wfile.write(bytes(f'<p>Latest {lines} lines shown</p>\n', 'utf-8'))
 
     def do_GET(self):
-        if (urlparse(self.path).path == '/graph'):
+        if (urlparse(self.path).path == '/graphs'):
             parsed = parse_qs(urlparse(self.path).query).get('duration', None)
             if (not parsed):
                 duration = "1d"
@@ -392,7 +391,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._give_head()
             self.wfile.write(bytes('<h4>Graphs Generated (-' + duration + ' -> now) </h4>\n', 'utf-8'))
             self._give_datetime()
-            self._give_foot()
+            self._give_foot(refresh=300)
         elif ((urlparse(self.path).path == '/' + buttonPath) and (len(buttonPath) > 0)):
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
             if (not parsed):
@@ -413,7 +412,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._set_headers()
             self._give_head()
             self.wfile.write(bytes('<h2>%s</h2>' % serverName, 'utf-8'))
-            self._give_datetime()
             self.wfile.write(bytes('<table>\n', 'utf-8'))
             if "env" in view: self._give_env()
             if "sys" in view: self._give_sys()
@@ -421,8 +419,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('</table>', 'utf-8'))
             if "links" in view: self._give_links()
             if "log" in view: self._give_log()
-            self.wfile.write(bytes('<hr></div>', 'utf-8'))
-            self._give_foot(refresh=True)
+            self._give_datetime()
+            self.wfile.write(bytes('<hr>\n', 'utf-8'))
+            if "log" in view:
+                self._give_foot(refresh = 60, scroll = True) 
+            else:
+                self._give_foot(refresh = 60)
         else:
             self.send_error(404, 'No Such Page', 'This site serves pages at ".../" and ".../graph"')
 
