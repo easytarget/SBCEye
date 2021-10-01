@@ -85,6 +85,8 @@ import datetime
 import subprocess
 import tempfile
 
+# System monitoring tools
+import psutil
 
 # I2C Comms
 from board import SCL, SDA
@@ -306,9 +308,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _set_png_headers(self):
         self.send_response(200)
         self.send_header("Content-type", "image/png")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Pragma", "no-cache")
-        self.send_header("Expires", "0")
+        self.send_header("Cache-Control", "max-age=60")
         self.end_headers()
 
     def _give_head(self, titleExtra=""):
@@ -320,7 +320,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('<title>%s</title>\n' % title, 'utf-8'))
         self.wfile.write(bytes('<style>\n', 'utf-8'))
         self.wfile.write(bytes('body {display:flex; flex-direction: column; align-items: center;}\n', 'utf-8'))
+        self.wfile.write(bytes('a {color:#666666; text-decoration: none;}\n', 'utf-8'))
         self.wfile.write(bytes('table {border-spacing: 0.2em;}\n', 'utf-8'))
+        self.wfile.write(bytes('th {font-size: 110%; text-align: left;}\n', 'utf-8'))
         self.wfile.write(bytes('td {padding-left: 1em;}\n', 'utf-8'))
         self.wfile.write(bytes('</style>\n', 'utf-8'))
         self.wfile.write(bytes('</head>\n', 'utf-8'))
@@ -343,18 +345,18 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _give_datetime(self):
         timestamp = datetime.datetime.now()
-        self.wfile.write(bytes('<p style="color:#666666">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</p>\n', 'utf-8'))
+        self.wfile.write(bytes('<div style="color:#666666; font-size: 90%">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</div>\n', 'utf-8'))
 
     def _give_env(self):
         # room sensors
-        self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">Room</th></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr><th>Room</th></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>Temperature: </td><td>' + format(TMP, '.1f') + '&deg;</td></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>Humidity: </td><td>' + format(HUM, '.1f') + '%</td></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>Presssure: </td><td>' + format(PRE, '.0f') + 'mb</td></tr>\n', 'utf-8'))
 
     def _give_sys(self):
         # Internal Sensors
-        self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">Server</th></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr><th>Server</th></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>CPU Temperature: </td><td>' + CPU + '&deg;</td></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>CPU Load: </td><td>' + TOP + '</td></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>Memory used: </td><td>' + MEM + '%</td></tr>\n', 'utf-8'))
@@ -362,22 +364,28 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_pins(self):
         # GPIO states
         if (len(pinMap) > 0):
-            self.wfile.write(bytes('<tr><th style="font-size: 110%; text-align: left;">GPIO</th></tr>\n', 'utf-8'))
-            for i in range(len(pinMap)):
-                if (pinState[i]):
-                    self.wfile.write(bytes('<tr><td>' + pinMap[i][0] +'</td><td>on</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><th>GPIO</th></tr>\n', 'utf-8'))
+            for p in range(len(pinMap)):
+                if (pinState[p]):
+                    self.wfile.write(bytes('<tr><td>' + pinMap[p][0] +'</td><td>on</td></tr>\n', 'utf-8'))
                 else:
-                    self.wfile.write(bytes('<tr><td>' + pinMap[i][0] +'</td><td>off</td></tr>\n', 'utf-8'))
+                    self.wfile.write(bytes('<tr><td>' + pinMap[p][0] +'</td><td>off</td></tr>\n', 'utf-8'))
 
     def _give_links(self):
         # Links to other pages
-        self.wfile.write(bytes('<br><div style="font-weight: bold; font-size: 110%;">Graphs:<br>', 'utf-8'))
+        self.wfile.write(bytes('<table>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr><th>Graph:</th></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr><td>\n', 'utf-8'))
         for g in graphDefaults:
-            self.wfile.write(bytes('&nbsp;<a style="color:#666666; text-decoration: none;" href="./graphs?duration=' + g + '">' + g + '</a>&nbsp;', 'utf-8'))
-        self.wfile.write(bytes('</div>\n', 'utf-8'))
-        self.wfile.write(bytes('<br><div style="font-weight: bold; font-size: 110%;">', 'utf-8'))
-        self.wfile.write(bytes('<a href="?view=log&lines=' + str(logLines) + '" style="color:#666666; font-weight: bold; text-decoration: none;">View Activity Log</a>', 'utf-8'))
-        self.wfile.write(bytes('</div>\n', 'utf-8'))
+            self.wfile.write(bytes('&nbsp;<a href="./graphs?duration=' + g + '">' + g + '</a>&nbsp;\n', 'utf-8'))
+        self.wfile.write(bytes('</td></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('</table>\n', 'utf-8'))
+        self.wfile.write(bytes('<table>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<td><a href="?view=deco&view=env&view=sys&view=gpio&view=links&view=log">Inline Log</a></td>\n', 'utf-8'))
+        self.wfile.write(bytes('<td><a href="?view=log&lines=' + str(logLines) + '">Main Log</a></td>\n', 'utf-8'))
+        self.wfile.write(bytes('</tr>\n', 'utf-8'))
+        self.wfile.write(bytes('</table>\n', 'utf-8'))
 
     def _give_log(self,lines = 10):
         parsedLines = parse_qs(urlparse(self.path).query).get('lines', None)
@@ -387,18 +395,30 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # There is doubtless a more 'python' way to do this, but it is fast, cheap and works..
         logCmd = f"for a in `ls -tr {logFile}*`;do cat $a ; done | tail -{lines}"
         log = subprocess.check_output(logCmd, shell=True).decode('utf-8')
-        self.wfile.write(bytes('<div><span style="font-size: 110%; font-weight: bold; text-decoration: none;">Recent log activity:</span><hr>', 'utf-8'))
-        self.wfile.write(bytes('<pre>\n' + log + '<pre>\n', 'utf-8'))
-        self.wfile.write(bytes(f'<p>Latest {lines} lines shown</p>\n', 'utf-8'))
+        self.wfile.write(bytes('<div>\n', 'utf-8'))
+        self.wfile.write(bytes('<span style="font-size: 110%; font-weight: bold;">Recent log activity:</span>\n', 'utf-8'))
+        self.wfile.write(bytes('<hr><pre>\n' + log + '</pre><hr>\n', 'utf-8'))
+        self.wfile.write(bytes(f'Latest {lines} lines shown\n', 'utf-8'))
+        self.wfile.write(bytes('</div>\n', 'utf-8'))
 
     def _give_graphs(self,d):
-        allgraphs = ["env-temp","env-humi","env-pres","sys-temp","sys-load","sys-mem"]
+        allgraphs = [["env-temp","Temperature"],
+                     ["env-humi","Humidity"],
+                     ["env-pres","Pressure"],
+                     ["sys-temp","CPU Temperature"],
+                     ["sys-load","CPU Load Average"],
+                     ["sys-mem","System Memory Use"]]
         for p in pinMap:
-            allgraphs.append("pin-" + p[0])
+            allgraphs.append(["pin-" + p[0],p[0] + " GPIO"])
+        self.wfile.write(bytes('<table>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr><th>Graphs: -' + d + ' -> now</th></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr><td>\n', 'utf-8'))
         for g in allgraphs:
-            self.wfile.write(bytes('<tr><td><a href="graph?graph=' + g + '&duration=' + d + '">', 'utf-8'))
-            self.wfile.write(bytes('<img src="graph?graph=' + g + '&duration=' + d + '">', 'utf-8'))
+            self.wfile.write(bytes('<tr><td><a href="graph?graph=' + g[0] + '&duration=' + d + '">', 'utf-8'))
+            self.wfile.write(bytes('<img width=400 title="' + g[1] + '" src="graph?graph=' + g[0] + '&duration=' + d + '">', 'utf-8'))
             self.wfile.write(bytes('</a></td></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('</td></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('</table>\n', 'utf-8'))
 
     def do_GET(self):
         if (urlparse(self.path).path == '/graph'):
@@ -426,8 +446,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 duration = parsed[0]
             logging.info('Graph Page (-' + duration + ' -> now) requested by: ' + self.client_address[0])
             self._set_headers()
-            self._give_head("graphs-" + duration)
-            self.wfile.write(bytes('<h4>Graphs for: -' + duration + ' -> now) </h4>\n', 'utf-8'))
+            self._give_head(serverName + ":: graphs -" + duration)
+            self.wfile.write(bytes('<h2>%s</h2>' % serverName, 'utf-8')) 
             self.wfile.write(bytes('<table style="width:33%;">\n', 'utf-8'))
             self._give_graphs(duration)
             self.wfile.write(bytes('</table>', 'utf-8'))
@@ -442,29 +462,31 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             logging.info('Web button triggered by: ' + self.client_address[0] + ' with action: ' + action)
             state = toggleButtonPin(action)
             self._set_headers()
-            self._give_head(pinMap[0][0])
+            self._give_head(serverName + ":: " + pinMap[0][0])
             self.wfile.write(bytes('<h2>' + state + '</h2>\n', 'utf-8'))
             self._give_datetime()
             self._give_foot()
         elif(urlparse(self.path).path == '/'):
             view = parse_qs(urlparse(self.path).query).get('view', None)
             if (not view):
-                view = ["env", "sys", "gpio", "links"]
+                view = ["deco", "env", "sys", "gpio", "links"]
             self._set_headers()
             self._give_head()
-            self.wfile.write(bytes('<h2>%s</h2>' % serverName, 'utf-8'))
+            if "deco" in view: self.wfile.write(bytes('<h2>%s</h2>' % serverName, 'utf-8'))
             self.wfile.write(bytes('<table>\n', 'utf-8'))
             if "env" in view: self._give_env()
             if "sys" in view: self._give_sys()
             if "gpio" in view: self._give_pins()
             self.wfile.write(bytes('</table>', 'utf-8'))
             if "links" in view: self._give_links()
-            if "log" in view: self._give_log()
-            self.wfile.write(bytes('<hr>\n', 'utf-8'))
-            self._give_datetime()
             if "log" in view:
+                self._give_log()
+                if "deco" in view: self._give_datetime()
                 self._give_foot(refresh = 60, scroll = True) 
             else:
+                if "deco" in view: 
+                    self.wfile.write(bytes('<br>', 'utf-8'))
+                    self._give_datetime()
                 self._give_foot(refresh = 60)
         else:
             self.send_error(404, 'No Such Page', 'This site serves pages at ".../" and ".../graph"')
@@ -476,6 +498,13 @@ def updateData():
     # Get sensor data
     getBmeData()
     getSysData()
+    print(psutil.virtual_memory().percent, psutil.getloadavg()[0], psutil.sensors_temperatures())
+    #temps = psutil.sensors_temperatures()
+    #for name, entries in temps.items():
+    #    print(name)
+    #    print(entries[0])
+
+    #print(psutil.sensors_temperatures().cpu_thermal)
     # Check if any pins have changed state, and log
     for i in range(len(pinMap)):
         thisPinState =  GPIO.input(pinMap[i][1])
@@ -562,7 +591,7 @@ def drawGraph(period,graph):
                           "--lower-limit", "30",
                           "--left-axis-format", "%3.1lf\u00B0C",
                           "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                          "DEF:syst=" + str(sysDB) + ":cpu-temp:AVERAGE", areaW + 'syst' + areaC, lineW + 'syst' + lineC)              # <---- FIXME FOR PRODUCTION
+                          "DEF:syst=" + str(sysDB) + ":sys-temp:AVERAGE", areaW + 'syst' + areaC, lineW + 'syst' + lineC)              # <---- FIXME FOR PRODUCTION
         except Exception:
             pass
     elif (graph == "sys-load"):
@@ -578,7 +607,7 @@ def drawGraph(period,graph):
                           "--units-exponent", "0",
                           "--left-axis-format", "%2.3lf",
                           "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                          "DEF:sysl=" + str(sysDB) + ":cpu-load:AVERAGE", areaW + 'sysl' + areaC, lineW + 'sysl' + lineC)              # <---- FIXME FOR PRODUCTION
+                          "DEF:sysl=" + str(sysDB) + ":sys-load:AVERAGE", areaW + 'sysl' + areaC, lineW + 'sysl' + lineC)              # <---- FIXME FOR PRODUCTION
         except Exception:
             pass
     elif (graph == "sys-mem"):
@@ -593,7 +622,7 @@ def drawGraph(period,graph):
                           "--lower-limit", "0",
                           "--left-axis-format", "%3.0lf%%",
                           "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                          "DEF:sysm=" + str(sysDB) + ":cpu-mem:AVERAGE", areaW + 'sysm' + areaC, lineW + 'sysm' + lineC)               # <---- FIXME FOR PRODUCTION
+                          "DEF:sysm=" + str(sysDB) + ":sys-mem:AVERAGE", areaW + 'sysm' + areaC, lineW + 'sysm' + lineC)               # <---- FIXME FOR PRODUCTION
         except Exception:
             pass
     else:
@@ -602,7 +631,7 @@ def drawGraph(period,graph):
                 try:
                     rrdtool.graph(tempf.name, "--title", pinMap[i][0] + " Pin State: last " + period,
                                   "--width", str(graphWide),
-                                  "--height", str(graphHigh/3),
+                                  "--height", str(graphHigh/2),
                                   "--full-size-mode",
                                   "--start", start,
                                   "--end", "now",

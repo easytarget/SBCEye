@@ -28,16 +28,19 @@ Based on [CircuitPython](https://github.com/adafruit/circuitpython)
 * [CircuitPython SSD_1306](https://github.com/adafruit/Adafruit_CircuitPython_SSD1306)
 * [CircuitPython BME280](https://github.com/adafruit/Adafruit_CircuitPython_BME280)
 * [Schedule](https://github.com/dbader/schedule)
-* [pythonRRDtool](https://pythonhosted.org/rrdtool/index.html)
+* [python RRDtool](https://pythonhosted.org/rrdtool/index.html)
+* [psutil](https://psutil.readthedocs.io/en/latest/)
 * Liberation Fonts
 
 ## Install:
-* Install the Python3 gpio, schedule and rrdtool packages
+* Install the Python3 gpio, schedule, rrdtool packages
   * `sudo apt install python3-rpi.gpio python3-schedule python3-rrdtool`
 * Install the CircuitPython libraries listed above
   * These will pull in the python CircuitPython dependencies too
   * `sudo pip3 install adafruit-circuitpython-ssd1306`
   * `sudo pip3 install adafruit-circuitpython-bme280`
+* Install psutil via PIP so we get the latest version (needed since PI packaged version is waaay old).
+  * `sudo pip install psutil --upgrade`
 * Install liberation fonts (may be already installed)
   * `sudo apt install fonts-liberation`
 * Make sure the `pi` user is in the `gpio` group:
