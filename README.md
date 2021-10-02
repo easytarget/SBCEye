@@ -54,6 +54,8 @@ Based on [CircuitPython](https://github.com/adafruit/circuitpython)
 
 ### Docs for CP libs:
 https://circuitpython.readthedocs.io/en/latest/shared-bindings/index.html
+https://circuitpython.readthedocs.io/projects/framebuf/en/latest/api.html
+https://circuitpython.readthedocs.io/projects/bme280/en/latest/api.html
 
 ### Set Up as Service
 ```
