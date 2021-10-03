@@ -8,23 +8,10 @@
 # User Settings  (with sensible defaults)
 #
 
-# I2C Sensor and Display:
-# Make sure I2C is enabled in 'boot/config.txt' (reboot after editing that file)
-# Uncomment: "dtparam=i2c_arm=on", which is the same as you get if enabling I2C via the 'Interface Options' in `sudo raspi-config` 
-# I prefer 'dtparam=i2c_arm=on,i2c_arm_baudrate=400000', to draw the display faster, but is more prone to errors from long wires etc.. ymmv.
-
-# To list all I2C addresses visible on the system run: `i2cdetect -y 1` (`sudo apt install i2c-tools`)
-# bme280 I2C address (should not change)
-bme280_address = 0x76
-# The SSD1306 I2C address should be automagically found; the driver will bind to the first matching display
-
 # GPIO:
 # All pins are defined using BCM GPIO numbering
 # https://www.raspberrypi.org/forums/viewtopic.php?t=105200
 # Try running `gpio readall` on the Pi itself ;-)
-
-# Button pin (set to `0` to disable button)
-button_PIN = 0         # BCM Pin Number
 
 # Pin list
 # - List entries consist of ['Name', BCM Pin Number]
@@ -34,6 +21,9 @@ button_PIN = 0         # BCM Pin Number
 # - Example: pinMap = [['Lamp', 16], ['Printer', 20], ['Enclosure', 21]]
 
 pinMap = []
+
+# Button pin (set to `0` to disable button)
+button_PIN = 0         # BCM Pin Number
 
 # Web UI
 host = ''                          # Ip address to bind web server to, '' =  bind to all addresses
@@ -45,7 +35,7 @@ buttonPath = ''                    # Web button url path, leave blank to disable
 # See https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html#TIME%20OFFSET%20SPECIFICATION
 graphDefaults = ['3h','3d','1w','1m','3m','1y','3y']
 graphWide = 1200                   # Pixels
-graphHigh = 600
+graphHigh = 300
 # Other graph attributes 
 lineW = 'LINE2:'                   # Line style and width (See: https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html)
 lineC = '#A000A0'                  # Line color (I _like_ purple..)
@@ -66,7 +56,7 @@ rrdFileStore = "./DB/"
 rrdGraphStore = "./Graphs/"
 
 # Display + animation
-invertDisplay = False  # Is the display 'upside down'? generally the ribbon connection from the glass is at the bottom
+rotateDisplay = False   # Is the display 'upside down'? generally the ribbon connection from the glass is at the bottom
 passtime = 2           # time between display refresh cycles (seconds)
 passes = 3             # number of refreshes of a screen before moving to next
 slidespeed = 16        # number of rows to scroll on each animation step between screens
@@ -74,6 +64,18 @@ slidespeed = 16        # number of rows to scroll on each animation step between
 #
 # End of user config
 #
+
+# I2C BME280 Sensor and SSD1306 Display:
+#
+# Note: the sensor and display are optional, if not found their functionality will be disabled and this will be logged at startup.
+#
+# Make sure I2C is enabled in 'boot/config.txt' (reboot after editing that file)
+# Uncomment: "dtparam=i2c_arm=on", which is the same as you get if enabling I2C via the 'Interface Options' in `sudo raspi-config`
+# I prefer 'dtparam=i2c_arm=on,i2c_arm_baudrate=400000', to draw the display faster, but is more prone to errors from long wires etc.. ymmv.
+
+# To list all I2C addresses visible on the system run: `i2cdetect -y 1` (`sudo apt install i2c-tools`)
+# bme280 I2C address should be 0x76 or 0x77 (this is selectable via a jumper) and we will search for it there
+# The SSD1306 I2C address should be automagically found; the driver will bind to the first matching display
 
 # Start by re-nicing so we dont block anything important
 import os
@@ -136,15 +138,34 @@ logging.info("Starting " + serverName)
 # Create the I2C interface object
 i2c = busio.I2C(SCL, SDA)
 
-# Create the I2C SSD1306 OLED object
-# The first two parameters are the pixel width and pixel height.
-disp = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
-# Immediately blank the display in case it is showing garbage
-disp.fill(0)
-disp.show()
+try:
+    # Create the I2C SSD1306 OLED object
+    # The first two parameters are the pixel width and pixel height.
+    disp = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
+    haveScreen = True
+    print("We have a Screen")
+except:
+    haveScreen = False
+    print("We do not have a Screen")
 
-# Create the I2C BME280 sensor object
-bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=bme280_address)
+# Immediately blank the display in case it is showing garbage
+if haveScreen:
+    disp.fill(0)
+    disp.show()
+
+try:
+    # Create the I2C BME280 sensor object
+    bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x76)
+    print("BME280 sensor found with address 0x76")
+    haveSensor = True
+except:
+    try:
+        bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x77)
+        print("BME280 sensor found with address 0x77")
+        haveSensor = True
+    except:
+        print("No BME280 sensor found on addresses 0x76 or 0x77")
+        haveSensor = False
 
 # GPIO mode and arrays for the pin database path and current status
 if (len(pinMap) > 0):
@@ -158,25 +179,26 @@ pinDB = []
 for i in range(len(pinMap)):
     pinDB.append(Path(rrdFileStore + pinMap[i][0] + ".rrd"))
 
-# Image canvas
-margin = 20           # Space between the screens while transitioning
-width  = disp.width
-span   = width*2 + margin
-height = disp.height
+if haveScreen:
+    # Image canvas
+    margin = 20           # Space between the screens while transitioning
+    width  = disp.width
+    span   = width*2 + margin
+    height = disp.height
 
-# Create image canvas (with mode '1' for 1-bit color)
-image = Image.new("1", (span, height))
+    # Create image canvas (with mode '1' for 1-bit color)
+    image = Image.new("1", (span, height))
 
-# Get drawing object so we can easily draw on canvas.
-draw = ImageDraw.Draw(image)
+    # Get drawing object so we can easily draw on canvas.
+    draw = ImageDraw.Draw(image)
 
-# LiberationMono-Regular : nice font that looks clear on the small display
-# This font is located in: /usr/share/fonts/truetype/liberation/ on Raspian.
-# If you get an error that it is not present, install it with:
-#   sudo apt install fonts-liberation
-font = ImageFont.truetype('LiberationMono-Regular.ttf', 16)
+    # LiberationMono-Regular : nice font that looks clear on the small display
+    # This font is located in: /usr/share/fonts/truetype/liberation/ on Raspian.
+    # If you get an error that it is not present, install it with:
+    #   sudo apt install fonts-liberation
+    font = ImageFont.truetype('LiberationMono-Regular.ttf', 16)
 
-# Unicode characters needed for display
+# Unicode characters needed for display and logging
 degree_sign= u'\N{DEGREE SIGN}'
 
 # Commands used to gather CPU data
@@ -200,7 +222,7 @@ def clean():
 
 def show(xpos=0):
     # Put a specific area of the canvas onto display
-    if invertDisplay:
+    if rotateDisplay:
         disp.image(image.transform((width,height),Image.EXTENT,(xpos,0,xpos+width,height)).transpose(Image.ROTATE_180))
     else:
         disp.image(image.transform((width,height),Image.EXTENT,(xpos,0,xpos+width,height)))
@@ -321,7 +343,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('<style>\n', 'utf-8'))
         self.wfile.write(bytes('body {display:flex; flex-direction: column; align-items: center;}\n', 'utf-8'))
         self.wfile.write(bytes('a {color:#666666; text-decoration: none;}\n', 'utf-8'))
-        self.wfile.write(bytes('table {border-spacing: 0.2em;}\n', 'utf-8'))
+        self.wfile.write(bytes('img {width:auto; max-width:100%;}\n', 'utf-8'))
+        self.wfile.write(bytes('table {border-spacing: 0.2em; width:auto; max-width:100%;}\n', 'utf-8'))
         self.wfile.write(bytes('th {font-size: 110%; text-align: left;}\n', 'utf-8'))
         self.wfile.write(bytes('td {padding-left: 1em;}\n', 'utf-8'))
         self.wfile.write(bytes('</style>\n', 'utf-8'))
@@ -348,11 +371,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('<div style="color:#666666; font-size: 90%">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</div>\n', 'utf-8'))
 
     def _give_env(self):
-        # room sensors
-        self.wfile.write(bytes('<tr><th>Room</th></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>Temperature: </td><td>' + format(TMP, '.1f') + '&deg;</td></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>Humidity: </td><td>' + format(HUM, '.1f') + '%</td></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>Presssure: </td><td>' + format(PRE, '.0f') + 'mb</td></tr>\n', 'utf-8'))
+        if haveSensor:
+            # room sensors
+            self.wfile.write(bytes('<tr><th>Room</th></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Temperature: </td><td>' + format(TMP, '.1f') + '&deg;</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Humidity: </td><td>' + format(HUM, '.1f') + '%</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Presssure: </td><td>' + format(PRE, '.0f') + 'mb</td></tr>\n', 'utf-8'))
 
     def _give_sys(self):
         # Internal Sensors
@@ -383,7 +407,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('<table>\n', 'utf-8'))
         self.wfile.write(bytes('<tr>\n', 'utf-8'))
         self.wfile.write(bytes('<td><a href="?view=deco&view=env&view=sys&view=gpio&view=links&view=log">Inline Log</a></td>\n', 'utf-8'))
-        self.wfile.write(bytes('<td><a href="?view=log&lines=' + str(logLines) + '">Main Log</a></td>\n', 'utf-8'))
+        self.wfile.write(bytes('<td><a href="?view=deco&view=log&lines=' + str(logLines) + '">Main Log</a></td>\n', 'utf-8'))
         self.wfile.write(bytes('</tr>\n', 'utf-8'))
         self.wfile.write(bytes('</table>\n', 'utf-8'))
 
@@ -395,27 +419,32 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # There is doubtless a more 'python' way to do this, but it is fast, cheap and works..
         logCmd = f"for a in `ls -tr {logFile}*`;do cat $a ; done | tail -{lines}"
         log = subprocess.check_output(logCmd, shell=True).decode('utf-8')
-        self.wfile.write(bytes('<div>\n', 'utf-8'))
+        self.wfile.write(bytes('<div style="overflow-x: auto; width: 100%;">\n', 'utf-8'))
         self.wfile.write(bytes('<span style="font-size: 110%; font-weight: bold;">Recent log activity:</span>\n', 'utf-8'))
         self.wfile.write(bytes('<hr><pre>\n' + log + '</pre><hr>\n', 'utf-8'))
         self.wfile.write(bytes(f'Latest {lines} lines shown\n', 'utf-8'))
         self.wfile.write(bytes('</div>\n', 'utf-8'))
 
     def _give_graphs(self,d):
-        allgraphs = [["env-temp","Temperature"],
-                     ["env-humi","Humidity"],
-                     ["env-pres","Pressure"],
-                     ["sys-temp","CPU Temperature"],
-                     ["sys-load","CPU Load Average"],
-                     ["sys-mem","System Memory Use"]]
+        if haveSensor:
+            allgraphs = [["env-temp","Temperature"],
+                         ["env-humi","Humidity"],
+                         ["env-pres","Pressure"],
+                         ["sys-temp","CPU Temperature"],
+                         ["sys-load","CPU Load Average"],
+                         ["sys-mem","System Memory Use"]]
+        else:
+            allgraphs = [["sys-temp","CPU Temperature"],
+                         ["sys-load","CPU Load Average"],
+                         ["sys-mem","System Memory Use"]]
         for p in pinMap:
             allgraphs.append(["pin-" + p[0],p[0] + " GPIO"])
         self.wfile.write(bytes('<table>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><th>Graphs: -' + d + ' -> now</th></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>\n', 'utf-8'))
-        for g in allgraphs:
-            self.wfile.write(bytes('<tr><td><a href="graph?graph=' + g[0] + '&duration=' + d + '">', 'utf-8'))
-            self.wfile.write(bytes('<img width=400 title="' + g[1] + '" src="graph?graph=' + g[0] + '&duration=' + d + '">', 'utf-8'))
+        for [g,t] in allgraphs:
+            self.wfile.write(bytes('<tr><td><a href="graph?graph=' + g + '&duration=' + d + '">', 'utf-8'))
+            self.wfile.write(bytes('<img title="' + t + '" src="graph?graph=' + g + '&duration=' + d + '">', 'utf-8'))
             self.wfile.write(bytes('</a></td></tr>\n', 'utf-8'))
         self.wfile.write(bytes('</td></tr>\n', 'utf-8'))
         self.wfile.write(bytes('</table>\n', 'utf-8'))
@@ -431,7 +460,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             else:
                 graph = parsedGraph[0]
                 duration = parsedDuration[0]
-                logging.info('Graph Generation requested for: ' + graph + '(-' + duration + ' -> now) triggered by: ' + self.client_address[0])
+                # logging.info('Graph Generation requested for: ' + graph + '(-' + duration + ' -> now) triggered by: ' + self.client_address[0])
                 body = drawGraph(duration,graph)
             if (len(body) == 0):
                 self.send_error(404, 'Image Unavailable', 'Check your parameters and try again')
@@ -444,11 +473,11 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 duration = "1d"
             else:
                 duration = parsed[0]
-            logging.info('Graph Page (-' + duration + ' -> now) requested by: ' + self.client_address[0])
+            # logging.info('Graph Page (-' + duration + ' -> now) requested by: ' + self.client_address[0])
             self._set_headers()
             self._give_head(serverName + ":: graphs -" + duration)
             self.wfile.write(bytes('<h2>%s</h2>' % serverName, 'utf-8')) 
-            self.wfile.write(bytes('<table style="width:33%;">\n', 'utf-8'))
+            self.wfile.write(bytes('<table>\n', 'utf-8'))
             self._give_graphs(duration)
             self.wfile.write(bytes('</table>', 'utf-8'))
             self._give_datetime()
@@ -472,12 +501,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 view = ["deco", "env", "sys", "gpio", "links"]
             self._set_headers()
             self._give_head()
-            if "deco" in view: self.wfile.write(bytes('<h2>%s</h2>' % serverName, 'utf-8'))
+            if "deco" in view: self.wfile.write(bytes('<h2>%s</h2>\n' % serverName, 'utf-8'))
             self.wfile.write(bytes('<table>\n', 'utf-8'))
             if "env" in view: self._give_env()
             if "sys" in view: self._give_sys()
             if "gpio" in view: self._give_pins()
-            self.wfile.write(bytes('</table>', 'utf-8'))
+            self.wfile.write(bytes('</table>\n', 'utf-8'))
             if "links" in view: self._give_links()
             if "log" in view:
                 self._give_log()
@@ -495,16 +524,18 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self._set_headers()
 
 def updateData():
-    # Get sensor data
-    getBmeData()
+    # Get environmental and system data
+    if haveSensor:
+        getBmeData()
     getSysData()
-    print(psutil.virtual_memory().percent, psutil.getloadavg()[0], psutil.sensors_temperatures())
+
+    #print(psutil.virtual_memory().percent, psutil.getloadavg()[0], psutil.sensors_temperatures())
     #temps = psutil.sensors_temperatures()
     #for name, entries in temps.items():
     #    print(name)
     #    print(entries[0])
-
     #print(psutil.sensors_temperatures().cpu_thermal)
+
     # Check if any pins have changed state, and log
     for i in range(len(pinMap)):
         thisPinState =  GPIO.input(pinMap[i][1])
@@ -516,8 +547,9 @@ def updateData():
                 logging.info(pinMap[i][0] + ': off')
 
 def updateDB():
-    updateCmd = "N:" + format(TMP, '.3f') + ":" + format(HUM, '.2f') + ":" + format(PRE, '.2f')
-    rrdtool.update(str(envDB), updateCmd)
+    if haveSensor:
+        updateCmd = "N:" + format(TMP, '.3f') + ":" + format(HUM, '.2f') + ":" + format(PRE, '.2f')
+        rrdtool.update(str(envDB), updateCmd)
     updateCmd = "N:" + CPU + ":" + TOP + ":" + MEM
     rrdtool.update(str(sysDB), updateCmd)
     for i in range(len(pinDB)):
@@ -525,13 +557,15 @@ def updateDB():
         rrdtool.update(str(pinDB[i]), updateCmd)
 
 def logSensors():
-    logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + TOP + ', Mem: ' + MEM + '%')
+    if haveSensor:
+        logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + TOP + ', Mem: ' + MEM + '%')
+    else:
+        logging.info('CPU: ' + CPU + degree_sign + ', Load: ' + TOP + ', Mem: ' + MEM + '%')
 
 def drawGraph(period,graph):
     # RRD graph generation
     # Returns the generated file for sending in the http response
     tempf = tempfile.NamedTemporaryFile(mode='rb', dir='/tmp', prefix='overwatch_graph')
-    print('Graph generation: graph ="' + graph + '", period="' + period + '"')
     start = 'end-' + period
     if (graph == "env-temp"):
         try:
@@ -541,7 +575,7 @@ def drawGraph(period,graph):
                           "--full-size-mode",
                           "--start", start,
                           "--end", "now",
-                          "--upper-limit", "60",
+                          "--upper-limit", "45",
                           "--lower-limit", "10",
                           "--left-axis-format", "%3.1lf\u00B0C",
                           "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
@@ -648,7 +682,7 @@ def drawGraph(period,graph):
     tempf.close()
     return response
 
-def scheduleRunDelay(seconds):
+def scheduleRunDelay(seconds=60):
     # Approximate delay while checking for pending scheduled jobs every second
     schedule.run_pending()
     for t in range(seconds):
@@ -664,19 +698,20 @@ if __name__ == "__main__":
     ServeHTTP()
 
 # Main RRDtool databases
-    if not envDB.is_file():
-        print("Generating " + str(envDB))
-        rrdtool.create(
-            str(envDB),
-            "--start", "now",
-            "--step", "60",
-            "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-            "RRA:AVERAGE:0.5:60:26352",   # 3 years per hour
-            "DS:env-temp:GAUGE:60:U:U",
-            "DS:env-humi:GAUGE:60:U:U",
-            "DS:env-pres:GAUGE:60:U:U")
-    else:
-        print("Using existing: " + str(envDB))
+    if haveSensor:
+        if not envDB.is_file():
+            print("Generating " + str(envDB))
+            rrdtool.create(
+                str(envDB),
+                "--start", "now",
+                "--step", "60",
+                "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
+                "RRA:AVERAGE:0.5:60:26352",   # 3 years per hour
+                "DS:env-temp:GAUGE:60:U:U",
+                "DS:env-humi:GAUGE:60:U:U",
+                "DS:env-pres:GAUGE:60:U:U")
+        else:
+            print("Using existing: " + str(envDB))
 
     if not sysDB.is_file():
         print("Generating " + str(sysDB))
@@ -713,8 +748,9 @@ if __name__ == "__main__":
         logging.info('Button enabled')
 
     # Initial data readings
-    getBmeData()
+    if haveSensor: getBmeData()
     getSysData()
+
     # Set all gpio pins to 'output' and record their initial status
     #   We need to set them as outputs in this scripts context in order to monitor their state.
     #   So long as we do not try to write to these pins this will not affect their output,
@@ -730,6 +766,11 @@ if __name__ == "__main__":
     # Exit handler
     atexit.register(goodBye)
 
+    # Warn if we are missing sensor or screen
+    if not haveScreen: logging.warning("No screen detected, screen features disabled")
+    if not haveSensor: logging.warning("No environmental sensor detected, reporting and logging disabled")
+    if (len(pinMap) == 0): logging.warning("No GPIO map provided, GPIO reporting and logging disabled")
+
     # We got this far... time to start the show
     logging.info("Init complete, starting schedule and entering main loop")
 
@@ -743,28 +784,37 @@ if __name__ == "__main__":
 
     # Main loop now runs forever
     while True:
-        # Screen 1
-        for i in range(passes):
-            clean()
-            bmeScreen()
-            show()
-            scheduleRunDelay(passtime)
-
-        # Update and transition to screen 2
-        bmeScreen()
-        sysScreen(width+margin)
-        slideout()
-        scheduleRunDelay(passtime)
-
-        # Screen 2
-        for i in range(passes):
-            clean()
-            sysScreen()
-            show()
-            scheduleRunDelay(passtime)
-
-        # Update and transition back to screen 1
-        sysScreen()
-        bmeScreen(width+margin)
-        slideout()
-        scheduleRunDelay(passtime)
+        if haveScreen:
+            if haveSensor:
+                # Environment Screen
+                for i in range(passes):
+                    clean()
+                    bmeScreen()
+                    show()
+                    scheduleRunDelay(passtime)
+                # Update and transition to system screen
+                bmeScreen()
+                sysScreen(width+margin)
+                slideout()
+                scheduleRunDelay(passtime)
+                # System screen
+                for i in range(passes):
+                    clean()
+                    sysScreen()
+                    show()
+                    scheduleRunDelay(passtime)
+                # Update and transition back to environment screen
+                sysScreen()
+                bmeScreen(width+margin)
+                slideout()
+                scheduleRunDelay(passtime)
+            else:
+                # Just loop refreshing the system screen
+                for i in range(passes):
+                    clean()
+                    sysScreen()
+                    show()
+                    scheduleRunDelay(passtime)
+        else:
+            # No screen, so just run schedule jobs in a loop
+            scheduleRunDelay()
