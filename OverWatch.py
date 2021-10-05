@@ -37,7 +37,7 @@ graphDefaults = ['3h','3d','1w','1m','3m','1y','3y']
 graphWide = 1200                   # Pixels
 graphHigh = 300
 # Other graph attributes 
-lineW = 'LINE2:'                   # Line style and width (See: https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html)
+lineW = 'LINE2:'                   # Line width (See: https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html)
 lineC = '#A000A0'                  # Line color (I _like_ purple..)
 areaW = 'AREA:'                    # This gives the shadow effect
 areaC = '#E0D0E0#FFFFFF:gradheight=0'
@@ -47,7 +47,7 @@ sensorInterval = 3                 # Seconds
 
 # Logging
 logFile = './overwatch.log'        # Folder must be writable by the OverWatch process
-logInterval = 600                  # Environmental and system log interval (seconds, zero to disable)
+logInterval = 600                  # Environmental and system log dumpinterval (seconds, zero to disable)
 logLines = 240                     # How many lines of logging to show in webui by default
 suppressGlitches=True              # Pin interrupts can produce phantom button presses due to crosstalk, ignore them
 
@@ -55,11 +55,18 @@ suppressGlitches=True              # Pin interrupts can produce phantom button p
 rrdFileStore = "./DB/"
 rrdGraphStore = "./Graphs/"
 
-# Display + animation
-rotateDisplay = False   # Is the display 'upside down'? generally the ribbon connection from the glass is at the bottom
+# Animation
 passtime = 2           # time between display refresh cycles (seconds)
 passes = 3             # number of refreshes of a screen before moving to next
 slidespeed = 16        # number of rows to scroll on each animation step between screens
+
+# Display orientation, contrast and burn-in prevention
+rotateDisplay = True    # Is the display 'upside down'? generally the ribbon connection from the glass is at the bottom
+displayContrast = 127   # (0-255, default 255) This gives a limited brightness reduction, not full dimming to black
+displayInvert = False   # Default is light text on dark background
+saverMode = 'off'       # Possible values are 'off', 'blank' and 'invert'
+saverOn  = 19           # Start time for screensaver (hour, 24hr clock)
+saverOff =  7           # End time
 
 #
 # End of user config
@@ -143,15 +150,14 @@ try:
     # The first two parameters are the pixel width and pixel height.
     disp = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
     haveScreen = True
+    disp.contrast(displayContrast)
+    disp.invert(displayInvert)
+    disp.fill(0)  # And blank as fast as possible in case it is showing garbage..
+    disp.show()
     print("We have a Screen")
 except:
     haveScreen = False
     print("We do not have a Screen")
-
-# Immediately blank the display in case it is showing garbage
-if haveScreen:
-    disp.fill(0)
-    disp.show()
 
 try:
     # Create the I2C BME280 sensor object
@@ -197,6 +203,12 @@ if haveScreen:
     # If you get an error that it is not present, install it with:
     #   sudo apt install fonts-liberation
     font = ImageFont.truetype('LiberationMono-Regular.ttf', 16)
+else:
+    # Ensure saver never triggers
+    saverMode = "off"
+
+# Current screensaver state
+saverActive= False
 
 # Unicode characters needed for display and logging
 degree_sign= u'\N{DEGREE SIGN}'
@@ -523,8 +535,26 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def do_HEAD(self):
         self._set_headers()
 
+def setSaver(saverOn):
+    global saverActive
+    print("Saver: " + str(saverActive) + ", Requested: " + str(saverOn))
+    if (saverOn):
+        print("Saver Being Enabled")
+        saverActive = True
+        if (saverMode == 'invert'):
+            disp.invert(not displayInvert)
+        elif (saverMode == 'blank'):
+            disp.poweroff()
+    else:
+        print("Saver Being Disabled")
+        saverActive = False
+        if (saverMode == 'invert'):
+            disp.invert(displayInvert)
+        elif (saverMode == 'blank'):
+            disp.poweron()
+
 def updateData():
-    # Get environmental and system data
+    # Runs every few seconds to get current environmental and system data
     if haveSensor:
         getBmeData()
     getSysData()
@@ -547,6 +577,7 @@ def updateData():
                 logging.info(pinMap[i][0] + ': off')
 
 def updateDB():
+    # Runs 3x per minute, updates RRD database and processes screensaver
     if haveSensor:
         updateCmd = "N:" + format(TMP, '.3f') + ":" + format(HUM, '.2f') + ":" + format(PRE, '.2f')
         rrdtool.update(str(envDB), updateCmd)
@@ -555,8 +586,16 @@ def updateDB():
     for i in range(len(pinDB)):
         updateCmd = "N:" + str(pinState[i])
         rrdtool.update(str(pinDB[i]), updateCmd)
+    if (saverMode != 'off'):
+        now = time.localtime()[3]
+        print(now)
+        if ((now == saverOn) and not saverActive):
+            setSaver(True)
+        elif ((now == saverOff) and saverActive):
+            setSaver(False)
 
 def logSensors():
+    # Runs on a user defined schedule to dump a line of sensor data in the log
     if haveSensor:
         logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + TOP + ', Mem: ' + MEM + '%')
     else:
@@ -694,6 +733,16 @@ def goodBye():
 
 # The fun starts here:
 if __name__ == "__main__":
+
+    # Splash!
+    draw.text((10, 10), 'Over-',  font=font, fill=255)
+    draw.text((28, 28), 'Watch',  font=font, fill=255)
+    show()
+
+    # Do an initial, early, data reading to settle sensors etc
+    if haveSensor: getBmeData()
+    getSysData()
+
     # Web Server
     ServeHTTP()
 
@@ -746,10 +795,6 @@ if __name__ == "__main__":
         GPIO.setup(button_PIN, GPIO.IN)       # Set our button pin to be an input
         GPIO.add_event_detect(button_PIN, GPIO.RISING, buttonInterrupt, bouncetime = 400)
         logging.info('Button enabled')
-
-    # Initial data readings
-    if haveSensor: getBmeData()
-    getSysData()
 
     # Set all gpio pins to 'output' and record their initial status
     #   We need to set them as outputs in this scripts context in order to monitor their state.
