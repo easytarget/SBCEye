@@ -1,2 +1,4 @@
-overwatch.log*
+*.log*
 DB/*.rrd
+settings.py
+__pycache__
