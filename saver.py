@@ -5,6 +5,7 @@ class saver:
     active = False
 
     def __init__(self, disp, mode, start, end, invert):
+        self.disp = disp
         self.mode = mode
         self.start = start
         self.end = end
@@ -18,18 +19,18 @@ class saver:
             self.active = True
             if (self.mode == 'invert'):
                 print("invert")
-                disp.invert(not self.invert)
+                self.disp.invert(not self.invert)
             elif (self.mode == 'blank'):
                 print("blank")
-                disp.poweroff()
+                self.disp.poweroff()
         else:
             self.active = False
             if (self.mode == 'invert'):
                 print("de-invert")
-                disp.invert(self.invert)
+                self.disp.invert(self.invert)
             elif (self.mode == 'blank'):
                 print("de-blank")
-                disp.poweron()
+                self.disp.poweron()
 
     def check(self):
         if (self.mode != 'off'):
