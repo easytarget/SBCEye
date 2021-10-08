@@ -14,6 +14,10 @@ except (ModuleNotFoundError):
     print("No user settings found, loading from default settings file")
     from default_settings import settings as s
 
+# Local classes
+from saver import saver
+from rrd import rrd
+
 # I2C BME280 Sensor and SSD1306 Display:
 #
 # Note: the sensor and display are optional, if not found their functionality will be disabled and this will be logged at startup.
@@ -34,7 +38,6 @@ os.nice(10)
 import time
 import datetime
 import subprocess
-import tempfile
 
 # System monitoring tools
 import psutil
@@ -57,10 +60,6 @@ import RPi.GPIO as GPIO           # Allows us to call our GPIO pins and names it
 import http.server
 from urllib.parse import urlparse, parse_qs
 from threading import Thread, current_thread
-
-# RRD database
-import rrdtool
-from pathlib import Path
 
 # Scheduler and Logging
 import schedule
@@ -124,12 +123,8 @@ if (len(s.pinMap) > 0):
     GPIO.setmode(GPIO.BCM)  # Set's GPIO pins to BCM GPIO numbering
 pinState = []
 
-# RRD database file locations
-envDB = Path(s.rrdFileStore + "env.rrd")
-sysDB = Path(s.rrdFileStore + "sys.rrd")
-pinDB = []
-for i in range(len(s.pinMap)):
-    pinDB.append(Path(s.rrdFileStore + s.pinMap[i][0] + ".rrd"))
+# RRD init
+rrd = rrd(s.rrdFileStore, haveSensor, s.pinMap)
 
 if haveScreen:
     # Image canvas
@@ -153,11 +148,12 @@ else:
     # Ensure saver never triggers
     s.saverMode = "off"
 
-# Current screensaver state
-saverActive= False
-
 # Unicode characters needed for display and logging
 degree_sign= u'\N{DEGREE SIGN}'
+
+# Start saver
+if haveScreen: 
+    screensaver = saver(disp, s.saverMode, s.saverOn, s.saverOff, s.displayInvert)
 
 # Commands used to gather CPU data
 cpuCmd = "cat /sys/class/thermal/thermal_zone0/temp | awk '{printf \"%.1f\", $1/1000}'"
@@ -419,7 +415,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 graph = parsedGraph[0]
                 duration = parsedDuration[0]
                 # logging.info('Graph Generation requested for: ' + graph + '(-' + duration + ' -> now) triggered by: ' + self.client_address[0])
-                body = drawGraph(duration,graph)
+                body = rrd.drawGraph(duration, graph, s.graphWide, s.graphHigh, s.areaC, s.areaW, s.lineC, s.lineW, s.serverName)
             if (len(body) == 0):
                 self.send_error(404, 'Image Unavailable', 'Check your parameters and try again')
                 return
@@ -507,23 +503,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def do_HEAD(self):
         self._set_headers()
 
-def setSaver(on):
-    global saverActive
-    if (on):
-        print("Saver Enabled")
-        saverActive = True
-        if (s.saverMode == 'invert'):
-            disp.invert(not s.displayInvert)
-        elif (s.saverMode == 'blank'):
-            disp.poweroff()
-    else:
-        print("Saver Disabled")
-        saverActive = False
-        if (s.saverMode == 'invert'):
-            disp.invert(s.displayInvert)
-        elif (s.saverMode == 'blank'):
-            disp.poweron()
-
 def updateData():
     # Runs every few seconds to get current environmental and system data
     if haveSensor:
@@ -549,20 +528,9 @@ def updateData():
 
 def updateDB():
     # Runs 3x per minute, updates RRD database and processes screensaver
-    if haveSensor:
-        updateCmd = "N:" + format(TMP, '.3f') + ":" + format(HUM, '.2f') + ":" + format(PRE, '.2f')
-        rrdtool.update(str(envDB), updateCmd)
-    updateCmd = "N:" + CPU + ":" + TOP + ":" + MEM
-    rrdtool.update(str(sysDB), updateCmd)
-    for i in range(len(pinDB)):
-        updateCmd = "N:" + str(pinState[i])
-        rrdtool.update(str(pinDB[i]), updateCmd)
-    if (s.saverMode != 'off'):
-        hour = time.localtime()[4]
-        if ((hour == s.saverOn) and not saverActive):
-            setSaver(True)
-        elif ((hour == s.saverOff) and saverActive):
-            setSaver(False)
+    rrd.update(TMP, HUM, PRE, CPU, TOP, MEM, pinState)
+    if haveScreen:
+        screensaver.check()
 
 def logSensors():
     # Runs on a user defined schedule to dump a line of sensor data in the log
@@ -570,126 +538,6 @@ def logSensors():
         logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + TOP + ', Mem: ' + MEM + '%')
     else:
         logging.info('CPU: ' + CPU + degree_sign + ', Load: ' + TOP + ', Mem: ' + MEM + '%')
-
-def drawGraph(period,graph):
-    # RRD graph generation
-    # Returns the generated file for sending in the http response
-    tempf = tempfile.NamedTemporaryFile(mode='rb', dir='/tmp', prefix='overwatch_graph')
-    start = 'end-' + period
-    if (graph == "env-temp"):
-        try:
-            rrdtool.graph(tempf.name, "--title", "Environment Temperature: last " + period,
-                          "--width", str(s.graphWide),
-                          "--height", str(s.graphHigh),
-                          "--full-size-mode",
-                          "--start", start,
-                          "--end", "now",
-                          "--upper-limit", "45",
-                          "--lower-limit", "10",
-                          "--left-axis-format", "%3.1lf\u00B0C",
-                          "--watermark", s.serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                          "DEF:envt=" + str(envDB) + ":env-temp:AVERAGE", s.areaW + 'envt' + s.areaC, s.lineW + 'envt' + s.lineC)
-        except Exception:
-            pass
-    elif (graph == "env-humi"):
-        try:
-            rrdtool.graph(tempf.name, "--title", "Environment Humidity: last " + period,
-                          "--width", str(s.graphWide),
-                          "--height", str(s.graphHigh),
-                          "--full-size-mode",
-                          "--start", start,
-                          "--end", "now",
-                          "--upper-limit", "100",
-                          "--lower-limit", "0",
-                          "--left-axis-format", "%3.0lf%%",
-                          "--watermark", s.serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                          "DEF:envh=" + str(envDB) + ":env-humi:AVERAGE", s.areaW + 'envh' + s.areaC, s.lineW + 'envh' + s.lineC)
-        except Exception:
-            pass
-    elif (graph == "env-pres"):
-        try:
-            rrdtool.graph(tempf.name, "--title", "Environment Pressure: last " + period,
-                          "--width", str(s.graphWide),
-                          "--height", str(s.graphHigh),
-                          "--full-size-mode",
-                          "--start", start,
-                          "--end", "now",
-                          "--upper-limit", "1040",
-                          "--lower-limit", "970",
-                          "--units-exponent", "0",
-                          "--left-axis-format", "%4.0lfmb",
-                          "--watermark", s.serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                          "DEF:envp=" + str(envDB) + ":env-pres:AVERAGE", s.areaW + 'envp' + s.areaC, s.lineW + 'envp' + s.lineC)
-        except Exception:
-            pass
-    elif (graph == "sys-temp"):
-        try:
-            rrdtool.graph(tempf.name, "--title", "CPU Temperature: last " + period,
-                          "--width", str(s.graphWide),
-                          "--height", str(s.graphHigh),
-                          "--full-size-mode",
-                          "--start", start,
-                          "--end", "now",
-                          "--upper-limit", "90",
-                          "--lower-limit", "30",
-                          "--left-axis-format", "%3.1lf\u00B0C",
-                          "--watermark", s.serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                          "DEF:syst=" + str(sysDB) + ":sys-temp:AVERAGE", s.areaW + 'syst' + s.areaC, s.lineW + 'syst' + s.lineC)
-        except Exception:
-            pass
-    elif (graph == "sys-load"):
-        try:
-            rrdtool.graph(tempf.name, "--title", "CPU Load Average: last " + period,
-                          "--width", str(s.graphWide),
-                          "--height", str(s.graphHigh),
-                          "--full-size-mode",
-                          "--start", start,
-                          "--end", "now",
-                          "--upper-limit", "3",
-                          "--lower-limit", "0",
-                          "--units-exponent", "0",
-                          "--left-axis-format", "%2.3lf",
-                          "--watermark", s.serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                          "DEF:sysl=" + str(sysDB) + ":sys-load:AVERAGE", s.areaW + 'sysl' + s.areaC, s.lineW + 'sysl' + s.lineC)
-        except Exception:
-            pass
-    elif (graph == "sys-mem"):
-        try:
-            rrdtool.graph(tempf.name, "--title", "System Memory Use: last " + period,
-                          "--width", str(s.graphWide),
-                          "--height", str(s.graphHigh),
-                          "--full-size-mode",
-                          "--start", start,
-                          "--end", "now",
-                          "--upper-limit", "100",
-                          "--lower-limit", "0",
-                          "--left-axis-format", "%3.0lf%%",
-                          "--watermark", s.serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                          "DEF:sysm=" + str(sysDB) + ":sys-mem:AVERAGE", s.areaW + 'sysm' + s.areaC, s.lineW + 'sysm' + s.lineC)
-        except Exception:
-            pass
-    else:
-        for i in range(len(s.pinMap)):
-            if (graph == "pin-" + s.pinMap[i][0]):
-                try:
-                    rrdtool.graph(tempf.name, "--title", s.pinMap[i][0] + " Pin State: last " + period,
-                                  "--width", str(s.graphWide),
-                                  "--height", str(s.graphHigh/2),
-                                  "--full-size-mode",
-                                  "--start", start,
-                                  "--end", "now",
-                                  "--upper-limit", "1.1",
-                                  "--lower-limit", "-0.1",
-                                  "--left-axis-format", "%3.1lf",
-                                  "--watermark", s.serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
-                                  "DEF:pinv=" + str(pinDB[i]) + ":status:AVERAGE", s.areaW + 'pinv' + s.areaC, s.lineW + 'pinv' + s.lineC)
-                except Exception:
-                    pass
-    response = tempf.read()
-    if (len(response) == 0):
-        print("Error: png file generation failed for : " + graph + " : " + period)
-    tempf.close()
-    return response
 
 def scheduleRunDelay(seconds=60):
     # Approximate delay while checking for pending scheduled jobs every second
@@ -716,50 +564,6 @@ if __name__ == "__main__":
 
     # Web Server
     ServeHTTP()
-
-# Main RRDtool databases
-    if haveSensor:
-        if not envDB.is_file():
-            print("Generating " + str(envDB))
-            rrdtool.create(
-                str(envDB),
-                "--start", "now",
-                "--step", "60",
-                "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-                "RRA:AVERAGE:0.5:60:26352",   # 3 years per hour
-                "DS:env-temp:GAUGE:60:U:U",
-                "DS:env-humi:GAUGE:60:U:U",
-                "DS:env-pres:GAUGE:60:U:U")
-        else:
-            print("Using existing: " + str(envDB))
-
-    if not sysDB.is_file():
-        print("Generating " + str(sysDB))
-        rrdtool.create(
-            str(sysDB),
-            "--start", "now",
-            "--step", "60",
-            "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-            "RRA:AVERAGE:0.5:60:26352",   # 3 years per hour
-            "DS:sys-temp:GAUGE:60:U:U",
-            "DS:sys-load:GAUGE:60:U:U",
-            "DS:sys-mem:GAUGE:60:U:U")
-    else:
-        print("Using existing: " + str(sysDB))
-
-    # Add RRD database for each GPIO line
-    for i in range(len(s.pinMap)):
-        if not pinDB[i].is_file():
-            print("Generating " + str(pinDB[i]))
-            rrdtool.create(
-                str(pinDB[i]),
-                "--start", "now",
-                "--step", "60",
-                "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-                "RRA:AVERAGE:0.5:60:26352",   # 3 years per hour
-                "DS:status:GAUGE:60:0:1")
-        else:
-            print("Using existing: " + str(pinDB[i]))
 
     # Set up the button pin interrupt (if defined, otherwise button is disabled)
     if (s.button_PIN > 0):
