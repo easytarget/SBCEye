@@ -82,8 +82,12 @@ schedule_logger.setLevel(level=logging.WARN)     # Stop it.
 logging.info('')
 logging.info("Starting " + s.serverName)
 
-# Create the I2C interface object
-i2c = busio.I2C(SCL, SDA)
+try: 
+    # Create the I2C interface object
+    i2c = busio.I2C(SCL, SDA)
+except Exception as e: 
+    print(e)
+    print("No I2C bus, screen and sensor functions will be disabled")
 
 try:
     # Create the I2C SSD1306 OLED object
@@ -698,10 +702,11 @@ def goodBye():
 # The fun starts here:
 if __name__ == "__main__":
 
-    # Splash!
-    draw.text((10, 10), 'Over-',  font=font, fill=255)
-    draw.text((28, 28), 'Watch',  font=font, fill=255)
-    show()
+    if (haveScreen):
+        # Splash!
+        draw.text((10, 10), 'Over-',  font=font, fill=255)
+        draw.text((28, 28), 'Watch',  font=font, fill=255)
+        show()
 
     # Do an initial, early, data reading to settle sensors etc
     if haveSensor: getBmeData()

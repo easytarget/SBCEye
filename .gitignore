@@ -1,4 +1,5 @@
 *.log*
 DB/*.rrd
 settings.py
+env
 __pycache__
