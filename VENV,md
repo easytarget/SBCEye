@@ -6,39 +6,11 @@ pi@marigold:~/HAT/pi-overwatch $ python3 -m pip --version
 pip 18.1 from /usr/lib/python3/dist-packages/pip (python 3.7)
 
 pi@marigold:~ $ python3 -m pip install --user --upgrade pip
-Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple
-Collecting pip
-  Downloading https://files.pythonhosted.org/packages/ca/31/b88ef447d595963c01060998cb329251648acf4a067721b0452c45527eb8/pip-21.2.4-py3-none-any.whl (1.6MB)
-    100% |████████████████████████████████| 1.6MB 283kB/s 
-Installing collected packages: pip
-Successfully installed pip-21.2.4
 
 pi@marigold:~/HAT/pi-overwatch $ python3 -m pip --version
 pip 21.2.4 from /home/pi/.local/lib/python3.7/site-packages/pip (python 3.7)
 
 pi@marigold:~/HAT/pi-overwatch $ python3 -m pip install --user virtualenv
-Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple
-Collecting virtualenv
-  Downloading https://www.piwheels.org/simple/virtualenv/virtualenv-20.8.1-py2.py3-none-any.whl (5.3 MB)
-     |████████████████████████████████| 5.3 MB 2.3 MB/s 
-Requirement already satisfied: six<2,>=1.9.0 in /usr/lib/python3/dist-packages (from virtualenv) (1.12.0)
-Collecting distlib<1,>=0.3.1
-  Downloading https://www.piwheels.org/simple/distlib/distlib-0.3.3-py3-none-any.whl (497 kB)
-     |████████████████████████████████| 497 kB 4.3 MB/s 
-Collecting filelock<4,>=3.0.0
-  Downloading https://www.piwheels.org/simple/filelock/filelock-3.3.0-py3-none-any.whl (9.7 kB)
-Collecting importlib-metadata>=0.12
-  Downloading https://www.piwheels.org/simple/importlib-metadata/importlib_metadata-4.8.1-py3-none-any.whl (17 kB)
-Collecting platformdirs<3,>=2
-  Downloading https://www.piwheels.org/simple/platformdirs/platformdirs-2.4.0-py3-none-any.whl (14 kB)
-Collecting backports.entry-points-selectable>=1.0.4
-  Downloading https://www.piwheels.org/simple/backports-entry-points-selectable/backports.entry_points_selectable-1.1.0-py2.py3-none-any.whl (6.2 kB)
-Collecting typing-extensions>=3.6.4
-  Downloading https://www.piwheels.org/simple/typing-extensions/typing_extensions-3.10.0.2-py3-none-any.whl (27 kB)
-Collecting zipp>=0.5
-  Downloading https://www.piwheels.org/simple/zipp/zipp-3.6.0-py3-none-any.whl (5.3 kB)
-Installing collected packages: zipp, typing-extensions, importlib-metadata, platformdirs, filelock, distlib, backports.entry-points-selectable, virtualenv
-Successfully installed backports.entry-points-selectable-1.1.0 distlib-0.3.3 filelock-3.3.0 importlib-metadata-4.8.1 platformdirs-2.4.0 typing-extensions-3.10.0.2 virtualenv-20.8.1 zipp-3.6.0
 
 pi@marigold:~/HAT/pi-overwatch $ python3 -m venv env
 
@@ -47,165 +19,18 @@ pi@marigold:~/HAT/pi-overwatch $ source env/bin/activate
 /home/pi/HAT/pi-overwatch/env/bin/python
 
 (env) pi@marigold:~/HAT/pi-overwatch $ pip install wheel
-Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple
-Collecting wheel
-  Using cached https://files.pythonhosted.org/packages/04/80/cad93b40262f5d09f6de82adbee452fd43cdff60830b56a74c5930f7e277/wheel-0.37.0-py2.py3-none-any.whl
-Installing collected packages: wheel
-Successfully installed wheel-0.37.0
 
 (env) pi@marigold:~/HAT/pi-overwatch $ pip install adafruit-circuitpython-ssd1306
-Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple
-Collecting adafruit-circuitpython-ssd1306
-  Using cached https://www.piwheels.org/simple/adafruit-circuitpython-ssd1306/adafruit_circuitpython_ssd1306-2.12.1-py3-none-any.whl
-Collecting adafruit-circuitpython-framebuf (from adafruit-circuitpython-ssd1306)
-  Using cached https://www.piwheels.org/simple/adafruit-circuitpython-framebuf/adafruit_circuitpython_framebuf-1.4.7-py3-none-any.whl
-Collecting Adafruit-Blinka (from adafruit-circuitpython-ssd1306)
-  Using cached https://www.piwheels.org/simple/adafruit-blinka/Adafruit_Blinka-6.14.1-py3-none-any.whl
-Collecting adafruit-circuitpython-busdevice (from adafruit-circuitpython-ssd1306)
-  Using cached https://www.piwheels.org/simple/adafruit-circuitpython-busdevice/adafruit_circuitpython_busdevice-5.1.0-py3-none-any.whl
-Collecting Adafruit-PureIO>=1.1.7 (from Adafruit-Blinka->adafruit-circuitpython-ssd1306)
-  Using cached https://www.piwheels.org/simple/adafruit-pureio/Adafruit_PureIO-1.1.9-py3-none-any.whl
-Collecting pyftdi>=0.40.0 (from Adafruit-Blinka->adafruit-circuitpython-ssd1306)
-  Using cached https://files.pythonhosted.org/packages/e8/42/74fe01fe7533a58808b9f2a9a112b22ee39849c3ac3526f4f6e16ef56fb4/pyftdi-0.53.3-py3-none-any.whl
-Collecting sysv-ipc>=1.1.0 (from Adafruit-Blinka->adafruit-circuitpython-ssd1306)
-  Using cached https://files.pythonhosted.org/packages/0c/d7/5d2f861155e9749f981e6c58f2a482d3ab458bf8c35ae24d4b4d5899ebf9/sysv_ipc-1.1.0.tar.gz
-Collecting rpi-ws281x>=4.0.0 (from Adafruit-Blinka->adafruit-circuitpython-ssd1306)
-  Using cached https://files.pythonhosted.org/packages/cd/b3/eb7ac93376952f165577707ec756f40c9537ed53c59fcbc3290c357370e0/rpi_ws281x-4.3.0.tar.gz
-Collecting Adafruit-PlatformDetect>=3.13.0 (from Adafruit-Blinka->adafruit-circuitpython-ssd1306)
-  Using cached https://www.piwheels.org/simple/adafruit-platformdetect/Adafruit_PlatformDetect-3.15.3-py3-none-any.whl
-Collecting RPi.GPIO (from Adafruit-Blinka->adafruit-circuitpython-ssd1306)
-  Using cached https://files.pythonhosted.org/packages/cb/88/d3817eb11fc77a8d9a63abeab8fe303266b1e3b85e2952238f0da43fed4e/RPi.GPIO-0.7.0.tar.gz
-Collecting pyserial>=3.0 (from pyftdi>=0.40.0->Adafruit-Blinka->adafruit-circuitpython-ssd1306)
-  Using cached https://files.pythonhosted.org/packages/07/bc/587a445451b253b285629263eb51c2d8e9bcea4fc97826266d186f96f558/pyserial-3.5-py2.py3-none-any.whl
-Collecting pyusb!=1.2.0,>=1.0.0 (from pyftdi>=0.40.0->Adafruit-Blinka->adafruit-circuitpython-ssd1306)
-  Using cached https://files.pythonhosted.org/packages/15/a8/4982498b2ab44d1fcd5c49f07ea3795eab01601dc143b009d333fcace3b9/pyusb-1.2.1-py3-none-any.whl
-Building wheels for collected packages: sysv-ipc, rpi-ws281x, RPi.GPIO
-  Running setup.py bdist_wheel for sysv-ipc ... done
-  Stored in directory: /home/pi/.cache/pip/wheels/86/fa/cb/38b87dada3ffd5f8cdd5f1e2ad882a1ddc30f8d7311e5af854
-  Running setup.py bdist_wheel for rpi-ws281x ... done
-  Stored in directory: /home/pi/.cache/pip/wheels/5f/40/28/b85b2c308a51688343a8d6d0b5bcd9d19c7556c554e16cb9c0
-  Running setup.py bdist_wheel for RPi.GPIO ... done
-  Stored in directory: /home/pi/.cache/pip/wheels/ec/11/7f/aa6fe56010104b49197ebbd697418affe12e05d42213f3e0ca
-Successfully built sysv-ipc rpi-ws281x RPi.GPIO
-Installing collected packages: Adafruit-PureIO, pyserial, pyusb, pyftdi, sysv-ipc, rpi-ws281x, Adafruit-PlatformDetect, RPi.GPIO, Adafruit-Blinka, adafruit-circuitpython-framebuf, adafruit-circuitpython-busdevice, adafruit-circuitpython-ssd1306
-Successfully installed Adafruit-Blinka-6.14.1 Adafruit-PlatformDetect-3.15.3 Adafruit-PureIO-1.1.9 RPi.GPIO-0.7.0 adafruit-circuitpython-busdevice-5.1.0 adafruit-circuitpython-framebuf-1.4.7 adafruit-circuitpython-ssd1306-2.12.1 pyftdi-0.53.3 pyserial-3.5 pyusb-1.2.1 rpi-ws281x-4.3.0 sysv-ipc-1.1.0
 
 (env) pi@marigold:~/HAT/pi-overwatch $ pip install adafruit-circuitpython-bme280
-Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple
-Collecting adafruit-circuitpython-bme280
-  Downloading https://www.piwheels.org/simple/adafruit-circuitpython-bme280/adafruit_circuitpython_bme280-2.6.6-py3-none-any.whl
-Requirement already satisfied: adafruit-circuitpython-busdevice in ./env/lib/python3.7/site-packages (from adafruit-circuitpython-bme280) (5.1.0)
-Requirement already satisfied: Adafruit-Blinka in ./env/lib/python3.7/site-packages (from adafruit-circuitpython-bme280) (6.14.1)
-Requirement already satisfied: Adafruit-PlatformDetect>=3.13.0 in ./env/lib/python3.7/site-packages (from Adafruit-Blinka->adafruit-circuitpython-bme280) (3.15.3)
-Requirement already satisfied: pyftdi>=0.40.0 in ./env/lib/python3.7/site-packages (from Adafruit-Blinka->adafruit-circuitpython-bme280) (0.53.3)
-Requirement already satisfied: RPi.GPIO in ./env/lib/python3.7/site-packages (from Adafruit-Blinka->adafruit-circuitpython-bme280) (0.7.0)
-Requirement already satisfied: rpi-ws281x>=4.0.0 in ./env/lib/python3.7/site-packages (from Adafruit-Blinka->adafruit-circuitpython-bme280) (4.3.0)
-Requirement already satisfied: Adafruit-PureIO>=1.1.7 in ./env/lib/python3.7/site-packages (from Adafruit-Blinka->adafruit-circuitpython-bme280) (1.1.9)
-Requirement already satisfied: sysv-ipc>=1.1.0 in ./env/lib/python3.7/site-packages (from Adafruit-Blinka->adafruit-circuitpython-bme280) (1.1.0)
-Requirement already satisfied: pyusb!=1.2.0,>=1.0.0 in ./env/lib/python3.7/site-packages (from pyftdi>=0.40.0->Adafruit-Blinka->adafruit-circuitpython-bme280) (1.2.1)
-Requirement already satisfied: pyserial>=3.0 in ./env/lib/python3.7/site-packages (from pyftdi>=0.40.0->Adafruit-Blinka->adafruit-circuitpython-bme280) (3.5)
-Installing collected packages: adafruit-circuitpython-bme280
-Successfully installed adafruit-circuitpython-bme280-2.6.6
 
 (env) pi@marigold:~/HAT/pi-overwatch $ sudo apt install librrd-dev
-Reading package lists... Done
-Building dependency tree       
-Reading state information... Done
-The following additional packages will be installed:
-  libdbi1 librrd8
-The following NEW packages will be installed:
-  libdbi1 librrd-dev librrd8
-0 upgraded, 3 newly installed, 0 to remove and 0 not upgraded.
-Need to get 511 kB of archives.
-After this operation, 1,135 kB of additional disk space will be used.
-Do you want to continue? [Y/n] y
-Get:1 http://marigold.easytarget.org:3142/raspbian.raspberrypi.org/raspbian buster/main armhf libdbi1 armhf 0.9.0-5 [27.0 kB]
-Get:2 http://marigold.easytarget.org:3142/raspbian.raspberrypi.org/raspbian buster/main armhf librrd8 armhf 1.7.1-2 [230 kB]
-Get:3 http://marigold.easytarget.org:3142/raspbian.raspberrypi.org/raspbian buster/main armhf librrd-dev armhf 1.7.1-2 [254 kB]
-Fetched 511 kB in 0s (1,045 kB/s)   
-Selecting previously unselected package libdbi1:armhf.
-(Reading database ... 160728 files and directories currently installed.)
-Preparing to unpack .../libdbi1_0.9.0-5_armhf.deb ...
-Unpacking libdbi1:armhf (0.9.0-5) ...
-Selecting previously unselected package librrd8:armhf.
-Preparing to unpack .../librrd8_1.7.1-2_armhf.deb ...
-Unpacking librrd8:armhf (1.7.1-2) ...
-Selecting previously unselected package librrd-dev:armhf.
-Preparing to unpack .../librrd-dev_1.7.1-2_armhf.deb ...
-Unpacking librrd-dev:armhf (1.7.1-2) ...
-Setting up libdbi1:armhf (0.9.0-5) ...
-Setting up librrd8:armhf (1.7.1-2) ...
-Setting up librrd-dev:armhf (1.7.1-2) ...
-Processing triggers for libc-bin (2.28-10+rpt2+rpi1) ...
 
 (env) pi@marigold:~/HAT/pi-overwatch $ pip install rrdtool
-Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple
-Collecting rrdtool
-  Using cached https://files.pythonhosted.org/packages/f9/86/2f87c8725effdc0f4abdc77af85fd764b04fe833fe3cd882c5fae1d7635d/rrdtool-0.1.15.tar.gz
-Building wheels for collected packages: rrdtool
-  Running setup.py bdist_wheel for rrdtool ... done
-  Stored in directory: /home/pi/.cache/pip/wheels/f5/8a/56/8563e2d69ee49b265a55e49c54c44a7e10f1f258e31d68fb54
-Successfully built rrdtool
-Installing collected packages: rrdtool
-Successfully installed rrdtool-0.1.15
 
 (env) pi@marigold:~/HAT/pi-overwatch $ pip install psutil
-Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple
-Collecting psutil
-  Downloading https://files.pythonhosted.org/packages/e1/b0/7276de53321c12981717490516b7e612364f2cb372ee8901bd4a66a000d7/psutil-5.8.0.tar.gz (470kB)
-    100% |████████████████████████████████| 471kB 910kB/s 
-Building wheels for collected packages: psutil
-  Running setup.py bdist_wheel for psutil ... done
-  Stored in directory: /home/pi/.cache/pip/wheels/65/65/52/8543bfd86249ad90c3f5a3bac9e15332f2251f8967fd78fdcd
-Successfully built psutil
-Installing collected packages: psutil
-Successfully installed psutil-5.8.0
-
 
 (env) pi@marigold:~/HAT/pi-overwatch $ sudo apt install libjpeg-dev
-Reading package lists... Done
-Building dependency tree       
-Reading state information... Done
-The following additional packages will be installed:
-  libjpeg62-turbo-dev
-The following NEW packages will be installed:
-  libjpeg-dev libjpeg62-turbo-dev
-0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
-Need to get 239 kB of archives.
-After this operation, 546 kB of additional disk space will be used.
-Do you want to continue? [Y/n] y
-Get:1 http://marigold.easytarget.org:3142/raspbian.raspberrypi.org/raspbian buster/main armhf libjpeg62-turbo-dev armhf 1:1.5.2-2+deb10u1 [181 kB]
-Get:2 http://marigold.easytarget.org:3142/raspbian.raspberrypi.org/raspbian buster/main armhf libjpeg-dev all 1:1.5.2-2+deb10u1 [57.7 kB]
-Fetched 239 kB in 1s (363 kB/s)        
-Selecting previously unselected package libjpeg62-turbo-dev:armhf.
-(Reading database ... 160757 files and directories currently installed.)
-Preparing to unpack .../libjpeg62-turbo-dev_1%3a1.5.2-2+deb10u1_armhf.deb ...
-Unpacking libjpeg62-turbo-dev:armhf (1:1.5.2-2+deb10u1) ...
-Selecting previously unselected package libjpeg-dev.
-Preparing to unpack .../libjpeg-dev_1%3a1.5.2-2+deb10u1_all.deb ...
-Unpacking libjpeg-dev (1:1.5.2-2+deb10u1) ...
-Setting up libjpeg62-turbo-dev:armhf (1:1.5.2-2+deb10u1) ...
-Setting up libjpeg-dev (1:1.5.2-2+deb10u1) ...
 
 (env) pi@marigold:~/HAT/pi-overwatch $ pip install image
-Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple
-Collecting image
-  Using cached https://www.piwheels.org/simple/image/image-1.5.33-py2.py3-none-any.whl
-Requirement already satisfied: django in ./env/lib/python3.7/site-packages (from image) (3.2.8)
-Collecting pillow (from image)
-  Using cached https://files.pythonhosted.org/packages/90/d4/a7c9b6c5d176654aa3dbccbfd0be4fd3a263355dc24122a5f1937bdc2689/Pillow-8.3.2.tar.gz
-Collecting six (from image)
-  Using cached https://files.pythonhosted.org/packages/d9/5a/e7c31adbe875f2abbb91bd84cf2dc52d792b5a01506781dbcf25c91daf11/six-1.16.0-py2.py3-none-any.whl
-Requirement already satisfied: pytz in ./env/lib/python3.7/site-packages (from django->image) (2021.3)
-Requirement already satisfied: asgiref<4,>=3.3.2 in ./env/lib/python3.7/site-packages (from django->image) (3.4.1)
-Requirement already satisfied: sqlparse>=0.2.2 in ./env/lib/python3.7/site-packages (from django->image) (0.4.2)
-Requirement already satisfied: typing-extensions; python_version < "3.8" in ./env/lib/python3.7/site-packages (from asgiref<4,>=3.3.2->django->image) (3.10.0.2)
-Building wheels for collected packages: pillow
-  Running setup.py bdist_wheel for pillow ... done
-  Stored in directory: /home/pi/.cache/pip/wheels/93/63/b7/ad0bb69357c01f9286a69b67a37823365bf3a97e7cd19077c4
-Successfully built pillow
-Installing collected packages: pillow, six, image
-Successfully installed image-1.5.33 pillow-8.3.2 six-1.16.0
-
-
-
+'''
