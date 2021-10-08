@@ -43,15 +43,24 @@ import subprocess
 import psutil
 
 # I2C Comms
-from board import SCL, SDA
-import busio
+try:
+    from board import SCL, SDA
+    import busio
+except:
+    print("I2C requirements not met")
 
 # I2C 128x64 OLED Display
 from PIL import Image, ImageDraw, ImageFont
-import adafruit_ssd1306
+try:
+    import adafruit_ssd1306
+except:
+    print("Display requirements not met")
 
 # BME280 I2C Tepmerature Pressure and Humidity sensor
-import adafruit_bme280
+try:
+    import adafruit_bme280
+except:
+    print("BME280 requirements not met")
 
 # GPIO light control
 import RPi.GPIO as GPIO           # Allows us to call our GPIO pins and names it just GPIO
@@ -115,7 +124,7 @@ except:
         print("BME280 sensor found with address 0x77")
         haveSensor = True
     except:
-        print("No BME280 sensor found on addresses 0x76 or 0x77")
+        print("We do not have an environmental sensor")
         haveSensor = False
 
 # GPIO mode and arrays for the pin database path and current status
@@ -144,16 +153,15 @@ if haveScreen:
     # If you get an error that it is not present, install it with:
     #   sudo apt install fonts-liberation
     font = ImageFont.truetype('LiberationMono-Regular.ttf', 16)
+
+    # Start saver
+    screensaver = saver(disp, s.saverMode, s.saverOn, s.saverOff, s.displayInvert)
 else:
     # Ensure saver never triggers
     s.saverMode = "off"
 
 # Unicode characters needed for display and logging
 degree_sign= u'\N{DEGREE SIGN}'
-
-# Start saver
-if haveScreen: 
-    screensaver = saver(disp, s.saverMode, s.saverOn, s.saverOff, s.displayInvert)
 
 # Commands used to gather CPU data
 cpuCmd = "cat /sys/class/thermal/thermal_zone0/temp | awk '{printf \"%.1f\", $1/1000}'"

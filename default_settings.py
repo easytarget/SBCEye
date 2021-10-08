@@ -4,6 +4,10 @@
 
 class settings:
 
+    # Enable/Disable Screen and BME280 sensor
+    haveSensor = True
+    haveScreen = True
+
     # GPIO:
     # All pins are defined using BCM GPIO numbering
     # https://www.raspberrypi.org/forums/viewtopic.php?t=105200
