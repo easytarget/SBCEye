@@ -22,10 +22,10 @@ class settings:
     button_PIN = 0            # BCM Pin Number
 
     # Web UI
-    host = ''                 # Ip address to bind web server to, '' =  bind to all addresses
-    port = 7081               # Port number for web server
-    serverName = 'OverWatch'  # Used for the title and page heading
-    buttonPath = ''           # Web button url path, leave blank to disable
+    host = ''                    # Ip address to bind web server to, '' =  bind to all addresses
+    port = 7080                  # Port number for web server
+    serverName = 'Pi OverWatch'  # Used for the title and page heading
+    buttonPath = ''              # Web button url path, leave blank to disable
 
     # Default graph durations presented to user
     # See https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html#TIME%20OFFSET%20SPECIFICATION

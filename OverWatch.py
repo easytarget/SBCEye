@@ -8,8 +8,10 @@
 # Default settings are in the file 'settings_default.py'
 # Copy this to 'settings.py' and edit as appropriate
 try:
+    print("Loading settings from user settings file")
     from settings import settings as s
-except:
+except (ModuleNotFoundError):
+    print("No user settings found, loading from default settings file")
     from default_settings import settings as s
 
 # I2C BME280 Sensor and SSD1306 Display:
