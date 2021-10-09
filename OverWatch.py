@@ -7,6 +7,7 @@
 
 # Default settings are in the file 'settings_default.py'
 # Copy this to 'settings.py' and edit as appropriate
+
 try:
     print("Loading settings from user settings file")
     from settings import settings as s
@@ -373,7 +374,14 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('</tr>\n', 'utf-8'))
         self.wfile.write(bytes('</table>\n', 'utf-8'))
 
-    def _give_log(self,lines = 10):
+    def _give_homelink(self):
+        self.wfile.write(bytes('<table>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<td colspan="0" style="text-align: center;"><a href=".">Home</a></td>\n', 'utf-8'))
+        self.wfile.write(bytes('</tr>\n', 'utf-8'))
+        self.wfile.write(bytes('</table>\n', 'utf-8'))
+
+    def _give_log(self, lines=10):
         parsedLines = parse_qs(urlparse(self.path).query).get('lines', None)
         if (parsedLines):
             lines = parsedLines[0]
@@ -387,7 +395,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes(f'Latest {lines} lines shown\n', 'utf-8'))
         self.wfile.write(bytes('</div>\n', 'utf-8'))
 
-    def _give_graphs(self,d):
+    def _give_graphs(self, d):
         if haveSensor:
             allgraphs = [["env-temp","Temperature"],
                          ["env-humi","Humidity"],
@@ -425,7 +433,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 # logging.info('Graph Generation requested for: ' + graph + '(-' + duration + ' -> now) triggered by: ' + self.client_address[0])
                 body = rrd.drawGraph(duration, graph, s.graphWide, s.graphHigh, s.areaC, s.areaW, s.lineC, s.lineW, s.serverName)
             if (len(body) == 0):
-                self.send_error(404, 'Image Unavailable', 'Check your parameters and try again')
+                self.send_error(404, 'Graph unavailable', 'Check your parameters and try again, see the <a href="/graphs/">/graphs/</a> page for examples.')
                 return
             self._set_png_headers()
             self.wfile.write(body)
@@ -439,37 +447,13 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._set_headers()
             self._give_head(s.serverName + ":: graphs -" + duration)
             self.wfile.write(bytes('<h2>%s</h2>' % s.serverName, 'utf-8')) 
+            self._give_homelink()
             self.wfile.write(bytes('<table>\n', 'utf-8'))
             self._give_graphs(duration)
             self.wfile.write(bytes('</table>', 'utf-8'))
+            self._give_homelink()
             self._give_datetime()
             self._give_foot(refresh=300)
-        elif ((urlparse(self.path).path == '/c')):
-            parsed = parse_qs(urlparse(self.path).query).get('c', None)
-            if (not parsed):
-                c = 0xff 
-            else:
-                c = int(parsed[0])
-            logging.info('Contrast: ' + self.client_address[0] + ' with action: ' + str(c))
-            disp.contrast(c)
-            self._set_headers()
-            self._give_head(s.serverName + ":: c=" + str(c))
-            self.wfile.write(bytes('<h2>' + str(c) + '</h2>\n', 'utf-8'))
-            self._give_datetime()
-            self._give_foot()
-        elif ((urlparse(self.path).path == '/i')):
-            parsed = parse_qs(urlparse(self.path).query).get('i', None)
-            if (not parsed):
-                i = False 
-            else:
-                i = True
-            logging.info('Invert: ' + self.client_address[0] + ' with action: ' + str(i))
-            disp.invert(i)
-            self._set_headers()
-            self._give_head(s.serverName + ":: i=" + str(i))
-            self.wfile.write(bytes('<h2>' + str(i) + '</h2>\n', 'utf-8'))
-            self._give_datetime()
-            self._give_foot()
         elif ((urlparse(self.path).path == '/' + s.buttonPath) and (len(s.buttonPath) > 0)):
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
             if (not parsed):
@@ -498,6 +482,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             if "links" in view: self._give_links()
             if "log" in view:
                 self._give_log()
+                self._give_homelink()
                 if "deco" in view: self._give_datetime()
                 self._give_foot(refresh = 60, scroll = True) 
             else:
@@ -506,7 +491,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                     self._give_datetime()
                 self._give_foot(refresh = 60)
         else:
-            self.send_error(404, 'No Such Page', 'This site serves pages at ".../" and ".../graph"')
+            self.send_error(404, 'No Such Page', 'This site serves pages at "/" and "/graphs"')
 
     def do_HEAD(self):
         self._set_headers()
