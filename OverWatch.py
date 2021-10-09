@@ -522,9 +522,9 @@ def updateDB():
 def logSensors():
     # Runs on a user defined schedule to dump a line of sensor data in the log
     if haveSensor:
-        logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + str(TOP) + ', Mem: ' + str(MEM) + '%')
+        logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + format(TOP, '.3f') + ', Mem: ' + format(MEM, '.1f') + '%')
     else:
-        logging.info('CPU: ' + CPU + degree_sign + ', Load: ' + str(TOP) + ', Mem: ' + str(MEM) + '%')
+        logging.info('CPU: ' + CPU + degree_sign + ', Load: ' + format(TOP, '.3f') + ', Mem: ' + format(MEM, '.1f') + '%')
 
 def scheduleRunDelay(seconds=60):
     # Approximate delay while checking for pending scheduled jobs every second
