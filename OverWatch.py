@@ -377,7 +377,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_homelink(self):
         self.wfile.write(bytes('<table>\n', 'utf-8'))
         self.wfile.write(bytes('<tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<td colspan="0" style="text-align: center;"><a href=".">Home</a></td>\n', 'utf-8'))
+        self.wfile.write(bytes('<td colspan="0" style="text-align: center;"><a href="./">Home</a></td>\n', 'utf-8'))
         self.wfile.write(bytes('</tr>\n', 'utf-8'))
         self.wfile.write(bytes('</table>\n', 'utf-8'))
 
@@ -420,6 +420,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('</table>\n', 'utf-8'))
 
     def do_GET(self):
+        # Process requests and parse their options
         if (urlparse(self.path).path == '/graph'):
             parsedGraph = parse_qs(urlparse(self.path).query).get('graph', None)
             parsedDuration = parse_qs(urlparse(self.path).query).get('duration', None)
