@@ -166,8 +166,6 @@ degree_sign= u'\N{DEGREE SIGN}'
 
 # Commands used to gather CPU data
 cpuCmd = "cat /sys/class/thermal/thermal_zone0/temp | awk '{printf \"%.1f\", $1/1000}'"
-topCmd = "top -bn1 | grep load | awk '{printf \"%.3f\", $(NF-2)}'"
-memCmd = "free -m | awk 'NR==2{printf \"%.1f\", $3*100/$2 }'"
 
 # Initial values for the sensor readings
 TMP = "undefined"
@@ -206,8 +204,8 @@ def bmeScreen(xpos=0):
 
 def sysScreen(xpos=0):
     draw.text((xpos, 5), 'CPU  : ' + CPU + degree_sign,  font=font, fill=255)
-    draw.text((xpos, 25), 'Load : ' + TOP, font=font, fill=255)
-    draw.text((xpos, 45), 'Mem  : ' + MEM + '%',  font=font, fill=255)
+    draw.text((xpos, 25), 'Load : ' + format(TOP, '.3f'), font=font, fill=255)
+    draw.text((xpos, 45), 'Mem  : ' + format(MEM, '.1f') + '%',  font=font, fill=255)
 
 def getBmeData():
     global TMP, HUM, PRE
@@ -218,10 +216,11 @@ def getBmeData():
 
 def getSysData():
     global CPU, TOP, MEM
-    # Shell commands to grab and parse system data
     CPU = subprocess.check_output(cpuCmd, shell=True).decode('utf-8')
-    TOP = subprocess.check_output(topCmd, shell=True).decode('utf-8')
-    MEM = subprocess.check_output(memCmd, shell=True).decode('utf-8')
+    TOP = psutil.getloadavg()[0]
+    MEM = psutil.virtual_memory().percent
+    print(psutil.sensors_temperatures())
+
 
 def toggleButtonPin(action="toggle"):
     # Set the first pin to a specified state or read and toggle it..
@@ -345,8 +344,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # Internal Sensors
         self.wfile.write(bytes('<tr><th>Server</th></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>CPU Temperature: </td><td>' + CPU + '&deg;</td></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>CPU Load: </td><td>' + TOP + '</td></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>Memory used: </td><td>' + MEM + '%</td></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr><td>CPU Load: </td><td>' + format(TOP, '.3f') + '</td></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr><td>Memory used: </td><td>' + format(MEM, '.1f') + '%</td></tr>\n', 'utf-8'))
 
     def _give_pins(self):
         # GPIO states
@@ -482,6 +481,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('</table>\n', 'utf-8'))
             if "links" in view: self._give_links()
             if "log" in view:
+                self._give_homelink()
                 self._give_log()
                 self._give_homelink()
                 if "deco" in view: self._give_datetime()
@@ -503,13 +503,6 @@ def updateData():
         getBmeData()
     getSysData()
 
-    #print(psutil.virtual_memory().percent, psutil.getloadavg()[0], psutil.sensors_temperatures())
-    #temps = psutil.sensors_temperatures()
-    #for name, entries in temps.items():
-    #    print(name)
-    #    print(entries[0])
-    #print(psutil.sensors_temperatures().cpu_thermal)
-
     # Check if any pins have changed state, and log
     for i in range(len(s.pinMap)):
         thisPinState =  GPIO.input(s.pinMap[i][1])
@@ -529,9 +522,9 @@ def updateDB():
 def logSensors():
     # Runs on a user defined schedule to dump a line of sensor data in the log
     if haveSensor:
-        logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + TOP + ', Mem: ' + MEM + '%')
+        logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + str(TOP) + ', Mem: ' + str(MEM) + '%')
     else:
-        logging.info('CPU: ' + CPU + degree_sign + ', Load: ' + TOP + ', Mem: ' + MEM + '%')
+        logging.info('CPU: ' + CPU + degree_sign + ', Load: ' + str(TOP) + ', Mem: ' + str(MEM) + '%')
 
 def scheduleRunDelay(seconds=60):
     # Approximate delay while checking for pending scheduled jobs every second
