@@ -164,16 +164,8 @@ else:
 # Unicode characters needed for display and logging
 degree_sign= u'\N{DEGREE SIGN}'
 
-# Commands used to gather CPU data
-cpuCmd = "cat /sys/class/thermal/thermal_zone0/temp | awk '{printf \"%.1f\", $1/1000}'"
-
 # Initial values for the sensor readings
-TMP = "undefined"
-HUM = "undefined"
-PRE = "undefined"
-CPU = "undefined"
-TOP = "undefined"
-MEM = "undefined"
+TMP = HUM = PRE = CPU = TOP = MEM = "undefined"
 
 # Local functions
 
@@ -203,7 +195,7 @@ def bmeScreen(xpos=0):
     draw.text((xpos, 45), 'Pres : ' + format(PRE, '.0f') + 'mb',  font=font, fill=255)
 
 def sysScreen(xpos=0):
-    draw.text((xpos, 5), 'CPU  : ' + CPU + degree_sign,  font=font, fill=255)
+    draw.text((xpos, 5), 'CPU  : ' + format(CPU, '.1f') + degree_sign,  font=font, fill=255)
     draw.text((xpos, 25), 'Load : ' + format(TOP, '.3f'), font=font, fill=255)
     draw.text((xpos, 45), 'Mem  : ' + format(MEM, '.1f') + '%',  font=font, fill=255)
 
@@ -216,11 +208,9 @@ def getBmeData():
 
 def getSysData():
     global CPU, TOP, MEM
-    CPU = subprocess.check_output(cpuCmd, shell=True).decode('utf-8')
+    CPU = psutil.sensors_temperatures()["cpu_thermal"][0].current
     TOP = psutil.getloadavg()[0]
     MEM = psutil.virtual_memory().percent
-    print(psutil.sensors_temperatures())
-
 
 def toggleButtonPin(action="toggle"):
     # Set the first pin to a specified state or read and toggle it..
@@ -343,7 +333,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_sys(self):
         # Internal Sensors
         self.wfile.write(bytes('<tr><th>Server</th></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>CPU Temperature: </td><td>' + CPU + '&deg;</td></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr><td>CPU Temperature: </td><td>' + format(CPU, '.1f') + '&deg;</td></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>CPU Load: </td><td>' + format(TOP, '.3f') + '</td></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>Memory used: </td><td>' + format(MEM, '.1f') + '%</td></tr>\n', 'utf-8'))
 
@@ -522,9 +512,9 @@ def updateDB():
 def logSensors():
     # Runs on a user defined schedule to dump a line of sensor data in the log
     if haveSensor:
-        logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + CPU + degree_sign + ', Load: ' + format(TOP, '.3f') + ', Mem: ' + format(MEM, '.1f') + '%')
+        logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + format(CPU, '.1f') + degree_sign + ', Load: ' + format(TOP, '.3f') + ', Mem: ' + format(MEM, '.1f') + '%')
     else:
-        logging.info('CPU: ' + CPU + degree_sign + ', Load: ' + format(TOP, '.3f') + ', Mem: ' + format(MEM, '.1f') + '%')
+        logging.info('CPU: ' + format(CPU, '.1f') + degree_sign + ', Load: ' + format(TOP, '.3f') + ', Mem: ' + format(MEM, '.1f') + '%')
 
 def scheduleRunDelay(seconds=60):
     # Approximate delay while checking for pending scheduled jobs every second

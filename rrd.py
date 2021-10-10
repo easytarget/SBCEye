@@ -58,9 +58,9 @@ class rrd:
 
     def update(self, tmp, hum, pre, cpu, top, mem, states):
         if self.sensor:
-            updateCmd = "N:" + format(tmp, '.3f') + ":" + format(hum, '.2f') + ":" + format(pre, '.2f')
+            updateCmd = "N:" + str(tmp) + ":" + str(hum) + ":" + str(pre)
             rrdtool.update(str(self.envDB), updateCmd)
-        updateCmd = "N:" + cpu + ":" + str(top) + ":" + str(mem)
+        updateCmd = "N:" + str(cpu) + ":" + str(top) + ":" + str(mem)
         rrdtool.update(str(self.sysDB), updateCmd)
         for i in range(len(self.pinMap)):
             updateCmd = "N:" + str(states[i])
