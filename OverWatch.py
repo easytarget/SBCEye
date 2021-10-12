@@ -40,25 +40,34 @@ import subprocess
 # System monitoring tools
 import psutil
 
-# I2C Comms
-try:
-    from board import SCL, SDA
-    import busio
-except:
-    print("I2C bus requirements not met")
+haveScreen = s.haveScreen
+haveSensor = s.haveSensor
 
-# I2C 128x64 OLED Display
-from PIL import Image, ImageDraw, ImageFont
-try:
-    import adafruit_ssd1306
-except:
-    print("ssd1306 display requirements not met")
+if haveScreen or haveSensor:
+    # I2C Comms
+    try:
+        from board import SCL, SDA
+        import busio
+    except:
+        print("I2C bus requirements not met")
+        haveScreen = haveSensor = False
 
-# BME280 I2C Tepmerature Pressure and Humidity sensor
-try:
-    import adafruit_bme280
-except:
-    print("BME280 ienvironment sensor requirements not met")
+if haveScreen:
+    # I2C 128x64 OLED Display
+    from PIL import Image, ImageDraw, ImageFont
+    try:
+        import adafruit_ssd1306
+    except:
+        print("ssd1306 display requirements not met")
+        haveScreen = False
+
+if haveSensor:
+    # BME280 I2C Tepmerature Pressure and Humidity sensor
+    try:
+        import adafruit_bme280
+    except:
+        print("BME280 ienvironment sensor requirements not met")
+        haveSensor = False
 
 # GPIO light control
 import RPi.GPIO as GPIO           # Allows us to call our GPIO pins and names it just GPIO
@@ -90,45 +99,51 @@ schedule_logger.setLevel(level=logging.WARN)     # Stop it.
 logging.info('')
 logging.info("Starting " + s.serverName)
 
-try: 
-    # Create the I2C interface object
-    i2c = busio.I2C(SCL, SDA)
-except Exception as e: 
-    print(e)
-    print("No I2C bus, screen and sensor functions will be disabled")
-
-try:
-    # Create the I2C SSD1306 OLED object
-    # The first two parameters are the pixel width and pixel height.
-    disp = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
-    haveScreen = True
-    disp.contrast(s.displayContrast)
-    disp.invert(s.displayInvert)
-    disp.fill(0)  # And blank as fast as possible in case it is showing garbage..
-    disp.show()
-    print("We have a Screen")
-except:
-    haveScreen = False
-    print("We do not have a Screen")
-
-try:
-    # Create the I2C BME280 sensor object
-    bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x76)
-    print("BME280 sensor found with address 0x76")
-    haveSensor = True
-except:
+# Initialise the bus, display and sensor
+if haveScreen or haveSensor:
     try:
-        bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x77)
-        print("BME280 sensor found with address 0x77")
+        # Create the I2C interface object
+        i2c = busio.I2C(SCL, SDA)
+    except Exception as e:
+        print(e)
+        print("No I2C bus, display and sensor functions will be disabled")
+
+if haveScreen:
+    try:
+        # Create the I2C SSD1306 OLED object
+        # The first two parameters are the pixel width and pixel height.
+        disp = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
+        haveScreen = True
+        disp.contrast(s.displayContrast)
+        disp.invert(s.displayInvert)
+        disp.fill(0)  # And blank as fast as possible in case it is showing garbage
+        disp.show()
+        print("We have a ssd1306 display at address " + hex(disp.addr))
+    except Exception as e:
+        print(e)
+        haveScreen = False
+        print("We do not have a display")
+
+if haveSensor:
+    try:
+        # Create the I2C BME280 sensor object
+        bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x76)
+        print("BME280 sensor found with address 0x76")
         haveSensor = True
-    except:
-        print("We do not have an environmental sensor")
-        haveSensor = False
+    except Exception as e:
+        try:
+            bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x77)
+            print("BME280 sensor found with address 0x77")
+            haveSensor = True
+        except Exception as f:
+            print(e)
+            print(f)
+            print("We do not have an environmental sensor")
+            haveSensor = False
 
 # GPIO mode and arrays for the pin database path and current status
 if (len(s.pinMap) > 0):
-    GPIO.setmode(GPIO.BCM)  # Set's GPIO pins to BCM GPIO numbering
-pinState = []
+    GPIO.setmode(GPIO.BCM)  # Set all GPIO pins to BCM GPIO numbering
 
 # Display setup
 if haveScreen:
@@ -150,6 +165,11 @@ if haveScreen:
     #   sudo apt install fonts-liberation
     font = ImageFont.truetype('LiberationMono-Regular.ttf', 16)
 
+    # Splash!
+    draw.text((10, 10), 'Over-',  font=font, fill=255)
+    draw.text((28, 28), 'Watch',  font=font, fill=255)
+    disp.show()
+
     # Start saver
     screensaver = saver(disp, s.saverMode, s.saverOn, s.saverOff, s.displayInvert)
 else:
@@ -162,7 +182,7 @@ degree_sign= u'\N{DEGREE SIGN}'
 # RRD init
 rrd = rrd(s.rrdFileStore, haveSensor, s.pinMap)
 
-# Latest readings
+# Store readings
 sysData = {
     'temperature': 0,
     'load': 0,
@@ -544,6 +564,7 @@ if __name__ == "__main__":
     # We need to set them as outputs in our context in order to monitor their state.
     # - So long as we do not try to write to these pins this will not affect their status,
     #   nor will it prevent other processes (eg octoprint) reading and using them
+    pinState = []
     for i in range(len(s.pinMap)):
         GPIO.setup(s.pinMap[i][1], GPIO.OUT)
         pinState.append(GPIO.input(s.pinMap[i][1]))
@@ -551,12 +572,6 @@ if __name__ == "__main__":
             logging.info(s.pinMap[i][0] + ": on")
         else:
             logging.info(s.pinMap[i][0] + ": off")
-
-    if (haveScreen):
-        # Splash!
-        draw.text((10, 10), 'Over-',  font=font, fill=255)
-        draw.text((28, 28), 'Watch',  font=font, fill=255)
-        show()
 
     # Do an initial, early, data reading to settle sensors etc
     updateData()
@@ -568,9 +583,8 @@ if __name__ == "__main__":
     atexit.register(goodBye)
 
     # Warn if we are missing sensor or screen
-    if not haveScreen: logging.warning("No screen detected, screen features disabled")
-    if not haveSensor: logging.warning("No environmental sensor detected, reporting and logging disabled")
-    if (len(s.pinMap) == 0): logging.warning("No GPIO map provided, GPIO reporting and logging disabled")
+    if s.haveScreen and not haveScreen: logging.warning("Display configured, but not detected: Display features disabled")
+    if s.haveSensor and not haveSensor: logging.warning("Environmental data configured, but no sensor detected: Environment status and logging disabled")
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedule and entering main loop")
