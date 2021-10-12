@@ -5,8 +5,8 @@
 class settings:
 
     # Enable/Disable Screen and BME280 sensor
-    haveSensor = True
-    haveScreen = True
+    haveSensor = False
+    haveScreen = False
 
     # GPIO:
     # All pins are defined using BCM GPIO numbering
@@ -49,13 +49,13 @@ class settings:
     logFile = './overwatch.log'        # Folder must be writable by the OverWatch process
     logInterval = 600                  # Environmental and system log dump interval (seconds, zero to disable)
     logLines = 240                     # How many lines of logging to show in webui by default
-    suppressGlitches=True              # Pin interrupts can produce phantom button presses due to crosstalk, ignore them
+    suppressGlitches=True              # Pin state changes can produce phantom button presses due to crosstalk, ignore them
 
-    # Location for RRD database files and graphs (folder must be writable by overwatch process)
+    # Location for RRD database files (folder must be writable by overwatch process)
     rrdFileStore = "./DB/"
 
     # Animation
-    passtime = 2            # time between display refresh cycles (seconds)
+    passtime = 2            # time between display refreshes (seconds)
     passes = 3              # number of refreshes of a screen before moving to next
     slidespeed = 16         # number of rows to scroll on each animation step between screens
 
@@ -63,7 +63,7 @@ class settings:
     rotateDisplay = True    # Is the display 'upside down'? (generally the ribbon connection from the glass is at the bottom)
     displayContrast = 127   # (0-255, default 255) This gives a limited brightness reduction, not full dimming to black 
     displayInvert = False   # Default is light text on dark background
-    saverMode = 'off'       # Possible values are 'off', 'blank' and 'invert' 
+    saverMode = 'invert'    # Possible values are 'off', 'blank' and 'invert' 
     saverOn  = 20           # Start time for screensaver (hour, 24hr clock)
     saverOff =  8           # End time
 
