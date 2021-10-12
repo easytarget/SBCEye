@@ -12,16 +12,19 @@ $ python3 -m pip install --user --upgrade pip
 $ python3 -m pip --version
 pip 21.2.4 from /home/pi/.local/lib/python3.7/site-packages/pip (python 3.7)
 
-$ python3 -m pip install --user virtualenv
+$ python3 -m pip install --user virtualenv --upgrade
 ```
 Create the venv and activate
 ```
-pi@pi:~/HAT/pi-overwatch $ python3 -m venv env
+pi@pi:~/HAT/pi-overwatch $ python3 -m virtualenv venv
 
-pi@pi:~/HAT/pi-overwatch $ source env/bin/activate
+pi@pi:~/HAT/pi-overwatch $ source venv/bin/activate
 
 (env) pi@pi:~/HAT/pi-overwatch $ which python
-/home/pi/HAT/pi-overwatch/env/bin/python
+/home/pi/HAT/pi-overwatch/venv/bin/python
+
+(env) pi@pi:~/HAT/pi-overwatch $ python --version
+Python 3.7.3
 ```
 Now the requirements
 ```
@@ -43,5 +46,7 @@ Now the requirements
 ```
 Then run with:
 `(env) pi@pi:~/HAT/pi-overwatch $ python OverWatch.py`
+
+Note; you can leave the virtualenv using `$ deactivate`
 
 Running as a service to be sorted and documented later
