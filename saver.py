@@ -16,11 +16,11 @@ class saver:
                 print("Disabling saver due to invalid time settings")
                 self.mode = 'off'
             elif (start < end):
-                self.sMap = [False]*23
+                self.sMap = [False]*24
                 for i in range(start, end):
                     self.sMap[i] = True
             else:
-                self.sMap = [True]*23
+                self.sMap = [True]*24
                 for i in range(end, start):
                     self.sMap[i] = False
 
