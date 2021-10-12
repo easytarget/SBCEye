@@ -226,7 +226,7 @@ def sysScreen(xpos=0):
     draw.text((xpos, 25), 'Load : ' + format(sysData['load'], '1.2f'), font=font, fill=255)
     draw.text((xpos, 45), 'Mem  : ' + format(sysData['memory'], '.1f') + '%',  font=font, fill=255)
 
-def toggleButtonPin(action="toggle"):
+def toggleButton(action="toggle"):
     # Set the first pin to a specified state or read and toggle it..
     if (len(s.pinMap) > 0):
         if (action == 'toggle'):
@@ -251,9 +251,9 @@ def buttonInterrupt(channel):
     # short delay, then re-read input to provide a minimum hold-down time
     # and suppress false triggers from other gpio operations
     time.sleep(0.1)
-    if (GPIO.input(s.button_PIN) == True):
+    if (GPIO.input(s.buttonPin) == True):
         logging.info('Button pressed')
-        toggleButtonPin()
+        toggleButton()
     elif (not s.suppressGlitches):
         logging.info('Button GLITCH')
 
@@ -465,7 +465,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             else:
                 action = parsed[0]
             logging.info('Web button triggered by: ' + self.client_address[0] + ' with action: ' + action)
-            state = toggleButtonPin(action)
+            state = toggleButton(action)
             self._set_headers()
             self._give_head(s.serverName + ":: " + s.pinMap[0][0])
             self.wfile.write(bytes('<h2>' + state + '</h2>\n', 'utf-8'))
@@ -554,11 +554,24 @@ if __name__ == "__main__":
     # Start by re-nicing to reduce blocking of other processes
     os.nice(10)
 
-    # Set up the button pin interrupt, if defined
-    if (s.button_PIN > 0):
-        GPIO.setup(s.button_PIN, GPIO.IN)       # Set our button pin to be an input
-        GPIO.add_event_detect(s.button_PIN, GPIO.RISING, buttonInterrupt, bouncetime = 400)
-        logging.info('Button enabled')
+    # Log screen and sensor status
+    if haveScreen:
+        logging.info("Display configured and enabled")
+    elif s.haveScreen:
+        logging.warning("Display configured but not detected: Display features disabled")
+    if haveSensor:
+        logging.info("Environmental sensor configured and enabled")
+    elif s.haveSensor:
+        logging.warning("Environmental data configured but no sensor detected: Environment status and logging disabled")
+
+    # Do we have a list of pins and a button
+    if (len(s.pinMap) > 0):
+        # Set up the button pin interrupt, if defined
+        if (s.buttonPin > 0):
+            GPIO.setup(s.buttonPin, GPIO.IN)       # Set our button pin to be an input
+            GPIO.add_event_detect(s.buttonPin, GPIO.RISING, buttonInterrupt, bouncetime = 400)
+            logging.info('Button enabled')
+        logging.info('GPIO pin(s) defined and logging enabled')
 
     # Set all gpio pins to 'output' and record their initial status
     # We need to set them as outputs in our context in order to monitor their state.
@@ -581,10 +594,6 @@ if __name__ == "__main__":
 
     # Exit handler
     atexit.register(goodBye)
-
-    # Warn if we are missing sensor or screen
-    if s.haveScreen and not haveScreen: logging.warning("Display configured, but not detected: Display features disabled")
-    if s.haveSensor and not haveSensor: logging.warning("Environmental data configured, but no sensor detected: Environment status and logging disabled")
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedule and entering main loop")
