@@ -14,6 +14,7 @@ class rrd:
         for i in range(len(self.pinMap)):
             self.pinDB.append(Path(path + self.pinMap[i][0] + ".rrd"))
         # Main RRDtool databases
+        # One DB file with three data sources for the environmental data
         if self.sensor:
             if not self.envDB.is_file():
                 print("Generating " + str(self.envDB))
@@ -29,6 +30,7 @@ class rrd:
             else:
                 print("Using existing: " + str(self.envDB))
 
+        # One DB file with three data sources for the system data
         if not self.sysDB.is_file():
             print("Generating " + str(self.sysDB))
             rrdtool.create(
@@ -42,7 +44,7 @@ class rrd:
                 "DS:sys-mem:GAUGE:60:U:U")
         else:
             print("Using existing: " + str(self.sysDB))
-        # Add RRD database for each GPIO line
+        # One database file for each GPIO line
         for i in range(len(self.pinMap)):
             if not self.pinDB[i].is_file():
                 print("Generating " + str(self.pinDB[i]))
@@ -56,11 +58,12 @@ class rrd:
             else:
                 print("Using existing: " + str(self.pinDB[i]))
 
-    def update(self, tmp, hum, pre, cpu, top, mem, states):
+    def update(self, env, sys, states):
+        # Update the database with the latest readings
         if self.sensor:
-            updateCmd = "N:" + str(tmp) + ":" + str(hum) + ":" + str(pre)
+            updateCmd = "N:" + str(env["temperature"]) + ":" + str(env["humidity"]) + ":" + str(env["pressure"])
             rrdtool.update(str(self.envDB), updateCmd)
-        updateCmd = "N:" + str(cpu) + ":" + str(top) + ":" + str(mem)
+        updateCmd = "N:" + str(sys["temperature"]) + ":" + str(sys["load"]) + ":" + str(sys["memory"])
         rrdtool.update(str(self.sysDB), updateCmd)
         for i in range(len(self.pinMap)):
             updateCmd = "N:" + str(states[i])
@@ -185,5 +188,3 @@ class rrd:
             print("Error: png file generation failed for : " + graph + " : " + period)
         tempf.close()
         return response
-
-

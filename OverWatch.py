@@ -5,6 +5,18 @@
 # Show, log and graph the environmental, system and gpio data via a web interface
 # Give me a on/off button + url to control the bench lights via a GPIO pin
 
+# I2C BME280 Sensor and SSD1306 Display:
+#
+# Note: the sensor and display are optional, if not found their functionality will be disabled and this will be logged at startup.
+#
+# Make sure I2C is enabled in 'boot/config.txt' (reboot after editing that file)
+# Uncomment: "dtparam=i2c_arm=on", which is the same as you get if enabling I2C via the 'Interface Options' in `sudo raspi-config`
+# I prefer 'dtparam=i2c_arm=on,i2c_arm_baudrate=400000', to draw the display faster, but is more prone to errors from long wires etc.. ymmv.
+
+# To list all I2C addresses visible on the system run: `i2cdetect -y 1` (`sudo apt install i2c-tools`)
+# bme280 I2C address should be 0x76 or 0x77 (this is selectable via a jumper) and we will search for it there
+# The SSD1306 I2C address should be automagically found; the driver will bind to the first matching display
+
 # Default settings are in the file 'settings_default.py'
 # Copy this to 'settings.py' and edit as appropriate
 
@@ -19,23 +31,8 @@ except (ModuleNotFoundError):
 from saver import saver
 from rrd import rrd
 
-# I2C BME280 Sensor and SSD1306 Display:
-#
-# Note: the sensor and display are optional, if not found their functionality will be disabled and this will be logged at startup.
-#
-# Make sure I2C is enabled in 'boot/config.txt' (reboot after editing that file)
-# Uncomment: "dtparam=i2c_arm=on", which is the same as you get if enabling I2C via the 'Interface Options' in `sudo raspi-config`
-# I prefer 'dtparam=i2c_arm=on,i2c_arm_baudrate=400000', to draw the display faster, but is more prone to errors from long wires etc.. ymmv.
-
-# To list all I2C addresses visible on the system run: `i2cdetect -y 1` (`sudo apt install i2c-tools`)
-# bme280 I2C address should be 0x76 or 0x77 (this is selectable via a jumper) and we will search for it there
-# The SSD1306 I2C address should be automagically found; the driver will bind to the first matching display
-
-# Start by re-nicing so we dont block anything important
-import os
-os.nice(10)
-
 # Some general functions we will use
+import os
 import time
 import datetime
 import subprocess
@@ -48,20 +45,20 @@ try:
     from board import SCL, SDA
     import busio
 except:
-    print("I2C requirements not met")
+    print("I2C bus requirements not met")
 
 # I2C 128x64 OLED Display
 from PIL import Image, ImageDraw, ImageFont
 try:
     import adafruit_ssd1306
 except:
-    print("Display requirements not met")
+    print("ssd1306 display requirements not met")
 
 # BME280 I2C Tepmerature Pressure and Humidity sensor
 try:
     import adafruit_bme280
 except:
-    print("BME280 requirements not met")
+    print("BME280 ienvironment sensor requirements not met")
 
 # GPIO light control
 import RPi.GPIO as GPIO           # Allows us to call our GPIO pins and names it just GPIO
@@ -133,9 +130,7 @@ if (len(s.pinMap) > 0):
     GPIO.setmode(GPIO.BCM)  # Set's GPIO pins to BCM GPIO numbering
 pinState = []
 
-# RRD init
-rrd = rrd(s.rrdFileStore, haveSensor, s.pinMap)
-
+# Display setup
 if haveScreen:
     # Image canvas
     margin = 20           # Space between the screens while transitioning
@@ -164,8 +159,20 @@ else:
 # Unicode characters needed for display and logging
 degree_sign= u'\N{DEGREE SIGN}'
 
-# Initial values for the sensor readings
-TMP = HUM = PRE = CPU = TOP = MEM = "undefined"
+# RRD init
+rrd = rrd(s.rrdFileStore, haveSensor, s.pinMap)
+
+# Latest readings
+sysData = {
+    'temperature': 0,
+    'load': 0,
+    'memory': 0
+}
+envData = {
+    'temperature': 0,
+    'humidity': 0,
+    'pressure':0
+    }
 
 # Local functions
 
@@ -190,27 +197,14 @@ def slideout(step=s.slidespeed):
     show(width + margin)
 
 def bmeScreen(xpos=0):
-    draw.text((xpos,  5), 'Temp : ' + format(TMP, '.1f') + degree_sign,  font=font, fill=255)
-    draw.text((xpos, 25), 'Humi : ' + format(HUM, '.1f') + '%', font=font, fill=255)
-    draw.text((xpos, 45), 'Pres : ' + format(PRE, '.0f') + 'mb',  font=font, fill=255)
+    draw.text((xpos,  5), 'Temp : ' + format(envData['temperature'], '.1f') + degree_sign,  font=font, fill=255)
+    draw.text((xpos, 25), 'Humi : ' + format(envData['humidity'], '.1f') + '%', font=font, fill=255)
+    draw.text((xpos, 45), 'Pres : ' + format(envData['pressure'], '.0f') + 'mb',  font=font, fill=255)
 
 def sysScreen(xpos=0):
-    draw.text((xpos, 5), 'CPU  : ' + format(CPU, '.1f') + degree_sign,  font=font, fill=255)
-    draw.text((xpos, 25), 'Load : ' + format(TOP, '.3f'), font=font, fill=255)
-    draw.text((xpos, 45), 'Mem  : ' + format(MEM, '.1f') + '%',  font=font, fill=255)
-
-def getBmeData():
-    global TMP, HUM, PRE
-    # Gather BME280 sensor data.
-    TMP = bme280.temperature
-    HUM = bme280.relative_humidity
-    PRE = bme280.pressure
-
-def getSysData():
-    global CPU, TOP, MEM
-    CPU = psutil.sensors_temperatures()["cpu_thermal"][0].current
-    TOP = psutil.getloadavg()[0]
-    MEM = psutil.virtual_memory().percent
+    draw.text((xpos, 5), 'CPU  : ' + format(sysData['temperature'], '.1f') + degree_sign,  font=font, fill=255)
+    draw.text((xpos, 25), 'Load : ' + format(sysData['load'], '1.2f'), font=font, fill=255)
+    draw.text((xpos, 45), 'Mem  : ' + format(sysData['memory'], '.1f') + '%',  font=font, fill=255)
 
 def toggleButtonPin(action="toggle"):
     # Set the first pin to a specified state or read and toggle it..
@@ -326,16 +320,16 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         if haveSensor:
             # room sensors
             self.wfile.write(bytes('<tr><th>Room</th></tr>\n', 'utf-8'))
-            self.wfile.write(bytes('<tr><td>Temperature: </td><td>' + format(TMP, '.1f') + '&deg;</td></tr>\n', 'utf-8'))
-            self.wfile.write(bytes('<tr><td>Humidity: </td><td>' + format(HUM, '.1f') + '%</td></tr>\n', 'utf-8'))
-            self.wfile.write(bytes('<tr><td>Presssure: </td><td>' + format(PRE, '.0f') + 'mb</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Temperature: </td><td>' + format(envData['temperature'], '.1f') + '&deg;</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Humidity: </td><td>' + format(envData['humidity'], '.1f') + '%</td></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><td>Presssure: </td><td>' + format(envData['pressure'], '.0f') + 'mb</td></tr>\n', 'utf-8'))
 
     def _give_sys(self):
         # Internal Sensors
         self.wfile.write(bytes('<tr><th>Server</th></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>CPU Temperature: </td><td>' + format(CPU, '.1f') + '&deg;</td></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>CPU Load: </td><td>' + format(TOP, '.3f') + '</td></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>Memory used: </td><td>' + format(MEM, '.1f') + '%</td></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr><td>CPU Temperature: </td><td>' + format(sysData['temperature'], '.1f') + '&deg;</td></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr><td>CPU Load: </td><td>' + format(sysData['load'], '1.2f') + '</td></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr><td>Memory used: </td><td>' + format(sysData['memory'], '.1f') + '%</td></tr>\n', 'utf-8'))
 
     def _give_pins(self):
         # GPIO states
@@ -423,7 +417,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 # logging.info('Graph Generation requested for: ' + graph + '(-' + duration + ' -> now) triggered by: ' + self.client_address[0])
                 body = rrd.drawGraph(duration, graph, s.graphWide, s.graphHigh, s.areaC, s.areaW, s.lineC, s.lineW, s.serverName)
             if (len(body) == 0):
-                self.send_error(404, 'Graph unavailable', 'Check your parameters and try again, see the <a href="/graphs/">/graphs/</a> page for examples.')
+                self.send_error(404, 'Graph unavailable', 'Check your parameters and try again, see the "/graphs/" page for examples.')
                 return
             self._set_png_headers()
             self.wfile.write(body)
@@ -490,8 +484,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 def updateData():
     # Runs every few seconds to get current environmental and system data
     if haveSensor:
-        getBmeData()
-    getSysData()
+        envData['temperature'] = bme280.temperature
+        envData['humidity'] = bme280.relative_humidity
+        envData['pressure'] = bme280.pressure
+    sysData['temperature'] = psutil.sensors_temperatures()["cpu_thermal"][0].current
+    sysData['load'] = psutil.getloadavg()[0]
+    sysData['memory'] = psutil.virtual_memory().percent
 
     # Check if any pins have changed state, and log
     for i in range(len(s.pinMap)):
@@ -505,16 +503,21 @@ def updateData():
 
 def updateDB():
     # Runs 3x per minute, updates RRD database and processes screensaver
-    rrd.update(TMP, HUM, PRE, CPU, TOP, MEM, pinState)
+    rrd.update(envData, sysData, pinState)
     if haveScreen:
         screensaver.check()
 
 def logSensors():
     # Runs on a user defined schedule to dump a line of sensor data in the log
+    logLine = ''
     if haveSensor:
-        logging.info('Temp: ' + format(TMP, '.1f') + degree_sign + ', Humi: ' + format(HUM, '.0f') + '%, Pres: ' + format(PRE, '.0f') + 'mb, CPU: ' + format(CPU, '.1f') + degree_sign + ', Load: ' + format(TOP, '.3f') + ', Mem: ' + format(MEM, '.1f') + '%')
-    else:
-        logging.info('CPU: ' + format(CPU, '.1f') + degree_sign + ', Load: ' + format(TOP, '.3f') + ', Mem: ' + format(MEM, '.1f') + '%')
+        logLine += 'Temp: ' + format(envData['temperature'], '.1f') + degree_sign + ', '
+        logLine += 'Humi: ' + format(envData['humidity'], '.0f') + '%, '
+        logLine += 'Pres: ' + format(envData['pressure'], '.0f') + 'mb, '
+    logLine += 'CPU: ' + format(sysData['temperature'], '.1f') + degree_sign + ', '
+    logLine += 'Load: ' + format(sysData['load'], '1.2f') + ', '
+    logLine += 'Mem: ' + format(sysData['memory'], '.1f') + '%'
+    logging.info(logLine)
 
 def scheduleRunDelay(seconds=60):
     # Approximate delay while checking for pending scheduled jobs every second
@@ -528,29 +531,18 @@ def goodBye():
 
 # The fun starts here:
 if __name__ == "__main__":
+    # Start by re-nicing to reduce blocking of other processes
+    os.nice(10)
 
-    if (haveScreen):
-        # Splash!
-        draw.text((10, 10), 'Over-',  font=font, fill=255)
-        draw.text((28, 28), 'Watch',  font=font, fill=255)
-        show()
-
-    # Do an initial, early, data reading to settle sensors etc
-    if haveSensor: getBmeData()
-    getSysData()
-
-    # Web Server
-    ServeHTTP()
-
-    # Set up the button pin interrupt (if defined, otherwise button is disabled)
+    # Set up the button pin interrupt, if defined
     if (s.button_PIN > 0):
         GPIO.setup(s.button_PIN, GPIO.IN)       # Set our button pin to be an input
         GPIO.add_event_detect(s.button_PIN, GPIO.RISING, buttonInterrupt, bouncetime = 400)
         logging.info('Button enabled')
 
     # Set all gpio pins to 'output' and record their initial status
-    #   We need to set them as outputs in this scripts context in order to monitor their state.
-    #   So long as we do not try to write to these pins this will not affect their output,
+    # We need to set them as outputs in our context in order to monitor their state.
+    # - So long as we do not try to write to these pins this will not affect their status,
     #   nor will it prevent other processes (eg octoprint) reading and using them
     for i in range(len(s.pinMap)):
         GPIO.setup(s.pinMap[i][1], GPIO.OUT)
@@ -559,6 +551,18 @@ if __name__ == "__main__":
             logging.info(s.pinMap[i][0] + ": on")
         else:
             logging.info(s.pinMap[i][0] + ": off")
+
+    if (haveScreen):
+        # Splash!
+        draw.text((10, 10), 'Over-',  font=font, fill=255)
+        draw.text((28, 28), 'Watch',  font=font, fill=255)
+        show()
+
+    # Do an initial, early, data reading to settle sensors etc
+    updateData()
+
+    # Start the web server
+    ServeHTTP()
 
     # Exit handler
     atexit.register(goodBye)
@@ -577,7 +581,8 @@ if __name__ == "__main__":
     if (s.logInterval > 0):
         schedule.every(s.logInterval).seconds.do(logSensors)
 
-    schedule.run_all() # do an initial log and database update
+    schedule.run_all()  # do the initial log and database update
+    scheduleRunDelay(3) # A brief pause for splash
 
     # Main loop now runs forever
     while True:

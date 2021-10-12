@@ -1,4 +1,5 @@
 import time
+import logging
 
 class saver:
     # Current screensaver state
@@ -7,36 +8,41 @@ class saver:
     def __init__(self, disp, mode, start, end, invert):
         self.disp = disp
         self.mode = mode
-        self.start = start
-        self.end = end
         self.invert = invert
-        print("mode: " + str(self.mode))
-        print("start: " + str(self.start))
-        print("end: " + str(self.end))
+        if (self.mode != 'off'):
+            print('Saver will ' + self.mode + ' display between: ' + str(start) + ":00 and " + str(end) + ":00")
+            if (start == end) or (start < 0) or (start > 23) or (end < 0) or (end > 23):
+                logging.warning("Saver start/end times are identical or out of range (0-23), disabling saver")
+                print("Disabling saver due to invalid time settings")
+                self.mode = 'off'
+            elif (start < end):
+                self.sMap = [False]*23
+                for i in range(start, end):
+                    self.sMap[i] = True
+            else:
+                self.sMap = [True]*23
+                for i in range(end, start):
+                    self.sMap[i] = False
+
 
     def _apply_state(self, state):
         if (state):
             self.active = True
+            print("Saver activated")
             if (self.mode == 'invert'):
-                print("invert")
                 self.disp.invert(not self.invert)
             elif (self.mode == 'blank'):
-                print("blank")
                 self.disp.poweroff()
         else:
             self.active = False
+            print("Saver deactivated")
             if (self.mode == 'invert'):
-                print("de-invert")
                 self.disp.invert(self.invert)
             elif (self.mode == 'blank'):
-                print("de-blank")
                 self.disp.poweron()
 
     def check(self):
         if (self.mode != 'off'):
-            hour = time.localtime()[4]
-            print("SaverIndex: " + str(hour) + " State: " + str(self.active))
-            if ((hour == self.start) and not self.active):
-                self._apply_state(True)
-            elif ((hour == self.end) and self.active):
-                self._apply_state(False)
+            hour = time.localtime()[3]
+            if (self.active != self.sMap[hour]):
+                self._apply_state(self.sMap[hour])
