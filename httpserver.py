@@ -14,7 +14,7 @@ import logging
 # RRD data
 from rrd import rrd
 
-def ServeHTTP(s, rrd, haveScreen, haveSensor, env, sys, pin):
+def ServeHTTP(s, rrd, haveScreen, haveSensor, env, sys, pin, toggleButton):
     # Spawns a http.server.HTTPServer in a separate thread on the given port.
     handler = _BaseRequestHandler
     httpd = http.server.HTTPServer((s.host, s.port), handler, False)
@@ -30,6 +30,7 @@ def ServeHTTP(s, rrd, haveScreen, haveSensor, env, sys, pin):
     http.sys = sys
     http.env = env
     http.pin = pin
+    http.toggleButton = toggleButton
     # Start the server
     threadlog("HTTP server will bind to port " + str(s.port) + " on host " + s.host)
     httpd.server_bind()
@@ -231,7 +232,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             else:
                 action = parsed[0]
             logging.info('Web button triggered by: ' + self.client_address[0] + ' with action: ' + action)
-            state = toggleButton(action)
+            state = http.toggleButton(action)
             self._set_headers()
             self._give_head(http.s.serverName + ":: " + http.s.pinMap[0][0])
             self.wfile.write(bytes('<h2>' + state + '</h2>\n', 'utf-8'))

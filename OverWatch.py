@@ -345,7 +345,7 @@ if __name__ == "__main__":
     updateData()
 
     # Start the web server
-    ServeHTTP(s, rrd, haveScreen, haveSensor, envData, sysData, pinState)
+    ServeHTTP(s, rrd, haveScreen, haveSensor, envData, sysData, pinState, toggleButton)
 
     # Exit handler
     atexit.register(goodBye)
