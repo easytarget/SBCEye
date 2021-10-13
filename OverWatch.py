@@ -317,15 +317,6 @@ if __name__ == "__main__":
     elif s.haveSensor:
         logging.warning("Environmental data configured but no sensor detected: Environment status and logging disabled")
 
-    # Do we have a list of pins and a button
-    if (len(s.pinMap) > 0):
-        # Set up the button pin interrupt, if defined
-        if (s.buttonPin > 0):
-            GPIO.setup(s.buttonPin, GPIO.IN)       # Set our button pin to be an input
-            GPIO.add_event_detect(s.buttonPin, GPIO.RISING, buttonInterrupt, bouncetime = 400)
-            logging.info('Button enabled')
-        logging.info('GPIO pin(s) defined and logging enabled')
-
     # Set all gpio pins to 'output' and record their initial status
     # We need to set them as outputs in our context in order to monitor their state.
     # - So long as we do not try to write to these pins this will not affect their status,
@@ -338,6 +329,15 @@ if __name__ == "__main__":
             logging.info(s.pinMap[i][0] + ": on")
         else:
             logging.info(s.pinMap[i][0] + ": off")
+    if (len(pinState) > 0)
+        logging.info('GPIO configured and logging enabled')
+
+    # Do we have a button, and a pin to control
+    if (len(s.pinMap) > 0) and (s.buttonPin > 0):
+        # Set up the button pin interrupt, if defined
+        GPIO.setup(s.buttonPin, GPIO.IN)       # Set our button pin to be an input
+        GPIO.add_event_detect(s.buttonPin, GPIO.RISING, buttonInterrupt, bouncetime = 400)
+        logging.info('Button enabled')
 
     # Do an initial, early, data reading to settle sensors etc
     updateData()
