@@ -87,7 +87,8 @@ class rrd:
                               "--left-axis-format", "%3.1lf\u00B0C",
                               "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
                               "DEF:envt=" + str(self.envDB) + ":env-temp:AVERAGE", areaw + 'envt' + areac, linew + 'envt' + linec)
-            except Exception:
+            except Exception as e:
+                print(e)
                 pass
         elif (graph == "env-humi"):
             try:
@@ -102,7 +103,8 @@ class rrd:
                               "--left-axis-format", "%3.0lf%%",
                               "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
                               "DEF:envh=" + str(self.envDB) + ":env-humi:AVERAGE", areaw + 'envh' + areac, linew + 'envh' + linec)
-            except Exception:
+            except Exception as e:
+                print(e)
                 pass
         elif (graph == "env-pres"):
             try:
@@ -118,7 +120,8 @@ class rrd:
                               "--left-axis-format", "%4.0lfmb",
                               "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
                               "DEF:envp=" + str(self.envDB) + ":env-pres:AVERAGE", areaw + 'envp' + areac, linew + 'envp' + linec)
-            except Exception:
+            except Exception as e:
+                print(e)
                 pass
         elif (graph == "sys-temp"):
             try:
@@ -133,7 +136,8 @@ class rrd:
                               "--left-axis-format", "%3.1lf\u00B0C",
                               "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
                               "DEF:syst=" + str(self.sysDB) + ":sys-temp:AVERAGE", areaw + 'syst' + areac, linew + 'syst' + linec)
-            except Exception:
+            except Exception as e:
+                print(e)
                 pass
         elif (graph == "sys-load"):
             try:
@@ -149,7 +153,8 @@ class rrd:
                               "--left-axis-format", "%2.3lf",
                               "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
                               "DEF:sysl=" + str(self.sysDB) + ":sys-load:AVERAGE", areaw + 'sysl' + areac, linew + 'sysl' + linec)
-            except Exception:
+            except Exception as e:
+                print(e)
                 pass
         elif (graph == "sys-mem"):
             try:
@@ -164,7 +169,8 @@ class rrd:
                               "--left-axis-format", "%3.0lf%%",
                               "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
                               "DEF:sysm=" + str(self.sysDB) + ":sys-mem:AVERAGE", areaw + 'sysm' + areac, linew + 'sysm' + linec)
-            except Exception:
+            except Exception as e:
+                print(e)
                 pass
         else:
             for i in range(len(self.pinMap)):
@@ -181,7 +187,8 @@ class rrd:
                                       "--left-axis-format", "%3.1lf",
                                       "--watermark", serverName + " :: " + datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y"),
                                       "DEF:pinv=" + str(self.pinDB[i]) + ":status:AVERAGE", areaw + 'pinv' + areac, linew + 'pinv' + linec)
-                    except Exception:
+                    except Exception as e:
+                        print(e)
                         pass
         response = tempf.read()
         if (len(response) == 0):
