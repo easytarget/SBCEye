@@ -329,7 +329,7 @@ if __name__ == "__main__":
             logging.info(s.pinMap[i][0] + ": on")
         else:
             logging.info(s.pinMap[i][0] + ": off")
-    if (len(pinState) > 0)
+    if (len(pinState) > 0):
         logging.info('GPIO configured and logging enabled')
 
     # Do we have a button, and a pin to control
