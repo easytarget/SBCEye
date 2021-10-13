@@ -55,8 +55,6 @@ Python 3.7.3
 ```
 
 Now we install/upgrade the requirements
-- Note that some of these also require you to `apt install` corresponding system libraries that are used by the python module
-
 ```console
 (env) pi@pi:~/HAT/pi-overwatch $ pip install --upgrade pip
 (env) pi@pi:~/HAT/pi-overwatch $ pip install --upgrade wheel
@@ -73,7 +71,7 @@ Now we install/upgrade the requirements
 
 ; Only if you plan to use a SSD1306 OLED display:
 (env) pi@pi:~/HAT/pi-overwatch $ pip install adafruit-circuitpython-ssd1306
-(env) pi@pi:~/HAT/pi-overwatch $ sudo apt install libjpeg-dev
+(env) pi@pi:~/HAT/pi-overwatch $ sudo apt install libjpeg-dev fonts-liberation
 (env) pi@pi:~/HAT/pi-overwatch $ pip install image
 ```
 
@@ -82,6 +80,12 @@ Copy the `default-settings.py` file to `settings.py` and edit as required.
 - The default configuration is sufficient for testing, but screens, sensors and GPIO settings need to be enabled in the settings
 - Some other parameters for the web server and display can be set there too
 
+
+If using either a screen, BME sensor or GPIO pin monitoring you must make sure the pi user is in the gpio group:
+```console
+pi@pi:~$ sudo usermod -a -G gpio pi
+```
+
 Then test run with:
 
 ```console
@@ -89,11 +93,11 @@ Then test run with:
 ```
 The file `overwatch.log` should be created in the pi-overwatch directory, and contain a startup log
 
-Debug messages etc are printed to the console
+Debug messages, errors, etc are printed to the console
 
-The web server should be available on `http://<PI ip address>:7080/` (or whatever is configured in the settings)
+The web server should be available on `http://<machines-address>:7080/` (or whatever is configured in the settings)
 
-Note; If you wan to leave the virtualenv at any time you can do so with `$ deactivate`, if you want to delete the virtualenv it is as simple as deleting the 'env' folder and all it's sunfolders.
+Note; If you want to leave the virtualenv at any time you can do so with `$ deactivate`, if you want to delete the virtualenv it is as simple as deleting the 'env' folder and all it's sunfolders.
 
 ## Set up as a service
 
