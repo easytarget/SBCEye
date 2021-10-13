@@ -58,13 +58,15 @@ Now we install/upgrade the requirements
 - Note that some of these also require you to `apt install` corresponding system libraries that are used by the python module
 
 ```console
-(env) pi@pi:~/HAT/pi-overwatch $ pip install wheel
-
-(env) pi@pi:~/HAT/pi-overwatch $ sudo apt install librrd-dev
-
-(env) pi@pi:~/HAT/pi-overwatch $ pip install rrdtool
+(env) pi@pi:~/HAT/pi-overwatch $ pip install --upgrade pip
+(env) pi@pi:~/HAT/pi-overwatch $ pip install --upgrade wheel
 
 (env) pi@pi:~/HAT/pi-overwatch $ pip install psutil
+(env) pi@pi:~/HAT/pi-overwatch $ pip install RPi.GPIO
+(env) pi@pi:~/HAT/pi-overwatch $ pip install schedule
+
+(env) pi@pi:~/HAT/pi-overwatch $ sudo apt install librrd-dev
+(env) pi@pi:~/HAT/pi-overwatch $ pip install rrdtool
 
 ; Only if you plan to use a BME280 Temperature/Humidity/Pressure sensor:
 (env) pi@pi:~/HAT/pi-overwatch $ pip install adafruit-circuitpython-bme280
@@ -82,9 +84,38 @@ Copy the `default-settings.py` file to `settings.py` and edit as required.
 Then test run with:
 
 ```console
-(env) pi@pi:~/HAT/pi-overwatch $ python OverWatch.py
+(env) pi@pi:~/HAT/pi-overwatch $ python overwatch.py
 ```
-
+The file `overwatch.log` should be created in the pi-overwatch directory, and contain a startup log
+Debug messages etc are printed to the console
+The web server should be available on `http://<PI ip address>:7080/` (or whatever is configured in the settings)
 Note; you can leave the virtualenv using `$ deactivate`
 
-Running as a service to be sorted and documented later
+## Set up as a service
+The OverWatch will then run automatically at boot
+
+```console
+pi@pi:~/HAT/pi-overwatch $ sudo cp OverWatch.service /etc/systemd/system/
+pi@pi:~/HAT/pi-overwatch $ sudo systemctl daemon-reload
+pi@pi:~/HAT/pi-overwatch $ sudo systemctl enable OverWatch.service
+pi@pi:~/HAT/pi-overwatch $ sudo systemctl start OverWatch.service
+
+pi@pi:~ $ sudo systemctl status OverWatch.service
+● OverWatch.service - OverWatch script for PI Hat
+   Loaded: loaded (/etc/systemd/system/OverWatch.service; enabled; vendor preset: enabled)
+   Active: active (running) since Wed 2021-10-13 19:37:49 CEST; 10min ago
+ Main PID: 20376 (python)
+    Tasks: 2 (limit: 4164)
+   CGroup: /system.slice/OverWatch.service
+           └─20376 /home/pi/HAT/pi-overwatch/env/bin/python /home/pi/HAT/pi-overwatch/overwatch.py
+
+Oct 13 19:37:49 pi.easytarget.org systemd[1]: Started OverWatch script for PI Hat.
+```
+
+## Upgrading
+Quick notes; to be expanded later as required, assumes you use git.
+- go to the pi-overwatch repo
+- `git pull`
+- stop the service
+- start the service
+Pip packages should not need upgrading if everything is working properly, but I'll investigate pip freeze and how to do this properly in teh future as it becomes necessary.
