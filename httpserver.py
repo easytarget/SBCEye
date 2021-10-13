@@ -22,7 +22,8 @@ def ServeHTTP(s, rrd, haveScreen, haveSensor, env, sys, pin, toggleButton):
     httpd.timeout = 0.5
     # HTTPServer sets this as well (left here to make obvious).
     httpd.allow_reuse_address = True
-    # I'm just passing objects blindly into the http class itself, probably a better way to do this
+    # I'm just passing objects blindly into the http class itself, quick and dirty but it works
+    # there is probably a better way to do this, eg using a meta-class and inheritance
     http.s = s
     http.rrd = rrd
     http.haveScreen = haveScreen
@@ -205,7 +206,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             else:
                 graph = parsedGraph[0]
                 duration = parsedDuration[0]
-                # logging.info('Graph Generation requested for: ' + graph + '(-' + duration + ' -> now) triggered by: ' + self.client_address[0])
                 body = rrd.drawGraph(http.rrd, duration, graph, http.s.graphWide, http.s.graphHigh, http.s.areaC, http.s.areaW, http.s.lineC, http.s.lineW, http.s.serverName)
             if (len(body) == 0):
                 self.send_error(404, 'Graph unavailable', 'Check your parameters and try again, see the "/graphs/" page for examples.')
