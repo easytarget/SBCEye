@@ -106,6 +106,7 @@ if haveScreen or haveSensor:
     except Exception as e:
         print(e)
         print("No I2C bus, display and sensor functions will be disabled")
+        haveScreen = haveSensor = False
 
 if haveScreen:
     try:
@@ -120,8 +121,8 @@ if haveScreen:
         print("We have a ssd1306 display at address " + hex(disp.addr))
     except Exception as e:
         print(e)
-        haveScreen = False
         print("We do not have a display")
+        haveScreen = False
 
 if haveSensor:
     try:
@@ -171,17 +172,14 @@ if haveScreen:
 
     # Start saver
     screensaver = saver(disp, s.saverMode, s.saverOn, s.saverOff, s.displayInvert)
-else:
-    # Ensure saver never triggers
-    s.saverMode = "off"
 
-# Unicode characters needed for display and logging
+# Unicode degrees character used for display and logging
 degree_sign= u'\N{DEGREE SIGN}'
 
 # RRD init
 rrd = rrd(s.rrdFileStore, haveSensor, s.pinMap)
 
-# Store readings
+# Use a couple of dictionaries to store latest readings
 sysData = {
     'temperature': 0,
     'load': 0,
@@ -242,12 +240,12 @@ def toggleButton(action="toggle"):
             GPIO.output(s.pinMap[0][1],False)
             return s.pinMap[0][0] + ' Switched: off'
         else:
-            return 'I dont know how to "' + action + '" ' + s.pinMap[0][0] + '!'
+            return 'I dont know how to "' + action + '" the ' + s.pinMap[0][0] + '!'
     else:
         return 'Not supported, no output pin defined'
 
 def buttonInterrupt(channel):
-    # short delay, then re-read input to provide a minimum hold-down time
+    # give a short delay, then re-read input to provide a minimum hold-down time
     # and suppress false triggers from other gpio operations
     time.sleep(0.1)
     if (GPIO.input(s.buttonPin) == True):
@@ -294,7 +292,7 @@ def logSensors():
     logLine += 'Mem: ' + format(sysData['memory'], '.1f') + '%'
     logging.info(logLine)
 
-def scheduleRunDelay(seconds=60):
+def scheduleServicingDelay(seconds=60):
     # Approximate delay while checking for pending scheduled jobs every second
     schedule.run_pending()
     for t in range(seconds):
@@ -344,7 +342,7 @@ if __name__ == "__main__":
     # Do an initial, early, data reading to settle sensors etc
     updateData()
 
-    # Start the web server
+    # Start the web server, it will fork into a seperate thread and run continually
     ServeHTTP(s, rrd, haveScreen, haveSensor, envData, sysData, pinState, toggleButton)
 
     # Exit handler
@@ -360,7 +358,10 @@ if __name__ == "__main__":
         schedule.every(s.logInterval).seconds.do(logSensors)
 
     schedule.run_all()  # do the initial log and database update
-    scheduleRunDelay(3) # A brief pause for splash
+
+    # A brief pause for splash
+    if haveScreen:
+        scheduleServicingDelay(3)
 
     # Main loop now runs forever
     while True:
@@ -371,30 +372,30 @@ if __name__ == "__main__":
                     clean()
                     bmeScreen()
                     show()
-                    scheduleRunDelay(s.passtime)
+                    scheduleServicingDelay(s.passtime)
                 # Update and transition to system screen
                 bmeScreen()
                 sysScreen(width+margin)
                 slideout()
-                scheduleRunDelay(s.passtime)
+                scheduleServicingDelay(s.passtime)
                 # System screen
                 for i in range(s.passes):
                     clean()
                     sysScreen()
                     show()
-                    scheduleRunDelay(s.passtime)
+                    scheduleServicingDelay(s.passtime)
                 # Update and transition back to environment screen
                 sysScreen()
                 bmeScreen(width+margin)
                 slideout()
-                scheduleRunDelay(s.passtime)
+                scheduleServicingDelay(s.passtime)
             else:
                 # Just loop refreshing the system screen
                 for i in range(s.passes):
                     clean()
                     sysScreen()
                     show()
-                    scheduleRunDelay(s.passtime)
+                    scheduleServicingDelay(s.passtime)
         else:
             # No screen, so just run schedule jobs in a loop
-            scheduleRunDelay()
+            scheduleServicingDelay()
