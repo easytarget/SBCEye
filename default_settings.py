@@ -38,9 +38,9 @@ class settings:
     graphHigh = 300
     # Other graph attributes 
     lineW = 'LINE2:'                      # Line width (See: https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html)
-    lineC = '#A000A0'                     # Line color (I like purple..)
+    lineC = '#00A0A0'                     # Line color (if you like purple try: lineC = '#A000A0', areaC = '#E0D0E0#FFFFFF:gradheight=0', etc..)
     areaW = 'AREA:'                       # This gives the shadow effect
-    areaC = '#E0D0E0#FFFFFF:gradheight=0' # More purple..
+    areaC = '#D0E0E0#FFFFFF:gradheight=0' # Gradient colors
 
     # Sensor reading update frequency
     sensorInterval = 3           # Seconds
