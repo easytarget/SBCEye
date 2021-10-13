@@ -334,7 +334,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _give_datetime(self):
         timestamp = datetime.datetime.now()
-        self.wfile.write(bytes('<div style="color:#666666; font-size: 90%">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</div>\n', 'utf-8'))
+        self.wfile.write(bytes('<div style="color:#666666; font-size: 90%; padding-top: 0.5em;">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</div>\n', 'utf-8'))
 
     def _give_env(self):
         if haveSensor:
@@ -361,28 +361,30 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 else:
                     self.wfile.write(bytes('<tr><td>' + s.pinMap[p][0] +'</td><td>off</td></tr>\n', 'utf-8'))
 
-    def _give_links(self):
-        # Links to other pages
-        self.wfile.write(bytes('<table>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><th>Graph:</th></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>\n', 'utf-8'))
+    def _give_graphlinks(self, skip=""):
+        if (len(skip) == 0):
+            self.wfile.write(bytes('<tr><th>Graphs:</th></tr>\n', 'utf-8'))
+        self.wfile.write(bytes('<tr>', 'utf-8'))
+        self.wfile.write(bytes('<td colspan="2" style="text-align: center;">', 'utf-8'))
         for g in s.graphDefaults:
-            self.wfile.write(bytes('&nbsp;<a href="./graphs?duration=' + g + '">' + g + '</a>&nbsp;\n', 'utf-8'))
-        self.wfile.write(bytes('</td></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('</table>\n', 'utf-8'))
-        self.wfile.write(bytes('<table>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<td><a href="?view=deco&view=env&view=sys&view=gpio&view=links&view=log">Inline Log</a></td>\n', 'utf-8'))
-        self.wfile.write(bytes('<td><a href="?view=deco&view=log&lines=' + str(s.logLines) + '">Main Log</a></td>\n', 'utf-8'))
+            if (g != skip):
+                self.wfile.write(bytes('&nbsp;<a href="./graphs?duration=' + g + '">' + g + '</a>&nbsp;', 'utf-8'))
+            else:
+                self.wfile.write(bytes('&nbsp;<span style="color: #AAAAAA;">' + g + '</span>&nbsp;', 'utf-8'))
+        self.wfile.write(bytes('</td>', 'utf-8'))
         self.wfile.write(bytes('</tr>\n', 'utf-8'))
-        self.wfile.write(bytes('</table>\n', 'utf-8'))
+
+    def _give_links(self):
+        self._give_graphlinks()
+        self.wfile.write(bytes('<tr>', 'utf-8'))
+        self.wfile.write(bytes('<td colspan="2" style="text-align: center;"><a href="./?view=deco&view=env&view=sys&view=gpio&view=links&view=log">Inline Log</a>&nbsp;', 'utf-8'))
+        self.wfile.write(bytes('&nbsp;<a href="./?view=deco&view=log&lines=' + str(s.logLines) + '">Main Log</a></td>', 'utf-8'))
+        self.wfile.write(bytes('</tr>\n', 'utf-8'))
 
     def _give_homelink(self):
-        self.wfile.write(bytes('<table>\n', 'utf-8'))
         self.wfile.write(bytes('<tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<td colspan="0" style="text-align: center;"><a href="./">Home</a></td>\n', 'utf-8'))
+        self.wfile.write(bytes('<td colspan="2" style="text-align: center;"><a href="./">Home</a></td>\n', 'utf-8'))
         self.wfile.write(bytes('</tr>\n', 'utf-8'))
-        self.wfile.write(bytes('</table>\n', 'utf-8'))
 
     def _give_log(self, lines=10):
         parsedLines = parse_qs(urlparse(self.path).query).get('lines', None)
@@ -420,6 +422,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('<img title="' + t + '" src="graph?graph=' + g + '&duration=' + d + '">', 'utf-8'))
             self.wfile.write(bytes('</a></td></tr>\n', 'utf-8'))
         self.wfile.write(bytes('</td></tr>\n', 'utf-8'))
+        self._give_graphlinks(skip=d)
+        self._give_homelink()
         self.wfile.write(bytes('</table>\n', 'utf-8'))
 
     def do_GET(self):
@@ -451,11 +455,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._set_headers()
             self._give_head(s.serverName + ":: graphs -" + duration)
             self.wfile.write(bytes('<h2>%s</h2>' % s.serverName, 'utf-8')) 
-            self._give_homelink()
-            self.wfile.write(bytes('<table>\n', 'utf-8'))
             self._give_graphs(duration)
-            self.wfile.write(bytes('</table>', 'utf-8'))
-            self._give_homelink()
             self._give_datetime()
             self._give_foot(refresh=300)
         elif ((urlparse(self.path).path == '/' + s.buttonPath) and (len(s.buttonPath) > 0)):
@@ -482,17 +482,16 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             if "env" in view: self._give_env()
             if "sys" in view: self._give_sys()
             if "gpio" in view: self._give_pins()
-            self.wfile.write(bytes('</table>\n', 'utf-8'))
             if "links" in view: self._give_links()
+            self.wfile.write(bytes('</table>\n', 'utf-8'))
             if "log" in view:
-                self._give_homelink()
                 self._give_log()
                 self._give_homelink()
-                if "deco" in view: self._give_datetime()
+                if "deco" in view:
+                    self._give_datetime()
                 self._give_foot(refresh = 60, scroll = True) 
             else:
-                if "deco" in view: 
-                    self.wfile.write(bytes('<br>', 'utf-8'))
+                if "deco" in view:
                     self._give_datetime()
                 self._give_foot(refresh = 60)
         else:
