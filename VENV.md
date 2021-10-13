@@ -79,7 +79,8 @@ Now we install/upgrade the requirements
 
 Copy the `default-settings.py` file to `settings.py` and edit as required.
 - See the comments in the file
-- The default configuration is sufficient for testing, but screens, sensors and GPIO settings need to be enabled in the settings, and some other parameters for the web server and display can be set there too.
+- The default configuration is sufficient for testing, but screens, sensors and GPIO settings need to be enabled in the settings
+- Some other parameters for the web server and display can be set there too
 
 Then test run with:
 
@@ -87,12 +88,16 @@ Then test run with:
 (env) pi@pi:~/HAT/pi-overwatch $ python overwatch.py
 ```
 The file `overwatch.log` should be created in the pi-overwatch directory, and contain a startup log
+
 Debug messages etc are printed to the console
+
 The web server should be available on `http://<PI ip address>:7080/` (or whatever is configured in the settings)
-Note; you can leave the virtualenv using `$ deactivate`
+
+Note; If you wan to leave the virtualenv at any time you can do so with `$ deactivate`, if you want to delete the virtualenv it is as simple as deleting the 'env' folder and all it's sunfolders.
 
 ## Set up as a service
-The OverWatch will then run automatically at boot
+
+Once you have everything installed, configured and tested by running on the console you should start running this as a system service. The OverWatch will then run automatically at boot and operate in the background like other services.
 
 ```console
 pi@pi:~/HAT/pi-overwatch $ sudo cp OverWatch.service /etc/systemd/system/
@@ -118,4 +123,5 @@ Quick notes; to be expanded later as required, assumes you use git.
 - `git pull`
 - stop the service
 - start the service
-Pip packages should not need upgrading if everything is working properly, but I'll investigate pip freeze and how to do this properly in teh future as it becomes necessary.
+
+Pip packages should not need upgrading any time soon if everything is working properly, but I'll investigate pip freeze and how to do this properly in the future as it becomes necessary.
