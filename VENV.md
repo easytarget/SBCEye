@@ -6,7 +6,8 @@
 Start by making sure that you are running a fully updated Raspian install (Buster as of this time of writing), have python3 installed, and have cloned the repo to `/~/HAT/pi-overwatch` eg:
 
 ```console
-pi@pi:~$ sudo apt install python3 python3-pip
+pi@pi:~$ sudo apt update
+pi@pi:~$ sudo apt install python3 python3-pip git
 pi@pi:~$ mkdir ~/HAT
 pi@pi:~$ git clone https://github.com/easytarget/pi-overwatch.git ~/HAT/pi-overwatch
 ; Alternatively, if you do not use git and have downloaded a zip or tarball, you should unpack it to: ~/HAT/pi-overwatch
