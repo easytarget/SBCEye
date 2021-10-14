@@ -3,11 +3,11 @@
 
 ### Setup
 
-Start by making sure that you are running a fully updated Raspian install (Buster as of this time of writing), have python3 installed, and have cloned the repo to `/~/HAT/pi-overwatch` eg:
+Start by making sure that you are running a fully updated Raspian install (Buster as of this time of writing), have git, python3, python3-pip and python3-dev installed, and have cloned the repo to `/~/HAT/pi-overwatch` eg:
 
 ```console
 pi@pi:~$ sudo apt update
-pi@pi:~$ sudo apt install python3 python3-pip git
+pi@pi:~$ sudo apt install python3 python3-dev python3-pip git
 pi@pi:~$ mkdir ~/HAT
 pi@pi:~$ git clone https://github.com/easytarget/pi-overwatch.git ~/HAT/pi-overwatch
 ; Alternatively, if you do not use git and have downloaded a zip or tarball, you should unpack it to: ~/HAT/pi-overwatch
@@ -72,7 +72,7 @@ Now we install/upgrade the requirements
 
 ; Only if you plan to use a SSD1306 OLED display:
 (env) pi@pi:~/HAT/pi-overwatch $ pip install adafruit-circuitpython-ssd1306
-(env) pi@pi:~/HAT/pi-overwatch $ sudo apt install libjpeg-dev fonts-liberation
+(env) pi@pi:~/HAT/pi-overwatch $ sudo apt install libjpeg-dev libopenjp2-7 libtiff-dev fonts-liberation
 (env) pi@pi:~/HAT/pi-overwatch $ pip install image
 ```
 
