@@ -74,7 +74,14 @@ if haveSensor:
         haveSensor = False
 
 # GPIO light control
-import RPi.GPIO as GPIO           # Allows us to call our GPIO pins and names it just GPIO
+try:
+    import RPi.GPIO as GPIO           # Allows us to call our GPIO pins and names it just GPIO
+    pinMap = s.pinMap
+except Exception as e:
+    print(e)
+    print("GPIO pin functions requirements not met")
+    pinMap = []
+
 
 # Scheduler and Logging
 import schedule
@@ -142,7 +149,7 @@ if haveSensor:
             haveSensor = False
 
 # GPIO mode and arrays for the pin database path and current status
-if (len(s.pinMap) > 0):
+if (len(pinMap) > 0):
     GPIO.setmode(GPIO.BCM)  # Set all GPIO pins to BCM GPIO numbering
 
 # Display setup
@@ -177,7 +184,7 @@ if haveScreen:
 degree_sign= u'\N{DEGREE SIGN}'
 
 # RRD init
-rrd = rrd(s.rrdFileStore, haveSensor, s.pinMap)
+rrd = rrd(s.rrdFileStore, haveSensor, pinMap)
 
 # Use a couple of dictionaries to store latest readings
 sysData = {
@@ -225,22 +232,22 @@ def sysScreen(xpos=0):
 
 def toggleButton(action="toggle"):
     # Set the first pin to a specified state or read and toggle it..
-    if (len(s.pinMap) > 0):
+    if (len(pinMap) > 0):
         if (action == 'toggle'):
-            if (GPIO.input(s.pinMap[0][1]) == True):
-                GPIO.output(s.pinMap[0][1],False)
-                return s.pinMap[0][0] + ' Toggled: off'
+            if (GPIO.input(pinMap[0][1]) == True):
+                GPIO.output(pinMap[0][1],False)
+                return pinMap[0][0] + ' Toggled: off'
             else:
-                GPIO.output(s.pinMap[0][1],True)
-                return s.pinMap[0][0] + ' Toggled: on'
+                GPIO.output(pinMap[0][1],True)
+                return pinMap[0][0] + ' Toggled: on'
         elif (action == 'on'):
-            GPIO.output(s.pinMap[0][1],True)
-            return s.pinMap[0][0] + ' Switched: on'
+            GPIO.output(pinMap[0][1],True)
+            return pinMap[0][0] + ' Switched: on'
         elif (action == 'off'):
-            GPIO.output(s.pinMap[0][1],False)
-            return s.pinMap[0][0] + ' Switched: off'
+            GPIO.output(pinMap[0][1],False)
+            return pinMap[0][0] + ' Switched: off'
         else:
-            return 'I dont know how to "' + action + '" the ' + s.pinMap[0][0] + '!'
+            return 'I dont know how to "' + action + '" the ' + pinMap[0][0] + '!'
     else:
         return 'Not supported, no output pin defined'
 
@@ -265,14 +272,14 @@ def updateData():
     sysData['memory'] = psutil.virtual_memory().percent
 
     # Check if any pins have changed state, and log
-    for i in range(len(s.pinMap)):
-        thisPinState =  GPIO.input(s.pinMap[i][1])
+    for i in range(len(pinMap)):
+        thisPinState =  GPIO.input(pinMap[i][1])
         if (thisPinState != pinState[i]):
             pinState[i] = thisPinState
             if (thisPinState):
-                logging.info(s.pinMap[i][0] + ': on')
+                logging.info(pinMap[i][0] + ': on')
             else:
-                logging.info(s.pinMap[i][0] + ': off')
+                logging.info(pinMap[i][0] + ': off')
 
 def updateDB():
     # Runs 3x per minute, updates RRD database and processes screensaver
@@ -322,18 +329,18 @@ if __name__ == "__main__":
     # - So long as we do not try to write to these pins this will not affect their status,
     #   nor will it prevent other processes (eg octoprint) reading and using them
     pinState = []
-    for i in range(len(s.pinMap)):
-        GPIO.setup(s.pinMap[i][1], GPIO.OUT)
-        pinState.append(GPIO.input(s.pinMap[i][1]))
+    for i in range(len(pinMap)):
+        GPIO.setup(pinMap[i][1], GPIO.OUT)
+        pinState.append(GPIO.input(pinMap[i][1]))
         if (pinState[i]):
-            logging.info(s.pinMap[i][0] + ": on")
+            logging.info(pinMap[i][0] + ": on")
         else:
-            logging.info(s.pinMap[i][0] + ": off")
+            logging.info(pinMap[i][0] + ": off")
     if (len(pinState) > 0):
         logging.info('GPIO configured and logging enabled')
 
     # Do we have a button, and a pin to control
-    if (len(s.pinMap) > 0) and (s.buttonPin > 0):
+    if (len(pinMap) > 0) and (s.buttonPin > 0):
         # Set up the button pin interrupt, if defined
         GPIO.setup(s.buttonPin, GPIO.IN)       # Set our button pin to be an input
         GPIO.add_event_detect(s.buttonPin, GPIO.RISING, buttonInterrupt, bouncetime = 400)
