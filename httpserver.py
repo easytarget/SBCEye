@@ -225,7 +225,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._give_graphs(duration)
             self._give_datetime()
             self._give_foot(refresh=300)
-        elif ((urlparse(self.path).path == '/' + http.s.buttonPath) and (len(http.s.buttonPath and (len(http.pin) > 0)):
+        elif ((urlparse(self.path).path == '/' + http.s.buttonPath) and (len(http.s.buttonPath) > 0) and (len(http.pin) > 0)):
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
             if (not parsed):
                 action = 'toggle'
