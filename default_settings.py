@@ -33,7 +33,7 @@ class settings:
 
     # Default graph durations presented to user
     # See https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html#TIME%20OFFSET%20SPECIFICATION
-    graphDefaults = ['3h','3d','1w','1m','3m','1y','3y']
+    graphDefaults = ['3h','1d','3d','1w','1m','3m','1y','3y']
     graphWide = 1200             # Pixels
     graphHigh = 300
     # Other graph attributes 
