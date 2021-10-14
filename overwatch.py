@@ -79,7 +79,7 @@ try:
     pinMap = s.pinMap
 except Exception as e:
     print(e)
-    print("GPIO pin functions requirements not met")
+    print("GPIO monitorig requirements not met")
     pinMap = []
 
 
@@ -337,7 +337,9 @@ if __name__ == "__main__":
         else:
             logging.info(pinMap[i][0] + ": off")
     if (len(pinState) > 0):
-        logging.info('GPIO configured and logging enabled')
+        logging.info('GPIO monitoring configured and logging enabled')
+    elif (len(s.pinMap) > 0):
+        logging.warning("GPIO monitoring configured but unable to read pins: GPIO status and logging disabled")
 
     # Do we have a button, and a pin to control
     if (len(pinMap) > 0) and (s.buttonPin > 0):
