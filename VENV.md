@@ -72,7 +72,7 @@ Now we install/upgrade the requirements
 
 ; Only if you plan to use a SSD1306 OLED display:
 (env) pi@pi:~/HAT/pi-overwatch $ pip install adafruit-circuitpython-ssd1306
-(env) pi@pi:~/HAT/pi-overwatch $ sudo apt install libjpeg-dev libopenjp2-7 libtiff-dev fonts-liberation
+(env) pi@pi:~/HAT/pi-overwatch $ sudo apt install libjpeg-dev libopenjp2-7-dev libtiff-dev fonts-liberation
 (env) pi@pi:~/HAT/pi-overwatch $ pip install image
 ```
 
