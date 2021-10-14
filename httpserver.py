@@ -121,9 +121,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _give_pins(self):
         # GPIO states
-        if (len(http.s.pinMap) > 0):
+        if (len(http.pin) > 0):
             self.wfile.write(bytes('<tr><th>GPIO</th></tr>\n', 'utf-8'))
-            for p in range(len(http.s.pinMap)):
+            for p in range(len(http.pin)):
                 if (http.pin[p]):
                     self.wfile.write(bytes('<tr><td>' + http.s.pinMap[p][0] +'</td><td>on</td></tr>\n', 'utf-8'))
                 else:
@@ -180,8 +180,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             allgraphs = [["sys-temp","CPU Temperature"],
                          ["sys-load","CPU Load Average"],
                          ["sys-mem","System Memory Use"]]
-        for p in http.s.pinMap:
-            allgraphs.append(["pin-" + p[0],p[0] + " GPIO"])
+        for p in range(len(http.pin)):
+            allgraphs.append(["pin-" + http.s.pinMap[p][0],http.s.pinMap[p][0] + " GPIO"])
         self.wfile.write(bytes('<table>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><th>Graphs: -' + d + ' -> now</th></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>\n', 'utf-8'))
@@ -225,7 +225,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._give_graphs(duration)
             self._give_datetime()
             self._give_foot(refresh=300)
-        elif ((urlparse(self.path).path == '/' + http.s.buttonPath) and (len(http.s.buttonPath) > 0)):
+        elif ((urlparse(self.path).path == '/' + http.s.buttonPath) and (len(http.s.buttonPath and (len(http.pin) > 0)):
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
             if (not parsed):
                 action = 'toggle'
