@@ -36,7 +36,6 @@ from httpserver import ServeHTTP
 import os
 import time
 import datetime
-import subprocess
 
 # System monitoring tools
 import psutil
@@ -93,6 +92,12 @@ import atexit
 
 # Let the console know we are starting
 print("Starting OverWatch")
+
+# Start by re-nicing to reduce blocking of other processes
+os.nice(10)
+# And change to the script dir as the CWD
+# default file locations are relative to this, but can be changed in the settings
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Logging 
 handler = RotatingFileHandler(s.logFile, maxBytes=1024*1024, backupCount=2)
@@ -311,9 +316,6 @@ def goodBye():
 
 # The fun starts here:
 if __name__ == "__main__":
-    # Start by re-nicing to reduce blocking of other processes
-    os.nice(10)
-
     # Log screen and sensor status
     if haveScreen:
         logging.info("Display configured and enabled")
