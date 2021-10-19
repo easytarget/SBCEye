@@ -4,6 +4,9 @@
 
 class Settings:
 
+    # Server name for the Log and Web UI
+    server_name = 'Pi OverWatch'
+
     # Enable/Disable Screen and BME280 sensor
     have_sensor = False
     have_screen = False
@@ -28,36 +31,37 @@ class Settings:
     # Web UI
     host = ''                     # Ip address to bind web server to, '' =  bind to all addresses
     port = 7080                   # Port number for web server
-    server_name = 'Pi OverWatch'  # Used for the title and page heading
     button_path = ''              # Web button url path, leave blank to disable
 
     # Default graph durations presented to user
     # See https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html#TIME%20OFFSET%20SPECIFICATION
     default_graphs = ['3h','1d','3d','1w','1m','3m','1y','3y']
-    graph_wide = 1200             # Pixels
-    graph_high = 300
-    # Other graph attributes
-    line_w = 'LINE2:'                      # Line width (See: https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html)
-    line_c = '#00A0A0'                     # Line color (if you like purple try: line_c = '#A000A0', area_c = '#E0D0E0#FFFFFF:gradheight=0', etc..)
-    area_w = 'AREA:'                       # This gives the shadow effect
-    area_c = '#D0E0E0#FFFFFF:gradheight=0' # Gradient colors
+    graph_wide = 1200  # Pixels
+    graph_high = 300   # GPIO pin on/off graphs are 1/2 this height
+    # Other graph attributes, see: https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html
+    graph_area = 'AREA:data#D0E0E0#FFFFFF:gradheight=0' # '' to disable
+    graph_line = 'LINE2:data#00A0A0'  # the '2' is line width in pixels, eg 'LINE5' is wider
+    graph_comment = '' # optional notes, copyright, etc. (escape colons ':' with a backslash '\:')
 
     # Sensor reading update frequency
     sensor_interval = 3           # Seconds
 
     # Logging
-    log_file = './overwatch.log'  # Folder must be writable by the OverWatch process
-    log_interval = 600            # Environmental and system log dump interval (seconds, zero to disable)
-    log_lines = 240               # How many lines of logging to show in webui by default
-    suppress_glitches=True        # Pin state changes can produce phantom button presses due to crosstalk, ignore them
+    log_file_path = './logs'         # Folder must be writable by the OverWatch process
+    log_file_name = 'overwatch.log'  # Folder must be writable by the OverWatch process
+    log_interval = 600               # Environmental and system log dump interval (seconds, zero to disable)
+    log_lines = 240                  # How many lines of logging to show in webui by default
+    log_file_count = 3               # Maximum number of old logfiles to retain
+    log_file_size = 1024*1024        # Maximum size before logfile rolls over
+    suppress_glitches=True           # Pin state changes can produce phantom button presses due to crosstalk, ignore them
 
     # Location for RRD database files (folder must be writable by overwatch process)
-    rrd_file_store = "./DB/"
+    rrd_file_store = "./DB"
 
     # Animation
-    passtime = 2            # time between display refreshes (seconds)
-    passes = 3              # number of refreshes of a screen before moving to next
-    slidespeed = 16         # number of rows to scroll on each animation step between screens
+    passtime = 2     # time between display refreshes (seconds)
+    passes = 3       # number of refreshes of a screen before moving to next
+    slidespeed = 16  # number of rows to scroll on each animation step between screens
 
     # Display orientation, contrast and burn-in prevention
     rotate_display = True    # Is the display 'upside down'? (generally the ribbon connection from the glass is at the bottom)

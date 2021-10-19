@@ -22,24 +22,55 @@
 
 # Some general functions we will use
 import os
+import sys
 import time
 import logging
 from logging.handlers import RotatingFileHandler
+import argparse
+from argparse import RawTextHelpFormatter
+from pathlib import Path
+import importlib
 import atexit
 import psutil
 import schedule
+import textwrap
 
 # Local classes
 from saver import Saver
 from rrd import Robin
 from httpserver import serve_http
 
+# Parse the arguments
+parser = argparse.ArgumentParser(
+    formatter_class=RawTextHelpFormatter,
+    description=textwrap.dedent('''
+        All hail the python Overwatch!
+        See 'default_settings.py' for more info on how to configure'''),
+    epilog=textwrap.dedent('''
+        Homepage: https://github.com/easytarget/pi-overwatch
+        '''))
+parser.add_argument("--datadir", "-d", help="Data directory, will be searched for settings.pl file, default = '.'", type=str)
+args = parser.parse_args()
+
+if args.datadir:
+    data_dir = Path(args.datadir)
+    if data_dir.is_dir():
+        sys.path.append(str(data_dir.resolve()))
+    else:
+        print(f"data_dir specified on commandline ({args.datadir}) not found; ignoring")
+else:
+    data_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+
+os.chdir(data_dir)
+print(f"data directory = {os.getcwd()}")
+print(f"PYTHON_PATH = {sys.path}")
+
 try:
-    print("Loading settings from user settings file")
-    from settings import Settings as s
+    from overwatch_settings import Settings as s
+    print("Loaded settings from 'overwatch_settings.py'")
 except ModuleNotFoundError:
-    print("No user settings found, loading from default settings file")
-    from default_settings import Settings as s
+    print("No user settings found in data directory or PYTHON_PATH, loading from 'default_overwatch_settings.py'")
+    from default_overwatch_settings import Settings as s
 
 HAVE_SCREEN = s.have_screen
 HAVE_SENSOR = s.have_sensor
@@ -83,21 +114,21 @@ except Exception as e:
     pin_map = []
 
 
-# Let the console know we are starting
+# Imports and settings should be OK now, let the console know we are starting
 print("Starting OverWatch")
 
 # Start by re-nicing to reduce blocking of other processes
 os.nice(10)
-# And change to the script dir as the CWD
-# default file locations are relative to this, but can be changed in the settings
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Logging
-handler = RotatingFileHandler(s.log_file, maxBytes=1024*1024, backupCount=2)
+s.log_file = Path(s.log_file_path + "/" + s.log_file_name).resolve()
+print(f"Logging to: {s.log_file}")
+handler = RotatingFileHandler(s.log_file, maxBytes=s.log_file_size, backupCount=s.log_file_count)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S', handlers=[handler])
+
 # Older scheduler versions sometimes log actions to 'INFO' not 'DEBUG', spewing debug into the log, sigh..
-schedule_logger = logging.getLogger('schedule')  # Oi! Schedule!
-schedule_logger.setLevel(level=logging.WARN)     # Stop it.
+schedule_logger = logging.getLogger('schedule') # For the scheduler..
+schedule_logger.setLevel(level=logging.WARN)    # ignore anything less severe than 'WARN'
 
 # Now we have logging, notify we are starting up
 logging.info('')
@@ -146,45 +177,10 @@ if HAVE_SENSOR:
             print("We do not have an environmental sensor")
             HAVE_SENSOR = False
 
-# GPIO mode and arrays for the pin database path and current status
-if len(pin_map) > 0:
-    GPIO.setmode(GPIO.BCM)  # Set all GPIO pins to BCM GPIO numbering
-
-# Display setup
-if HAVE_SCREEN:
-    # Image canvas
-    margin = 20           # Space between the screens while transitioning
-    width  = disp.width
-    span   = width*2 + margin
-    height = disp.height
-
-    # Create image canvas (with mode '1' for 1-bit color)
-    image = Image.new("1", (span, height))
-
-    # Get drawing object so we can easily draw on canvas.
-    draw = ImageDraw.Draw(image)
-
-    # LiberationMono-Regular : nice font that looks clear on the small display
-    # This font is located in: /usr/share/fonts/truetype/liberation/ on Raspian.
-    # If you get an error that it is not present, install it with:
-    #   sudo apt install fonts-liberation
-    font = ImageFont.truetype('LiberationMono-Regular.ttf', 16)
-
-    # Splash!
-    draw.text((10, 10), 'Over-',  font=font, fill=255)
-    draw.text((28, 28), 'Watch',  font=font, fill=255)
-    disp.show()
-
-    # Start saver
-    screensaver = Saver(disp, s.saver_mode, s.saver_on, s.saver_off, s.display_invert)
-
 # Unicode degrees character used for display and logging
 DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
-# RRD init
-rrd = Robin(s.rrd_file_store, HAVE_SENSOR, pin_map)
-
-# Use a couple of dictionaries to store latest readings
+# Use a couple of dictionaries to store current readings
 sysData = {
     'temperature': 0,
     'load': 0,
@@ -305,18 +301,54 @@ def schedule_servicing_delay(seconds=60):
 
 def good_bye():
     logging.info('Exiting')
+    print("Exit")
 
 # The fun starts here:
 if __name__ == "__main__":
-    # Log screen and sensor status
+
+    # RRD init
+    rrd = Robin(s, HAVE_SENSOR, pin_map)
+
+    # Display setup
     if HAVE_SCREEN:
+        # Image canvas
+        margin = 20           # Space between the screens while transitioning
+        width  = disp.width
+        span   = width*2 + margin
+        height = disp.height
+
+        # Create image canvas (with mode '1' for 1-bit color)
+        image = Image.new("1", (span, height))
+
+        # Get drawing object so we can easily draw on canvas.
+        draw = ImageDraw.Draw(image)
+
+        # LiberationMono-Regular : nice font that looks clear on the small display
+        # This font is located in: /usr/share/fonts/truetype/liberation/ on Raspian.
+        # If you get an error that it is not present, install it with:
+        #   sudo apt install fonts-liberation
+        font = ImageFont.truetype('LiberationMono-Regular.ttf', 16)
+
+        # Splash!
+        draw.text((10, 10), 'Over-',  font=font, fill=255)
+        draw.text((28, 28), 'Watch',  font=font, fill=255)
+        disp.show()
         logging.info("Display configured and enabled")
     elif s.have_screen:
         logging.warning("Display configured but not detected: Display features disabled")
+
+        # Start saver
+        screensaver = Saver(disp, s.saver_mode, s.saver_on, s.saver_off, s.display_invert)
+
+    # Log sensor status
     if HAVE_SENSOR:
         logging.info("Environmental sensor configured and enabled")
     elif s.have_sensor:
         logging.warning("Environmental data configured but no sensor detected: Environment status and logging disabled")
+
+    # GPIO mode and arrays for the pin database path and current status
+    if len(pin_map) > 0:
+        GPIO.setmode(GPIO.BCM)  # Set all GPIO pins to BCM GPIO numbering
 
     # Set all gpio pins to 'output' and record their initial status
     # We need to set them as outputs in our context in order to monitor their state.

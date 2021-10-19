@@ -158,7 +158,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         parsed_lines = parse_qs(urlparse(self.path).query).get('lines', None)
         if parsed_lines:
             lines = parsed_lines[0]
-        # LogCmd is a shell one-liner used to extract the last {lines} of data from the logs
+        # Use a shell one-liner used to extract the last {lines} of data from the logs
         # There is doubtless a more 'python' way to do this, but it is fast, cheap and works..
         log_command = f"for a in `ls -tr {http.s.log_file}*`;do cat $a ; done | tail -{lines}"
         log = subprocess.check_output(log_command, shell=True).decode('utf-8')
@@ -206,7 +206,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             else:
                 graph = parsed_graph[0]
                 duration = parsed_duration[0]
-                body = Robin.draw_graph(http.rrd, duration, graph, http.s.graph_wide, http.s.graph_high, http.s.area_c, http.s.area_w, http.s.line_c, http.s.line_w, http.s.server_name)
+                body = Robin.draw_graph(http.rrd, duration, graph)
             if len(body) == 0:
                 self.send_error(404, 'Graph unavailable', 'Check your parameters and try again, see the "/graphs/" page for examples.')
                 return
