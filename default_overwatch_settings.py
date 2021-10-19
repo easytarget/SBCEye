@@ -1,6 +1,13 @@
 #
 # User Settings  (with sensible defaults)
 #
+# Copy this file to `overwatch_settings.py' in your data directory
+#  and edit as appropriate.
+#
+# Default data directory is the overwatch script directory, but this
+#  can be overidden on the commandline with the -d option.
+# Paths for logging and database can be absolute, or relative to the data directory
+#
 
 class Settings:
 

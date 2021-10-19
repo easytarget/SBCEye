@@ -6,7 +6,7 @@ It logs temperature, pressure and humidity environmental readings, plus the CPU 
 
 (Optionally) It also has the ability to monitor and log specified GPIO pins as they are toggled by other programs (eg printer power control pins controlled by Octoprint, etc.)
 
-_Bonus!_ it can control a light connected to a GPIO pin via a button and/or url, useful if you have webcams..
+_Bonus!_ Control a light connected to a GPIO pin via a button and/or url, useful in the room or if you have webcams..
 
 Based on [CircuitPython](https://github.com/adafruit/circuitpython)
 

@@ -37,7 +37,7 @@ Create the virtual environment and activate it
 - The virtual environment will be located at `/home/pi/HAT/pi-overwatch/env`
 - TL;DR: (Quick primer for the unitiated and curious):
   - A python virtual environment is, simply put, a complete and self-contained copy of python and all it's utilities, libraries, and packages.
-  - It is installed into a folder (which you specify when creating it) 
+  - It is installed into a folder (which you specify when creating it)
   - *Everything* is located in that folder, nothing gets installed to the machines OS, and you can do this as an ordinary user without needing root privileges.
   - This means that your virtualenv can have, say, a different version of python in it than the main 'os' version, either higher or lower, most useful when the OS python version is lagging behind the version you want to use.
   - You can also install python modules into the virtual environment directly, this allows you to use modules and module versions that are different or unsupported on your main OS
@@ -76,11 +76,10 @@ Now we install/upgrade the requirements
 (env) pi@pi:~/HAT/pi-overwatch $ pip install image
 ```
 
-Copy the `default-settings.py` file to `settings.py` and edit as required.
+Copy the `default-overwatch-settings.py` file to `overwatch-settings.py` and edit as required.
 - See the comments in the file
 - The default configuration is sufficient for testing, but screens, sensors and GPIO settings need to be enabled in the settings
-- Some other parameters for the web server and display can be set there too
-
+- Some other parameters for the web server, logging and display can be set there too
 
 If using either a screen, BME sensor or GPIO pin monitoring you must make sure the pi user is in the gpio group:
 ```console
