@@ -40,22 +40,12 @@ class Settings:
     port = 7080                   # Port number for web server
     button_path = ''              # Web button url path, leave blank to disable
 
-    # Default graph durations presented to user
-    # See https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html#TIME%20OFFSET%20SPECIFICATION
-    default_graphs = ['3h','1d','3d','1w','1m','3m','1y','3y']
-    graph_wide = 1200  # Pixels
-    graph_high = 300   # GPIO pin on/off graphs are 1/2 this height
-    # Other graph attributes, see: https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html
-    graph_area = 'AREA:data#D0E0E0#FFFFFF:gradheight=0' # '' to disable
-    graph_line = 'LINE2:data#00A0A0'  # the '2' is line width in pixels, eg 'LINE5' is wider
-    graph_comment = '' # optional notes, copyright, etc. (escape colons ':' with a backslash '\:')
-
     # Sensor reading update frequency
     sensor_interval = 3           # Seconds
 
     # Logging
-    log_file_path = './logs'         # Folder must be writable by the OverWatch process
-    log_file_name = 'overwatch.log'  # Folder must be writable by the OverWatch process
+    log_file_path = './logs/'        # Folder must be writable by the OverWatch process
+    log_file_name = 'overwatch.log'  
     log_interval = 600               # Environmental and system log dump interval (seconds, zero to disable)
     log_lines = 240                  # How many lines of logging to show in webui by default
     log_file_count = 3               # Maximum number of old logfiles to retain
@@ -64,8 +54,20 @@ class Settings:
 
     # Location for RRD database files (folder must be writable by overwatch process)
     rrd_file_store = "./DB"
+    rrd_file_path = "./DB/"
+    rrd_file_name = "overwatch.rrd"
 
-    # Animation
+    # Default graph durations
+    # See https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html#TIME%20OFFSET%20SPECIFICATION
+    default_graphs = ['3h','1d','3d','1w','1m','3m','1y','3y']
+    graph_wide = 1200  # Pixels
+    graph_high = 300   # GPIO pin on/off graphs are 1/2 this height
+    # Other graph attributes, see: https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html
+    graph_area = 'AREA:data#D0E0E0#FFFFFF:gradheight=0' # set to '' to disable
+    graph_line = 'LINE2:data#00A0A0'  # the '2' is line width in pixels, eg 'LINE5' is wider
+    graph_comment = '' # optional notes, copyright, etc. (escape colons ':' with a backslash '\:')
+
+    # Display Animation
     passtime = 2     # time between display refreshes (seconds)
     passes = 3       # number of refreshes of a screen before moving to next
     slidespeed = 16  # number of rows to scroll on each animation step between screens
