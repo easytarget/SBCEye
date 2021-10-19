@@ -26,6 +26,7 @@ import sys
 import time
 import logging
 from logging.handlers import RotatingFileHandler
+import random
 import argparse
 from argparse import RawTextHelpFormatter
 from pathlib import Path
@@ -227,22 +228,31 @@ def sys_screen(xpos=0):
 def toggle_button(action="toggle"):
     # Set the first pin to a specified state or read and toggle it..
     if len(pin_map) > 0:
-        if action == 'toggle':
+        if action.lower() in ['toggle','flip','invert','mirror','switch']:
             if GPIO.input(pin_map[0][1]):
                 GPIO.output(pin_map[0][1],False)
-                return pin_map[0][0] + ' Toggled: off'
             else:
                 GPIO.output(pin_map[0][1],True)
-                return pin_map[0][0] + ' Toggled: on'
-        elif action == 'on':
+            ret =  pin_map[0][0] + ' Toggled: '
+        elif action.lower() in ['on','true','enabled','high','hi']:
             GPIO.output(pin_map[0][1],True)
-            return pin_map[0][0] + ' Switched: on'
-        elif action == 'off':
+            ret = pin_map[0][0] + ' Switched: '
+        elif action.lower() in ['off','false','disabled','low','lo']:
             GPIO.output(pin_map[0][1],False)
-            return pin_map[0][0] + ' Switched: off'
+            ret = pin_map[0][0] + ' Switched: '
+        elif action.lower() in ['random','easter']:
+            pick_one = random.choice([True, False])
+            GPIO.output(pin_map[0][1],pick_one)
+            ret = pin_map[0][0] + ' Randomly Switched: '
         else:
             return 'I dont know how to "' + action + '" the ' + pin_map[0][0] + '!'
-    return 'Not supported, no output pin defined'
+        if GPIO.input(pin_map[0][1]):
+            ret += "On"
+        else:
+            ret += "Off"
+    else:
+        ret = 'Not supported, no output pin defined'
+    return ret
 
 def button_interrupt(*_):
     # give a short delay, then re-read input to provide a minimum hold-down time
@@ -333,12 +343,11 @@ if __name__ == "__main__":
         draw.text((10, 10), 'Over-',  font=font, fill=255)
         draw.text((28, 28), 'Watch',  font=font, fill=255)
         disp.show()
+        # Start saver
+        screensaver = Saver(disp, s.saver_mode, s.saver_on, s.saver_off, s.display_invert)
         logging.info("Display configured and enabled")
     elif s.have_screen:
         logging.warning("Display configured but not detected: Display features disabled")
-
-        # Start saver
-        screensaver = Saver(disp, s.saver_mode, s.saver_on, s.saver_off, s.display_invert)
 
     # Log sensor status
     if HAVE_SENSOR:

@@ -65,6 +65,7 @@ class Settings:
 
     # Display orientation, contrast and burn-in prevention
     rotate_display = True    # Is the display 'upside down'? (generally the ribbon connection from the glass is at the bottom)
+    display_contrast = 127   # (0-255, default 255) This gives a limited brightness reduction, not full dimming to black
     display_invert = False   # Default is light text on dark background
     saver_mode = 'invert'    # Possible values are 'off', 'blank' and 'invert'
     saver_on  = 20           # Start time for screensaver (hour, 24hr clock)

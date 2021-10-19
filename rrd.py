@@ -20,7 +20,7 @@ class Robin:
         self.sys_db = Path(s.rrd_file_store + "/" + "sys.rrd").resolve()
         self.pin_db = []
         for pin in range(len(self.pin_map)):
-            self.pin_db.append(Path(path + self.pin_map[pin][0] + ".rrd"))
+            self.pin_db.append(Path(s.rrd_file_store + "/" + self.pin_map[pin][0] + ".rrd").resolve())
         # Main RRDtool databases
         # One DB file with three data sources for the environmental data
         if self.have_sensor:
