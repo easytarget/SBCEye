@@ -84,6 +84,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('<body>\n', 'utf-8'))
 
     def _give_foot(self,scroll = False, refresh = 0):
+        self.wfile.write(bytes('<div style="color:#888888; font-size: 66%; font-weight: lighter; padding-top:0.5em"><a href="https://github.com/easytarget/pi-overwatch" title="Project homepage on GitHub" target="_blank">OverWatch Home</a></div>\n', 'utf-8'))
         # DEBUG: self.wfile.write(bytes('<pre style="color:#888888">GET: ' + self.path + ' from: ' + self.client_address[0] + '</pre>\n', 'utf-8'))
         self.wfile.write(bytes('</body>\n', 'utf-8'))
         self.wfile.write(bytes("<script>\n", 'utf-8'))
@@ -134,7 +135,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('<td colspan="2" style="text-align: center;">', 'utf-8'))
         for g in http.s.default_graphs:
             if g != skip:
-                self.wfile.write(bytes('&nbsp;<a href="./graphs?duration=' + g + '">' + g + '</a>&nbsp;', 'utf-8'))
+                self.wfile.write(bytes('&nbsp;<a href="./graphs?duration=' + g + '" title="Graphs covering the last ' + g + ' in time">' + g + '</a>&nbsp;', 'utf-8'))
             else:
                 self.wfile.write(bytes('&nbsp;<span style="color: #AAAAAA;">' + g + '</span>&nbsp;', 'utf-8'))
         self.wfile.write(bytes('</td>', 'utf-8'))
@@ -143,8 +144,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_links(self):
         self._give_graphlinks()
         self.wfile.write(bytes('<tr>', 'utf-8'))
-        self.wfile.write(bytes('<td colspan="2" style="text-align: center;"><a href="./?view=deco&view=env&view=sys&view=gpio&view=links&view=log">Inline Log</a>&nbsp;', 'utf-8'))
-        self.wfile.write(bytes('&nbsp;<a href="./?view=deco&view=log&lines=' + str(http.s.log_lines) + '">Main Log</a></td>', 'utf-8'))
+        self.wfile.write(bytes('<td colspan="2" style="text-align: center;"><a href="./?view=deco&view=env&view=sys&view=gpio&view=links&view=log" title="Show the most recent log entries inline">Inline Log</a>&nbsp;', 'utf-8'))
+        self.wfile.write(bytes('&nbsp;<a href="./?view=deco&view=log&lines=' + str(http.s.log_lines) + '" title="Open the extended log in a new page" target="_blank">Main Log</a></td>', 'utf-8'))
         self.wfile.write(bytes('</tr>\n', 'utf-8'))
 
     def _give_homelink(self):
