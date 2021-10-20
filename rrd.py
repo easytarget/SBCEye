@@ -135,108 +135,52 @@ class Robin:
                 "--template", self.update_template,
                 dataline)
 
-
     def draw_graph(self, period, graph):
         # RRD graph generation
         # Returns the generated file for sending in the http response
-        start = 'end-' + period
-        temp_file = tempfile.NamedTemporaryFile(mode='rb', dir='/tmp', prefix='overwatch_graph')
-        timestamp = datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y")
-        rrd_args = ["--full-size-mode",
-                    "--start", start,
-                    "--end", "now",
-                    "--watermark", self.server_name + " :: " + timestamp,
-                    "--width", str(self.wide)]
-        if graph[:4] == 'pin-':
-            rrd_args.extend(["--height", str(self.high/2)])
-        else:
-            rrd_args.extend(["--height", str(self.high)])
-        rrd_args.extend(["DEF:data=" + str(self.db) + ":" + graph.lower() + ":AVERAGE",
-                         *self.style])
+        graphArgMap = {
+                'env-temp': ('Environment Temperature','50','10','%3.1lf\u00B0C'),
+                'env-humi': ('Environment Humidity','100','0','%3.0lf%%'),
+                'env-pres': ('Environment Pressure','1040','970','%4.0lfmb','0'),
+                'sys-temp': ('CPU Temperature','80','40','%3.1lf\u00B0C'),
+                'sys-load': ('CPU Load Average','3','0','%2.3lf','0'),
+                'sys-mem':  ('System Memory Use','100','0','%3.0lf%%')
+                }
+        for _, pin in enumerate(self.pin_map):
+            graphArgMap["pin-" + pin[0]] = (pin[0] + ' Pin State','1.1','-0.1','%3.1lf')
 
-        if graph == "env-temp":
+        if graph in graphArgMap:
+            temp_file = tempfile.NamedTemporaryFile(mode='rb', dir='/tmp', prefix='overwatch_graph')
+            start = 'end-' + period
+            timestamp = datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y")
+            rrd_args = ["--full-size-mode",
+                        "--start", start,
+                        "--end", "now",
+                        "--watermark", self.server_name + " :: " + timestamp,
+                        "--width", str(self.wide)]
+            if graph[:4] == 'pin-':
+                rrd_args.extend(["--height", str(self.high/2)])
+            else:
+                rrd_args.extend(["--height", str(self.high)])
+            rrd_args.extend(["--title", graphArgMap[graph][0] + ": last " + period,
+                             "--upper-limit", graphArgMap[graph][1],
+                             "--lower-limit", graphArgMap[graph][2],
+                             "--left-axis-format", graphArgMap[graph][3]])
+            if len(graphArgMap[graph]) > 4:
+                rrd_args.extend(["--units-exponent", graphArgMap[graph][4]])
+            rrd_args.extend(["DEF:data=" + str(self.db) + ":" + graph.lower() + ":AVERAGE",
+                             *self.style])
             try:
                 rrdtool.graph(
                         temp_file.name,
-                        "--title", "Environment Temperature: last " + period,
-                        "--upper-limit", "50",
-                        "--lower-limit", "10",
-                        "--left-axis-format", "%3.1lf\u00B0C",
                         *rrd_args)
             except Exception as rrd_error:
                 print(rrd_error)
-        elif graph == "env-humi":
-            try:
-                rrdtool.graph(
-                        temp_file.name,
-                        "--title", "Environment Humidity: last " + period,
-                        "--upper-limit", "100",
-                        "--lower-limit", "0",
-                        "--left-axis-format", "%3.0lf%%",
-                        *rrd_args)
-            except Exception as rrd_error:
-                print(rrd_error)
-        elif graph == "env-pres":
-            try:
-                rrdtool.graph(
-                        temp_file.name,
-                        "--title", "Environment Pressure: last " + period,
-                        "--upper-limit", "1040",
-                        "--lower-limit", "970",
-                        "--units-exponent", "0",
-                        "--left-axis-format", "%4.0lfmb",
-                        *rrd_args)
-            except Exception as rrd_error:
-                print(rrd_error)
-        elif graph == "sys-temp":
-            try:
-                rrdtool.graph(
-                        temp_file.name,
-                        "--title", "CPU Temperature: last " + period,
-                        "--upper-limit", "80",
-                        "--lower-limit", "40",
-                        "--left-axis-format", "%3.1lf\u00B0C",
-                        *rrd_args)
-            except Exception as rrd_error:
-                print(rrd_error)
-        elif graph == "sys-load":
-            try:
-                rrdtool.graph(
-                        temp_file.name,
-                        "--title", "CPU Load Average: last " + period,
-                        "--upper-limit", "3",
-                        "--lower-limit", "0",
-                        "--units-exponent", "0",
-                        "--left-axis-format", "%2.3lf",
-                        *rrd_args)
-            except Exception as rrd_error:
-                print(rrd_error)
-        elif graph == "sys-mem":
-            try:
-                rrdtool.graph(
-                        temp_file.name,
-                        "--title", "System Memory Use: last " + period,
-                        "--upper-limit", "100",
-                        "--lower-limit", "0",
-                        "--left-axis-format", "%3.0lf%%",
-                        *rrd_args)
-            except Exception as rrd_error:
-                print(rrd_error)
+            response = temp_file.read()
+            if len(response) == 0:
+                print("Error: png file generation failed for : " + graph + " : " + period)
+            temp_file.close()
         else:
-            for _, pin in enumerate(self.pin_map):
-                if graph == "pin-" + pin[0]:
-                    try:
-                        rrdtool.graph(
-                                temp_file.name,
-                                "--title", pin[0] + " Pin State: last " + period,
-                                "--upper-limit", "1.1",
-                                "--lower-limit", "-0.1",
-                                "--left-axis-format", "%3.1lf",
-                                *rrd_args)
-                    except Exception as rrd_error:
-                        print(rrd_error)
-        response = temp_file.read()
-        if len(response) == 0:
-            print("Error: png file generation failed for : " + graph + " : " + period)
-        temp_file.close()
+            response = bytearray()
+            print("Error: No graph map entry for type: " + graph)
         return response

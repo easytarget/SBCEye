@@ -8,7 +8,7 @@ class Saver:
     def __init__(self, s, disp):
         self.disp = disp
         self.mode = s.saver_mode
-        self.invert = s.saver_invert
+        self.invert = s.display_invert
         if self.mode != 'off':
             print('Saver will ' + self.mode + ' display between: ' +
                 str(s.saver_on) + ':00 and ' + str(s.saver_off) + ':00')
