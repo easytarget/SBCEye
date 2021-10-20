@@ -14,7 +14,7 @@ import logging
 # RRD data
 from rrd import Robin
 
-def serve_http(s, rrd, have_screen, have_sensor, env, sys, pin, toggle_button):
+def serve_http(s, rrd, env, sys, pin, toggle_button):
     # Spawns a http.server.HTTPServer in a separate thread on the given port.
     handler = _BaseRequestHandler
     httpd = http.server.HTTPServer((s.host, s.port), handler, False)
@@ -26,8 +26,6 @@ def serve_http(s, rrd, have_screen, have_sensor, env, sys, pin, toggle_button):
     # there is probably a better way to do this, eg using a meta-class and inheritance
     http.s = s
     http.rrd = rrd
-    http.have_screen = have_screen
-    http.have_sensor = have_sensor
     http.sys = sys
     http.env = env
     http.pin = pin
@@ -105,7 +103,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('<div style="color:#666666; font-size: 90%; padding-top: 0.5em;">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</div>\n', 'utf-8'))
 
     def _give_env(self):
-        if http.have_sensor:
+        if len(http.env) > 0:
             # room sensors
             self.wfile.write(bytes('<tr><th>Room</th></tr>\n', 'utf-8'))
             self.wfile.write(bytes('<tr><td>Temperature: </td><td>' + format(http.env['temperature'], '.1f') + '&deg;</td></tr>\n', 'utf-8'))
@@ -170,7 +168,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _give_graphs(self, d):
         allgraphs = []
-        if http.have_sensor:
+        if len(http.env) > 0:
             allgraphs.extend([["env-temp", "Temperature"],
                          ["env-humi", "Humidity"],
                          ["env-pres", "Pressure"]])
@@ -179,7 +177,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                          ["sys-mem", "System Memory Use"]])
         for _, pin in enumerate(http.s.pin_map):
             allgraphs.append(["pin-" + pin[0], pin[0] + " GPIO"])
-        print(f"GRAPHS: {allgraphs}")
         self.wfile.write(bytes('<table>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><th>Graphs: -' + d + ' -> now</th></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>\n', 'utf-8'))

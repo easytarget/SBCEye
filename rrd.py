@@ -4,10 +4,10 @@ from pathlib import Path
 import rrdtool
 
 class Robin:
-    def __init__(self, s, env, sys, pins):
+    def __init__(self, s, env, sys, pin):
         self.env = env
         self.sys = sys
-        self.pins = pins
+        self.pin = pin
         self.pin_map = s.pin_map
         self.server_name = s.server_name
         self.wide = s.graph_wide
@@ -21,7 +21,7 @@ class Robin:
         # DataBase
 
         # Calculate desired data sources (things we will record)
-        if env:
+        if len(self.env) > 0:
             sources = ['env-temp','env-humi','env-pres']
         else:
             sources = []
@@ -118,22 +118,23 @@ class Robin:
 
     def update(self):
         # Update the database with the latest readings
-        dataline = "N:"
-        if self.env:
-            update_cmd = str(self.env["temperature"]) + ":" + str(self.env["humidity"]) + ":" + str(self.env["pressure"])
-            rrdtool.update(str(self.env_db), "N:" + update_cmd)
+        dataline = "N"
+        if len(self.env) > 0:
+            update_cmd = ':' + str(self.env["temperature"]) + ":" + str(self.env["humidity"]) + ":" + str(self.env["pressure"])
+            rrdtool.update(str(self.env_db), "N" + update_cmd)
             dataline += update_cmd
-        update_cmd = str(self.sys["temperature"]) + ":" + str(self.sys["load"]) + ":" + str(self.sys["memory"])
-        dataline += ':' + update_cmd
-        rrdtool.update(str(self.sys_db), "N:" + update_cmd)
-        for idx, pin in enumerate(self.pins):
-            update_cmd = str(pin)
-            rrdtool.update(str(self.pin_db[idx]), "N:" + update_cmd)
-            dataline += ':' + update_cmd
+        update_cmd = ':' + str(self.sys["temperature"]) + ":" + str(self.sys["load"]) + ":" + str(self.sys["memory"])
+        dataline += update_cmd
+        rrdtool.update(str(self.sys_db), "N" + update_cmd)
+        for idx, pin in enumerate(self.pin):
+            update_cmd = ':' + str(pin)
+            rrdtool.update(str(self.pin_db[idx]), "N" + update_cmd)
+            dataline += update_cmd
         rrdtool.update(
                 str(self.db),
                 "--template", self.update_template,
                 dataline)
+
 
     def draw_graph(self, period, graph):
         # RRD graph generation

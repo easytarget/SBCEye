@@ -182,19 +182,19 @@ if HAVE_SENSOR:
 DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
 # Use a couple of dictionaries to store current readings
-if HAVE_SENSOR:
-    sysData = {
-        'temperature': 0,
-        'load': 0,
-        'memory': 0
-    }
-else:
-    sysData = {}
-envData = {
+sysData = {
     'temperature': 0,
-    'humidity': 0,
-    'pressure':0
-    }
+    'load': 0,
+    'memory': 0
+}
+if HAVE_SENSOR:
+    envData = {
+        'temperature': 0,
+        'humidity': 0,
+        'pressure':0
+        }
+else:
+    envData = {}
 
 # Local functions
 
@@ -390,7 +390,7 @@ if __name__ == "__main__":
     update_data()
 
     # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(s, rrd, HAVE_SCREEN, HAVE_SENSOR, envData, sysData, pinData, toggle_button)
+    serve_http(s, rrd, envData, sysData, pinData, toggle_button)
 
     # Exit handler
     atexit.register(good_bye)
