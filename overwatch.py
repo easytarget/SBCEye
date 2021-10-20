@@ -182,11 +182,14 @@ if HAVE_SENSOR:
 DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
 # Use a couple of dictionaries to store current readings
-sysData = {
-    'temperature': 0,
-    'load': 0,
-    'memory': 0
-}
+if HAVE_SENSOR:
+    sysData = {
+        'temperature': 0,
+        'load': 0,
+        'memory': 0
+    }
+else:
+    sysData = {}
 envData = {
     'temperature': 0,
     'humidity': 0,
@@ -277,8 +280,8 @@ def update_data():
     # Check if any pins have changed state, and log
     for pin in range(len(pin_map)):
         this_pin_state =  GPIO.input(pin_map[pin][1])
-        if this_pin_state != pin_state[pin]:
-            pin_state[pin] = this_pin_state
+        if this_pin_state != pinData[pin]:
+            pinData[pin] = this_pin_state
             if this_pin_state:
                 logging.info(pin_map[pin][0] + ': on')
             else:
@@ -286,7 +289,7 @@ def update_data():
 
 def update_db():
     # Runs 3x per minute, updates RRD database and processes screensaver
-    rrd.update(envData, sysData, pin_state)
+    rrd.update()
     if HAVE_SCREEN:
         screensaver.check()
 
@@ -315,9 +318,6 @@ def good_bye():
 
 # The fun starts here:
 if __name__ == "__main__":
-
-    # RRD init
-    rrd = Robin(s, HAVE_SENSOR, pin_map)
 
     # Display setup
     if HAVE_SCREEN:
@@ -363,31 +363,34 @@ if __name__ == "__main__":
     # We need to set them as outputs in our context in order to monitor their state.
     # - So long as we do not try to write to these pins this will not affect their status,
     #   nor will it prevent other processes (eg octoprint) reading and using them
-    pin_state = []
-    for pin in range(len(pin_map)):
-        GPIO.setup(pin_map[pin][1], GPIO.OUT)
-        pin_state.append(GPIO.input(pin_map[pin][1]))
-        if pin_state[pin]:
-            logging.info(pin_map[pin][0] + ": on")
+    pinData = []
+    for idx, pin in enumerate(pin_map):
+        GPIO.setup(pin[1], GPIO.OUT)
+        pinData.append(GPIO.input(pin[1]))
+        if pinData[idx]:
+            logging.info(pin[0] + ": on")
         else:
-            logging.info(pin_map[pin][0] + ": off")
-    if len(pin_state) > 0:
+            logging.info(pin[0] + ": off")
+    if len(pinData) > 0:
         logging.info('GPIO monitoring configured and logging enabled')
     elif len(s.pin_map) > 0:
         logging.warning("GPIO monitoring configured but unable to read pins: GPIO status and logging disabled")
 
     # Do we have a button, and a pin to control
-    if (len(pin_map) > 0) and (s.button_pin > 0):
+    if (len(pinData) > 0) and (s.button_pin > 0):
         # Set up the button pin interrupt, if defined
         GPIO.setup(s.button_pin, GPIO.IN)       # Set our button pin to be an input
         GPIO.add_event_detect(s.button_pin, GPIO.RISING, button_interrupt, bouncetime = 400)
         logging.info('Button enabled')
 
+    # RRD init
+    rrd = Robin(s, envData, sysData, pinData)
+
     # Do an initial, early, data reading to settle sensors etc
     update_data()
 
     # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(s, rrd, HAVE_SCREEN, HAVE_SENSOR, envData, sysData, pin_state, toggle_button)
+    serve_http(s, rrd, HAVE_SCREEN, HAVE_SENSOR, envData, sysData, pinData, toggle_button)
 
     # Exit handler
     atexit.register(good_bye)

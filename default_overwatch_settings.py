@@ -26,13 +26,13 @@ class Settings:
     # Pin list
     # - List entries consist of ['Name', BCM Pin Number]
     # - The state will be read from the pins at startup and used to track changes
-    # - The button, if enabled, will always control the 1st entry in the list
     # - An empty list disables the GPIO features
     # - Example: pin_map = [['Lamp', 16], ['Printer', 20], ['Enclosure', 21]]
 
     pin_map = []
 
     # Button pin (set to `0` to disable button)
+    # Wnen enabled will always control the 1st entry in the pin list
     button_pin = 0                # BCM Pin Number
 
     # Web UI
