@@ -123,11 +123,11 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # GPIO states
         if len(http.pin) > 0:
             self.wfile.write(bytes('<tr><th>GPIO</th></tr>\n', 'utf-8'))
-            for p in range(len(http.pin)):
-                if http.pin[p]:
-                    self.wfile.write(bytes('<tr><td>' + http.s.pin_map[p][0] +'</td><td>on</td></tr>\n', 'utf-8'))
+            for idx, pin in enumerate(http.s.pin_map):
+                if http.pin[idx]:
+                    self.wfile.write(bytes('<tr><td>' + pin[0] +'</td><td>on</td></tr>\n', 'utf-8'))
                 else:
-                    self.wfile.write(bytes('<tr><td>' + http.s.pin_map[p][0] +'</td><td>off</td></tr>\n', 'utf-8'))
+                    self.wfile.write(bytes('<tr><td>' + pin[0] +'</td><td>off</td></tr>\n', 'utf-8'))
 
     def _give_graphlinks(self, skip=""):
         if len(skip) == 0:
@@ -169,19 +169,17 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('</div>\n', 'utf-8'))
 
     def _give_graphs(self, d):
+        allgraphs = []
         if http.have_sensor:
-            allgraphs = [["env-temp","Temperature"],
-                         ["env-humi","Humidity"],
-                         ["env-pres","Pressure"],
-                         ["sys-temp","CPU Temperature"],
-                         ["sys-load","CPU Load Average"],
-                         ["sys-mem","System Memory Use"]]
-        else:
-            allgraphs = [["sys-temp","CPU Temperature"],
-                         ["sys-load","CPU Load Average"],
-                         ["sys-mem","System Memory Use"]]
-        for p in range(len(http.pin)):
-            allgraphs.append(["pin-" + http.s.pin_map[p][0],http.s.pin_map[p][0] + " GPIO"])
+            allgraphs.extend([["env-temp", "Temperature"],
+                         ["env-humi", "Humidity"],
+                         ["env-pres", "Pressure"]])
+        allgraphs.extend([["sys-temp", "CPU Temperature"],
+                         ["sys-load", "CPU Load Average"],
+                         ["sys-mem", "System Memory Use"]])
+        for _, pin in enumerate(http.s.pin_map):
+            allgraphs.append(["pin-" + pin[0], pin[0] + " GPIO"])
+        print(f"GRAPHS: {allgraphs}")
         self.wfile.write(bytes('<table>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><th>Graphs: -' + d + ' -> now</th></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr><td>\n', 'utf-8'))

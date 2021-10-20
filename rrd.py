@@ -28,11 +28,9 @@ class Robin:
         sources.extend(['sys-temp','sys-load','sys-mem'])
         for _, pin in enumerate(self.pin_map):
             sources.append('pin-' + pin[0].lower())
-        print(f"We require:  {sources}")
 
         # File, create new if necesscary
         self.db = Path(s.rrd_file_path + '/' + s.rrd_file_name).resolve()
-        print(f"RRD DB file: {self.db}")
         if not self.db.is_file():
             print("Generating " + str(self.db))
             ds_list = []
@@ -53,7 +51,6 @@ class Robin:
         for key in rrdtool.info(str(self.db)):
             if key[:2] == 'ds' and key[-6:] == '.index':
                 existing_sources.append(key[3:-7])
-        print(f"DB file has: {existing_sources}")
 
         # generate the update template and create any missing data sources in db file
         ds_template = ""
@@ -65,7 +62,6 @@ class Robin:
                     str(self.db),
                     "DS:" + ds_entry + ":GAUGE:60:U:U")
         self.update_template = ds_template[1:]
-        print(f"DB update template: {self.update_template}")
 
         print("------------ OLD DB STUFF --------------")
 
@@ -134,8 +130,7 @@ class Robin:
             update_cmd = str(pin)
             rrdtool.update(str(self.pin_db[idx]), "N:" + update_cmd)
             dataline += ':' + update_cmd
-        print(f"{dataline}")
-        rrdtool.updatev(
+        rrdtool.update(
                 str(self.db),
                 "--template", self.update_template,
                 dataline)

@@ -278,14 +278,14 @@ def update_data():
     sysData['memory'] = psutil.virtual_memory().percent
 
     # Check if any pins have changed state, and log
-    for pin in range(len(pin_map)):
-        this_pin_state =  GPIO.input(pin_map[pin][1])
-        if this_pin_state != pinData[pin]:
-            pinData[pin] = this_pin_state
+    for idx, pin in enumerate(pin_map):
+        this_pin_state =  GPIO.input(pin[1])
+        if this_pin_state != pinData[idx]:
+            pinData[idx] = this_pin_state
             if this_pin_state:
-                logging.info(pin_map[pin][0] + ': on')
+                logging.info(pin[0] + ': on')
             else:
-                logging.info(pin_map[pin][0] + ': off')
+                logging.info(pin[0] + ': off')
 
 def update_db():
     # Runs 3x per minute, updates RRD database and processes screensaver
