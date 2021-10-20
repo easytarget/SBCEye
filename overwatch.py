@@ -27,14 +27,13 @@ import time
 import logging
 from logging.handlers import RotatingFileHandler
 import random
+import textwrap
 import argparse
 from argparse import RawTextHelpFormatter
 from pathlib import Path
-import importlib
 import atexit
 import psutil
 import schedule
-import textwrap
 
 # Local classes
 from saver import Saver
@@ -107,7 +106,7 @@ if HAVE_SENSOR:
 
 # GPIO light control
 try:
-    import RPi.GPIO as GPIO           # Allows us to call our GPIO pins and names it just GPIO
+    from RPi import GPIO
     pin_map = s.pin_map
 except Exception as e:
     print(e)
@@ -308,7 +307,7 @@ def log_sensors():
 def schedule_servicing_delay(seconds=60):
     # Approximate delay while checking for pending scheduled jobs every second
     schedule.run_pending()
-    for second in range(seconds):
+    for _ in range(seconds):
         time.sleep(1)
         schedule.run_pending()
 
@@ -344,7 +343,7 @@ if __name__ == "__main__":
         draw.text((28, 28), 'Watch',  font=font, fill=255)
         disp.show()
         # Start saver
-        screensaver = Saver(disp, s.saver_mode, s.saver_on, s.saver_off, s.display_invert)
+        screensaver = Saver(s, disp)
         logging.info("Display configured and enabled")
     elif s.have_screen:
         logging.warning("Display configured but not detected: Display features disabled")

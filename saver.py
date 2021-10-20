@@ -5,23 +5,25 @@ class Saver:
     # Current screensaver state
     active = False
 
-    def __init__(self, disp, mode, start, end, invert):
+    def __init__(self, s, disp):
         self.disp = disp
-        self.mode = mode
-        self.invert = invert
+        self.mode = s.saver_mode
+        self.invert = s.saver_invert
         if self.mode != 'off':
-            print('Saver will ' + self.mode + ' display between: ' + str(start) + ":00 and " + str(end) + ":00")
-            if (start == end) or (start < 0) or (start > 23) or (end < 0) or (end > 23):
-                logging.warning("Saver start/end times are identical or out of range (0-23), disabling saver")
+            print('Saver will ' + self.mode + ' display between: ' +
+                str(s.saver_on) + ':00 and ' + str(s.saver_off) + ':00')
+            if (s.saver_on == s.saver_off) or \
+               (s.saver_on < 0) or (s.saver_on > 23) or (s.saver_off < 0) or (s.saver_off > 23):
+                logging.warning("Saver start/end times are identical or out of range; disabling")
                 print("Disabling saver due to invalid time settings")
                 self.mode = 'off'
-            elif start < end:
+            elif s.saver_on < s.saver_off:
                 self.saver_map = [False]*24
-                for i in range(start, end):
+                for i in range(s.saver_on, s.saver_off):
                     self.saver_map[i] = True
             else:
                 self.saver_map = [True]*24
-                for i in range(end, start):
+                for i in range(s.saver_off, s.saver_on):
                     self.saver_map[i] = False
 
 
