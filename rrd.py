@@ -17,7 +17,7 @@ class Robin:
         if s.graph_area:
             self.style.insert(0, s.graph_area)
         if s.graph_comment:
-            self.style.append("COMMENT:" + s.graph_comment)
+            self.style.append(f'COMMENT: {s.graph_comment}')
 
         # Data sources, min, max values
         sources = {}
@@ -35,12 +35,16 @@ class Robin:
         self.db = Path(s.rrd_file_path + '/' + s.rrd_file_name).resolve()
         if not self.db.is_file():
             print("Generating " + str(self.db))
+            ds_list = []
+            for ds,(mi,ma) in sources.items():
+                ds_list.append(f"DS:{ds}:GAUGE:60:{mi}:{ma}")
             rrdtool.create(
                 str(self.db),
                 "--start", "now",
                 "--step", "60",
                 "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-                "RRA:AVERAGE:0.5:60:26352")  # 3 years per hour
+                "RRA:AVERAGE:0.5:60:26352",  # 3 years per hour
+                *ds_list)
         else:
             print("Using existing: " + str(self.db))
 
