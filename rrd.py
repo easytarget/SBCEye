@@ -18,31 +18,28 @@ class Robin:
         if s.graph_comment:
             self.style.append("COMMENT:" + s.graph_comment)
 
-        # DataBase
-
-        # Calculate desired data sources (things we will record)
+        # Data sources, min, max values
+        sources = {}
         if len(self.env) > 0:
-            sources = ['env-temp','env-humi','env-pres']
-        else:
-            sources = []
-        sources.extend(['sys-temp','sys-load','sys-mem'])
+            sources['env-temp'] = ('-40','80')
+            sources['env-humi'] = ('0','100')
+            sources['env-pres'] = ('300','1100')
+        sources['sys-temp'] = ('-10','110')
+        sources['sys-load'] = ('0','10')
+        sources['sys-mem']  = ('0','100')
         for _, pin in enumerate(self.pin_map):
-            sources.append('pin-' + pin[0].lower())
+            sources['pin-' + pin[0].lower()] = ('0','1')
 
-        # File, create new if necesscary
+        # File, create if necesscary
         self.db = Path(s.rrd_file_path + '/' + s.rrd_file_name).resolve()
         if not self.db.is_file():
             print("Generating " + str(self.db))
-            ds_list = []
-            for ds_entry in sources:
-                ds_list.append("DS:" + ds_entry + ":GAUGE:60:U:U")
             rrdtool.create(
                 str(self.db),
                 "--start", "now",
                 "--step", "60",
                 "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-                "RRA:AVERAGE:0.5:60:26352",   # 3 years per hour
-                *ds_list)
+                "RRA:AVERAGE:0.5:60:26352")  # 3 years per hour
         else:
             print("Using existing: " + str(self.db))
 
@@ -54,13 +51,13 @@ class Robin:
 
         # generate the update template and create any missing data sources in db file
         ds_template = ""
-        for ds_entry in sources:
-            ds_template += ':' + str(ds_entry)
-            if not ds_entry in existing_sources:
-                print(f"Adding: {ds_entry} to {self.db}")
+        for ds,(mi,ma) in sources.items():
+            ds_template += ':' + str(ds)
+            if not ds in existing_sources:
+                print(f"Adding: {ds} to {self.db}")
                 rrdtool.tune(
                     str(self.db),
-                    "DS:" + ds_entry + ":GAUGE:60:U:U")
+                    f"DS:{ds}:GAUGE:60:{mi}:{ma}")
         self.update_template = ds_template[1:]
 
         print("------------ OLD DB STUFF --------------")

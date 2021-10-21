@@ -39,15 +39,15 @@ class Settings:
     host = ''                     # Ip address to bind web server to, '' =  bind to all addresses
     port = 7080                   # Port number for web server
     button_path = ''              # Web button url path, leave blank to disable
+    time_format = '"%H:%M:%S, %A, %d %B, %Y"'  # time.strftime() formatting
 
     # Sensor reading update frequency
     sensor_interval = 3           # Seconds
 
     # Logging
     log_file_path = './logs/'        # Folder must be writable by the OverWatch process
-    log_file_name = 'overwatch.log'  
+    log_file_name = 'overwatch.log'
     log_interval = 600               # Environmental and system log dump interval (seconds, zero to disable)
-    log_lines = 240                  # How many lines of logging to show in webui by default
     log_file_count = 3               # Maximum number of old logfiles to retain
     log_file_size = 1024*1024        # Maximum size before logfile rolls over
     suppress_glitches=True           # Pin state changes can produce phantom button presses due to crosstalk, ignore them

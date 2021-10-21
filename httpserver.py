@@ -31,10 +31,10 @@ def serve_http(s, rrd, env, sys, pin, toggle_button):
     http.pin = pin
     http.toggle_button = toggle_button
     # Start the server
-    threadlog("HTTP server will bind to port " + str(s.port) + " on host " + s.host)
+    threadlog(f"HTTP server will bind to port {str(s.port)} on host {s.host}")
     httpd.server_bind()
-    address = "http://%s:%d" % (httpd.server_name, httpd.server_port)
-    threadlog("Access via: " + address)
+    address = f"http://{httpd.server_name}:{httpd.server_port}"
+    threadlog(f"Access via: {address}")
     httpd.server_activate()
     def serve_forever(httpd):
         with httpd:  # to make sure httpd.server_close is called
@@ -48,7 +48,7 @@ def serve_http(s, rrd, env, sys, pin, toggle_button):
 
 def threadlog(logline):
     # A wrapper function around logging.info() that prepends the current thread name
-    logging.info("[" + current_thread().name + "] : " + logline)
+    logging.info(f"[{current_thread().name}] : {logline}")
 
 class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _set_headers(self):
@@ -68,10 +68,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_head(self, title_extra=""):
         title = http.s.server_name
         if len(title_extra) > 0:
-            title= http.s.server_name +" :: " + title_extra
+            title=f"{http.s.server_name}{title_extra}"
         self.wfile.write(bytes('<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n', 'utf-8'))
         self.wfile.write(bytes('<meta name="viewport" content="width=device-width,initial-scale=1">\n', 'utf-8'))
-        self.wfile.write(bytes('<title>%s</title>\n' % title, 'utf-8'))
+        self.wfile.write(bytes(f'<title>{title}</title>\n', 'utf-8'))
         self.wfile.write(bytes('<style>\n', 'utf-8'))
         self.wfile.write(bytes('body {display:flex; flex-direction: column; align-items: center;}\n', 'utf-8'))
         self.wfile.write(bytes('a {color:#666666; text-decoration: none;}\n', 'utf-8'))
@@ -84,7 +84,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('<body>\n', 'utf-8'))
 
     def _give_foot(self,scroll = False, refresh = 0):
-        self.wfile.write(bytes('<div style="color:#888888; font-size: 66%; font-weight: lighter; padding-top:0.5em"><a href="https://github.com/easytarget/pi-overwatch" title="Project homepage on GitHub" target="_blank">OverWatch Home</a></div>\n', 'utf-8'))
+        self.wfile.write(bytes('<div style="color:#888888; font-size: 66%; font-weight: lighter; padding-top:0.5em"><a href="https://github.com/easytarget/pi-overwatch" title="Project homepage on GitHub" target="_blank">OverWatch</a></div>\n', 'utf-8'))
         # DEBUG: self.wfile.write(bytes('<pre style="color:#888888">GET: ' + self.path + ' from: ' + self.client_address[0] + '</pre>\n', 'utf-8'))
         self.wfile.write(bytes('</body>\n', 'utf-8'))
         self.wfile.write(bytes("<script>\n", 'utf-8'))
@@ -95,13 +95,13 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('}\n', 'utf-8'))
             self.wfile.write(bytes('window.onload = down;\n', 'utf-8'))
         if refresh > 0:
-            self.wfile.write(bytes('setTimeout(function(){location.replace(document.URL);}, ' + str(refresh*1000) + ');\n', 'utf-8'))
+            self.wfile.write(bytes(f'setTimeout(function(){{location.replace(document.URL);}}, {str(refresh*1000)});\n', 'utf-8'))
         self.wfile.write(bytes('</script>\n', 'utf-8'))
         self.wfile.write(bytes('</html>\n', 'utf-8'))
 
     def _give_datetime(self):
-        timestamp = datetime.datetime.now()
-        self.wfile.write(bytes('<div style="color:#666666; font-size: 90%; padding-top: 0.5em;">' + timestamp.strftime("%H:%M:%S, %A, %d %B, %Y") + '</div>\n', 'utf-8'))
+        timestamp = datetime.datetime.now().strftime(http.s.time_format)
+        self.wfile.write(bytes(f'<div style="color:#666666; font-size: 90%; padding-top: 0.5em;">{timestamp}</div>\n', 'utf-8'))
 
     def _give_env(self):
         if len(http.env) > 0:
@@ -124,9 +124,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('<tr><th>GPIO</th></tr>\n', 'utf-8'))
             for idx, pin in enumerate(http.s.pin_map):
                 if http.pin[idx]:
-                    self.wfile.write(bytes('<tr><td>' + pin[0] +'</td><td>on</td></tr>\n', 'utf-8'))
+                    self.wfile.write(bytes(f'<tr><td>{pin[0]}</td><td>on</td></tr>\n', 'utf-8'))
                 else:
-                    self.wfile.write(bytes('<tr><td>' + pin[0] +'</td><td>off</td></tr>\n', 'utf-8'))
+                    self.wfile.write(bytes(f'<tr><td>{pin[0]}</td><td>off</td></tr>\n', 'utf-8'))
 
     def _give_graphlinks(self, skip=""):
         if len(skip) == 0:
@@ -135,37 +135,44 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('<td colspan="2" style="text-align: center;">', 'utf-8'))
         for g in http.s.default_graphs:
             if g != skip:
-                self.wfile.write(bytes('&nbsp;<a href="./graphs?duration=' + g + '" title="Graphs covering the last ' + g + ' in time">' + g + '</a>&nbsp;', 'utf-8'))
+                self.wfile.write(bytes(f'&nbsp;<a href="./graphs?duration={g}" title="Graphs covering the last {g} in time">{g}</a>&nbsp;', 'utf-8'))
             else:
-                self.wfile.write(bytes('&nbsp;<span style="color: #AAAAAA;">' + g + '</span>&nbsp;', 'utf-8'))
+                self.wfile.write(bytes(f'&nbsp;<span style="color: #AAAAAA;">{g}</span>&nbsp;', 'utf-8'))
+        if len(skip) > 0:
+            self.wfile.write(bytes('&nbsp;:&nbsp;&nbsp;<a href="./" title="Main page">Home</a>', 'utf-8'))
         self.wfile.write(bytes('</td>', 'utf-8'))
         self.wfile.write(bytes('</tr>\n', 'utf-8'))
 
     def _give_links(self):
         self._give_graphlinks()
         self.wfile.write(bytes('<tr>', 'utf-8'))
-        self.wfile.write(bytes('<td colspan="2" style="text-align: center;"><a href="./?view=deco&view=env&view=sys&view=gpio&view=links&view=log" title="Show the most recent log entries inline">Inline Log</a>&nbsp;', 'utf-8'))
-        self.wfile.write(bytes('&nbsp;<a href="./?view=deco&view=log&lines=' + str(http.s.log_lines) + '" title="Open the extended log in a new page" target="_blank">Main Log</a></td>', 'utf-8'))
+        self.wfile.write(bytes(f'<td colspan="2" style="text-align: center;"><a href="./?view=deco&view=log" title="Open the extended log in a new page" target="_blank">Main Log</a></td>', 'utf-8'))
         self.wfile.write(bytes('</tr>\n', 'utf-8'))
 
-    def _give_homelink(self):
-        self.wfile.write(bytes('<tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<td colspan="2" style="text-align: center;"><a href="./">Home</a></td>\n', 'utf-8'))
-        self.wfile.write(bytes('</tr>\n', 'utf-8'))
-
-    def _give_log(self, lines=10):
+    def _give_log(self, lines=100):
         parsed_lines = parse_qs(urlparse(self.path).query).get('lines', None)
-        if parsed_lines:
+        if isinstance(parsed_lines, list):
             lines = parsed_lines[0]
+        # Do not pass anything other than integers to the shell commsnd..
+        if not isinstance(lines, int):
+            try:
+                lines = int(lines)
+            except ValueError:
+                lines = int(100)
+        lines = max(1, min(lines, 100000))
         # Use a shell one-liner used to extract the last {lines} of data from the logs
         # There is doubtless a more 'python' way to do this, but it is fast, cheap and works..
         log_command = f"for a in `ls -tr {http.s.log_file}*`;do cat $a ; done | tail -{lines}"
         log = subprocess.check_output(log_command, shell=True).decode('utf-8')
         self.wfile.write(bytes('<div style="overflow-x: auto; width: 100%;">\n', 'utf-8'))
         self.wfile.write(bytes('<span style="font-size: 110%; font-weight: bold;">Recent log activity:</span>\n', 'utf-8'))
-        self.wfile.write(bytes('<hr><pre>\n' + log + '</pre><hr>\n', 'utf-8'))
-        self.wfile.write(bytes(f'Latest {lines} lines shown\n', 'utf-8'))
+        self.wfile.write(bytes(f'<hr><pre>\n{log}</pre><hr>\n', 'utf-8'))
+        self.wfile.write(bytes(f'<span style="font-size: 80%;">Latest {lines} lines shown</span>\n', 'utf-8'))
         self.wfile.write(bytes('</div>\n', 'utf-8'))
+        self.wfile.write(bytes('<div><a href="./?view=deco&view=log&lines=25" title="show 25 lines">25</a>&nbsp;:', 'utf-8'))
+        self.wfile.write(bytes('&nbsp;<a href="./?view=deco&view=log&lines=250" title="show 250 lines">250</a>&nbsp;:', 'utf-8'))
+        self.wfile.write(bytes('&nbsp;<a href="./?view=deco&view=log&lines=2500" title="show 2500 lines">2500</a>&nbsp;:', 'utf-8'))
+        self.wfile.write(bytes('&nbsp;<a href="./" title="Main page">Home</a></div>\n', 'utf-8'))
 
     def _give_graphs(self, d):
         allgraphs = []
@@ -179,15 +186,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         for _, pin in enumerate(http.s.pin_map):
             allgraphs.append(["pin-" + pin[0], pin[0] + " GPIO"])
         self.wfile.write(bytes('<table>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><th>Graphs: -' + d + ' -> now</th></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>\n', 'utf-8'))
+        self.wfile.write(bytes(f'<tr><th>Graphs: -{d} -> now</th></tr>\n', 'utf-8'))
         for [g,t] in allgraphs:
-            self.wfile.write(bytes('<tr><td><a href="graph?graph=' + g + '&duration=' + d + '">', 'utf-8'))
-            self.wfile.write(bytes('<img title="' + t + '" src="graph?graph=' + g + '&duration=' + d + '">', 'utf-8'))
+            self.wfile.write(bytes(f'<tr><td><a href="graph?graph={g}&duration={d}">', 'utf-8'))
+            self.wfile.write(bytes(f'<img title="{t}" src="graph?graph={g}&duration={d}">', 'utf-8'))
             self.wfile.write(bytes('</a></td></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('</td></tr>\n', 'utf-8'))
         self._give_graphlinks(skip=d)
-        self._give_homelink()
         self.wfile.write(bytes('</table>\n', 'utf-8'))
 
     def do_GET(self):
@@ -214,10 +218,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 duration = "1d"
             else:
                 duration = parsed[0]
-            # logging.info('Graph Page (-' + duration + ' -> now) requested by: ' + self.client_address[0])
+            # logging.info(f'Graph Page (-{duration} -> now) requested by: {self.client_address[0]}')
             self._set_headers()
-            self._give_head(http.s.server_name + ":: graphs -" + duration)
-            self.wfile.write(bytes('<h2>%s</h2>' % http.s.server_name, 'utf-8'))
+            self._give_head(f" :: graphs -{duration}")
+            self.wfile.write(bytes(f'<h2>{http.s.server_name}</h2>', 'utf-8'))
             self._give_graphs(duration)
             self._give_datetime()
             self._give_foot(refresh=300)
@@ -227,11 +231,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 action = 'toggle'
             else:
                 action = parsed[0]
-            logging.info('Web button triggered by: ' + self.client_address[0] + ' with action: ' + action)
+            logging.info(f'Web button triggered by: {self.client_address[0]} with action: {action}')
             state = http.toggle_button(action)
             self._set_headers()
-            self._give_head(http.s.server_name + ":: " + http.s.pin_map[0][0])
-            self.wfile.write(bytes('<h2>' + state + '</h2>\n', 'utf-8'))
+            self._give_head(f" :: {http.s.pin_map[0][0]}")
+            self.wfile.write(bytes(f'<h2>{state}</h2>\n', 'utf-8'))
+            self.wfile.write(bytes('<div><a href="./" title="Main page">Home</a></div>\n', 'utf-8'))
             self._give_datetime()
             self._give_foot()
         elif urlparse(self.path).path == '/':
@@ -241,7 +246,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._set_headers()
             self._give_head()
             if "deco" in view:
-                self.wfile.write(bytes('<h2>%s</h2>\n' % http.s.server_name, 'utf-8'))
+                self.wfile.write(bytes(f'<h2>{http.s.server_name}</h2>\n', 'utf-8'))
             self.wfile.write(bytes('<table>\n', 'utf-8'))
             if "env" in view:
                 self._give_env()
@@ -254,7 +259,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('</table>\n', 'utf-8'))
             if "log" in view:
                 self._give_log()
-                self._give_homelink()
                 if "deco" in view:
                     self._give_datetime()
                 self._give_foot(refresh = 60, scroll = True)
