@@ -10,6 +10,7 @@ class Robin:
         self.pin = pin
         self.pin_map = s.pin_map
         self.server_name = s.server_name
+        self.time_format = s.time_format
         self.wide = s.graph_wide
         self.high = s.graph_high
         self.style = [s.graph_line]
@@ -149,7 +150,7 @@ class Robin:
         if graph in graphArgMap:
             temp_file = tempfile.NamedTemporaryFile(mode='rb', dir='/tmp', prefix='overwatch_graph')
             start = 'end-' + period
-            timestamp = datetime.datetime.now().strftime("%H:%M:%S, %A, %d %B, %Y")
+            timestamp = datetime.datetime.now().strftime(self.time_format)
             rrd_args = ["--full-size-mode",
                         "--start", start,
                         "--end", "now",

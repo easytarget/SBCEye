@@ -124,7 +124,7 @@ os.nice(10)
 s.log_file = Path(s.log_file_path + "/" + s.log_file_name).resolve()
 print(f"Logging to: {s.log_file}")
 handler = RotatingFileHandler(s.log_file, maxBytes=s.log_file_size, backupCount=s.log_file_count)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt='%d-%m-%Y %H:%M:%S', handlers=[handler])
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt=s.log_date_format, handlers=[handler])
 
 # Older scheduler versions sometimes log actions to 'INFO' not 'DEBUG', spewing debug into the log, sigh..
 schedule_logger = logging.getLogger('schedule') # For the scheduler..
@@ -304,7 +304,7 @@ def log_sensors():
     log_line += 'Mem: ' + format(sysData['memory'], '.1f') + '%'
     logging.info(log_line)
 
-def schedule_servicing_delay(seconds=60):
+def scheduler_servicer(seconds=60):
     # Approximate delay while checking for pending scheduled jobs every second
     schedule.run_pending()
     for _ in range(seconds):
@@ -399,7 +399,7 @@ if __name__ == "__main__":
 
     # Schedule sensor readings, database updates and logging events
     schedule.every(s.sensor_interval).seconds.do(update_data)
-    schedule.every(20).seconds.do(update_db)
+    schedule.every(s.rrd_update_interval).seconds.do(update_db)
     if s.log_interval > 0:
         schedule.every(s.log_interval).seconds.do(log_sensors)
 
@@ -407,7 +407,7 @@ if __name__ == "__main__":
 
     # A brief pause for splash
     if HAVE_SCREEN:
-        schedule_servicing_delay(3)
+        scheduler_servicer(3)
 
     # Main loop now runs forever
     while True:
@@ -418,30 +418,30 @@ if __name__ == "__main__":
                     clean()
                     bme_screen()
                     show()
-                    schedule_servicing_delay(s.passtime)
+                    scheduler_servicer(s.passtime)
                 # Update and transition to system screen
                 bme_screen()
                 sys_screen(width+margin)
                 slideout()
-                schedule_servicing_delay(s.passtime)
+                scheduler_servicer(s.passtime)
                 # System screen
                 for this_pass in range(s.passes):
                     clean()
                     sys_screen()
                     show()
-                    schedule_servicing_delay(s.passtime)
+                    scheduler_servicer(s.passtime)
                 # Update and transition back to environment screen
                 sys_screen()
                 bme_screen(width+margin)
                 slideout()
-                schedule_servicing_delay(s.passtime)
+                scheduler_servicer(s.passtime)
             else:
                 # Just loop refreshing the system screen
                 for i in range(s.passes):
                     clean()
                     sys_screen()
                     show()
-                    schedule_servicing_delay(s.passtime)
+                    scheduler_servicer(s.passtime)
         else:
             # No screen, so just run schedule jobs in a loop
-            schedule_servicing_delay()
+            scheduler_servicer()

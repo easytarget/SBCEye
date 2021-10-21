@@ -14,6 +14,9 @@ class Settings:
     # Server name for the Log and Web UI
     server_name = 'Pi OverWatch'
 
+    # Date/Time format for Web and Graphs
+    time_format = '%H:%M:%S, %A, %d %B, %Y'  # time.strftime() formatting
+
     # Enable/Disable Screen and BME280 sensor
     have_sensor = False
     have_screen = False
@@ -39,10 +42,9 @@ class Settings:
     host = ''                     # Ip address to bind web server to, '' =  bind to all addresses
     port = 7080                   # Port number for web server
     button_path = ''              # Web button url path, leave blank to disable
-    time_format = '"%H:%M:%S, %A, %d %B, %Y"'  # time.strftime() formatting
 
     # Sensor reading update frequency
-    sensor_interval = 3           # Seconds
+    sensor_interval = 2           # Seconds
 
     # Logging
     log_file_path = './logs/'        # Folder must be writable by the OverWatch process
@@ -50,12 +52,15 @@ class Settings:
     log_interval = 600               # Environmental and system log dump interval (seconds, zero to disable)
     log_file_count = 3               # Maximum number of old logfiles to retain
     log_file_size = 1024*1024        # Maximum size before logfile rolls over
+    log_date_format = '%d-%m-%Y %H:%M:%S'  # Log line date/timestamp, strftime() format
     suppress_glitches=True           # Pin state changes can produce phantom button presses due to crosstalk, ignore them
 
     # Location for RRD database files (folder must be writable by overwatch process)
-    rrd_file_store = "./DB"
-    rrd_file_path = "./DB/"
-    rrd_file_name = "overwatch.rrd"
+    rrd_update_interval = 15
+    rrd_file_store = './DB'
+    rrd_file_path = './DB/'
+    rrd_file_name = 'overwatch.rrd'
+    rrd_cache_socket = './DB/rrdcache.sock'
 
     # Default graph durations
     # See https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html#TIME%20OFFSET%20SPECIFICATION

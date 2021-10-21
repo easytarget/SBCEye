@@ -124,9 +124,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(bytes('<tr><th>GPIO</th></tr>\n', 'utf-8'))
             for idx, pin in enumerate(http.s.pin_map):
                 if http.pin[idx]:
-                    self.wfile.write(bytes(f'<tr><td>{pin[0]}</td><td>on</td></tr>\n', 'utf-8'))
+                    self.wfile.write(bytes(f'<tr><td>{pin[0]}:</td><td>on</td></tr>\n', 'utf-8'))
                 else:
-                    self.wfile.write(bytes(f'<tr><td>{pin[0]}</td><td>off</td></tr>\n', 'utf-8'))
+                    self.wfile.write(bytes(f'<tr><td>{pin[0]}:</td><td>off</td></tr>\n', 'utf-8'))
 
     def _give_graphlinks(self, skip=""):
         if len(skip) == 0:
