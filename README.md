@@ -29,9 +29,10 @@ Log GPIO actions etc..
 
 ![Web](/docs/workshop-log.png)
 
-Embeddable Panels
+Embeddable Panels and Standalone Graphs
 
 ![Web](/docs/workshop-sys-panel.png)
+![Web](/docs/workshop-humi-graph.png)
 
 ## Requires:
 * [Python3.6+](https://www.python.org/), [pip](https://pypi.org/project/pip/) and [virtualenv](https://pypi.org/project/virtualenv/)
