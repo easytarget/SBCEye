@@ -84,7 +84,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('<body>\n', 'utf-8'))
 
     def _give_foot(self,scroll = False, refresh = 0):
-        self.wfile.write(bytes('<div style="color:#888888; font-size: 66%; font-weight: lighter; padding-top:0.5em"><a href="https://github.com/easytarget/pi-overwatch" title="Project homepage on GitHub" target="_blank">OverWatch</a></div>\n', 'utf-8'))
         # DEBUG: self.wfile.write(bytes('<pre style="color:#888888">GET: ' + self.path + ' from: ' + self.client_address[0] + '</pre>\n', 'utf-8'))
         self.wfile.write(bytes('</body>\n', 'utf-8'))
         self.wfile.write(bytes("<script>\n", 'utf-8'))
@@ -102,6 +101,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_datetime(self):
         timestamp = datetime.datetime.now().strftime(http.s.time_format)
         self.wfile.write(bytes(f'<div style="color:#666666; font-size: 90%; padding-top: 0.5em;">{timestamp}</div>\n', 'utf-8'))
+        self.wfile.write(bytes('<div style="color:#888888; font-size: 66%; font-weight: lighter; padding-top:0.5em">'\
+                '<a href="https://github.com/easytarget/pi-overwatch" title="Project homepage on GitHub" target="_blank">'\
+                'OverWatch</a></div>\n', 'utf-8'))
 
     def _give_env(self):
         if len(http.env) > 0:
