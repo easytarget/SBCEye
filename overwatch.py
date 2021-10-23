@@ -180,20 +180,20 @@ if HAVE_SENSOR:
 # Unicode degrees character used for display and logging
 DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
-# Use a couple of dictionaries to store current readings
-sysData = {
-    'temperature': 0,
-    'load': 0,
-    'memory': 0
+# Use a dictionary to store current readings
+data = {
+    'sys-temp': 0,
+    'sys-load': 0,
+    'sys-mem': 0,
 }
+# add sensor data if needed
 if HAVE_SENSOR:
-    envData = {
-        'temperature': 0,
-        'humidity': 0,
-        'pressure':0
-        }
-else:
-    envData = {}
+    data["env-temp"] = 0
+    data["env-humi"] = 0
+    data["env-pres"] = 0
+# add pins
+for (name,pin) in pin_map:
+    data[f"pin-{name}"] = 0
 
 # Local functions
 
@@ -204,9 +204,12 @@ def clean():
 # Put a specific area of the canvas onto display
 def show(xpos=0):
     if s.rotate_display:
-        disp.image(image.transform((width,height),Image.EXTENT,(xpos,0,xpos+width,height)).transpose(Image.ROTATE_180))
+        disp.image(image.transform((width,height),
+                   Image.EXTENT,(xpos,0,xpos+width,height))
+                   .transpose(Image.ROTATE_180))
     else:
-        disp.image(image.transform((width,height),Image.EXTENT,(xpos,0,xpos+width,height)))
+        disp.image(image.transform((width,height),
+                   Image.EXTENT,(xpos,0,xpos+width,height)))
     disp.show()
 
 # Slide the display view across the canvas to animate between screens
@@ -218,14 +221,28 @@ def slideout(step=s.slidespeed):
     show(width + margin)
 
 def bme_screen(xpos=0):
-    draw.text((xpos,  5), 'Temp : ' + format(envData['temperature'], '.1f') + DEGREE_SIGN,  font=font, fill=255)
-    draw.text((xpos, 25), 'Humi : ' + format(envData['humidity'], '.1f') + '%', font=font, fill=255)
-    draw.text((xpos, 45), 'Pres : ' + format(envData['pressure'], '.0f') + 'mb',  font=font, fill=255)
+    # Dictionary of tuples specifying name,format,suffix and Y-position
+    ITEMS = {
+            "env-temp": ('Temp', '.1f', DEGREE_SIGN, 5),
+            "env-humi": ('Humi', '.0f', '%', 25),
+            "env-pres": ('Pres', '.0f', 'mb', 45),
+            }
+    for sense,value in LOGLIST.items():
+        if sense[:4] == 'env-':
+            line = f'{value[0]}: {data[sense]:{value[1]}}{value[2]}'
+            draw.text((xpos,  value[3]), line, font=font, fill=255)
 
 def sys_screen(xpos=0):
-    draw.text((xpos, 5), 'CPU  : ' + format(sysData['temperature'], '.1f') + DEGREE_SIGN,  font=font, fill=255)
-    draw.text((xpos, 25), 'Load : ' + format(sysData['load'], '1.2f'), font=font, fill=255)
-    draw.text((xpos, 45), 'Mem  : ' + format(sysData['memory'], '.1f') + '%',  font=font, fill=255)
+    # Dictionary of tuples specifying name,format,suffix and Y-position
+    ITEMS = {
+            "sys-temp": ('CPU', '.1f', DEGREE_SIGN, 5),
+            "sys-load": ('Load', '1.2f', '', 25),
+            "sys-mem": ('Mem', '.1f', '%', 45),
+            }
+    for sense,value in ITEMS.items():
+        if sense in ITEMS.keys():
+            line = f'{value[0]}: {data[sense]:{value[1]}}{value[2]}'
+            draw.text((xpos,  value[3]), line, font=font, fill=255)
 
 def toggle_button(action="toggle"):
     # Set the first pin to a specified state or read and toggle it..
@@ -269,18 +286,19 @@ def button_interrupt(*_):
 def update_data():
     # Runs every few seconds to get current environmental and system data
     if HAVE_SENSOR:
-        envData['temperature'] = bme280.temperature
-        envData['humidity'] = bme280.relative_humidity
-        envData['pressure'] = bme280.pressure
-    sysData['temperature'] = psutil.sensors_temperatures()["cpu_thermal"][0].current
-    sysData['load'] = psutil.getloadavg()[0]
-    sysData['memory'] = psutil.virtual_memory().percent
+        data['env-temp'] = bme280.temperature
+        data['env-humi'] = bme280.relative_humidity
+        data['env-pres'] = bme280.pressure
+    data['sys-temp'] = psutil.sensors_temperatures()["cpu_thermal"][0].current
+    data['sys-load'] = psutil.getloadavg()[0]
+    data['sys-mem'] = psutil.virtual_memory().percent
 
     # Check if any pins have changed state, and log
     for idx, pin in enumerate(pin_map):
         this_pin_state =  GPIO.input(pin[1])
-        if this_pin_state != pinData[idx]:
-            pinData[idx] = this_pin_state
+        if this_pin_state != data[f"pin-{pin[0]}"]:
+            # Pin has changed state, remember new state and log
+            data[f"pin-{pin[0]}"] = this_pin_state
             if this_pin_state:
                 logging.info(pin[0] + ': on')
             else:
@@ -294,15 +312,20 @@ def update_db():
 
 def log_sensors():
     # Runs on a user defined schedule to dump a line of sensor data in the log
+    # Dictionary of tuples specifying name,format and suffix
+    LOGLIST = {
+            "env-temp": ('Temp', '.1f', DEGREE_SIGN),
+            "env-humi": ('Humi', '.0f', '%'),
+            "env-pres": ('Pres', '.0f', 'mb'),
+            "sys-temp": ('CPU', '.1f', DEGREE_SIGN),
+            "sys-load": ('Load', '1.2f', ''),
+            "sys-mem": ('Mem', '.1f', '%'),
+            }
     log_line = ''
-    if HAVE_SENSOR:
-        log_line += 'Temp: ' + format(envData['temperature'], '.1f') + DEGREE_SIGN + ', '
-        log_line += 'Humi: ' + format(envData['humidity'], '.0f') + '%, '
-        log_line += 'Pres: ' + format(envData['pressure'], '.0f') + 'mb, '
-    log_line += 'CPU: ' + format(sysData['temperature'], '.1f') + DEGREE_SIGN + ', '
-    log_line += 'Load: ' + format(sysData['load'], '1.2f') + ', '
-    log_line += 'Mem: ' + format(sysData['memory'], '.1f') + '%'
-    logging.info(log_line)
+    for sense,value in LOGLIST.items():
+        log_line += f'{value[0]}: {data[sense]:{value[1]}}{value[2]}, '
+    print(log_line[:-2])
+    logging.info(log_line[:-2])
 
 def scheduler_servicer(seconds=60):
     # Approximate delay while checking for pending scheduled jobs every second
@@ -314,6 +337,18 @@ def scheduler_servicer(seconds=60):
 def good_bye():
     logging.info('Exiting')
     print("Exit")
+
+print(data)
+ITEMS = {
+        "env-temp": ('Temp', '.1f', DEGREE_SIGN, 5),
+        "env-humi": ('Humi', '.0f', '%', 25),
+        "env-pres": ('Pres', '.0f', 'mb', 45),
+        }
+for sense,value in ITEMS.items():
+    if sense in ITEMS.keys():
+        print(f'{value[0]}: {data[sense]:{value[1]}}{value[2]}')
+log_sensors()
+exit()
 
 # The fun starts here:
 if __name__ == "__main__":
@@ -383,13 +418,13 @@ if __name__ == "__main__":
         logging.info('Button enabled')
 
     # RRD init
-    rrd = Robin(s, envData, sysData, pinData)
+    rrd = Robin(s, data)
 
     # Do an initial, early, data reading to settle sensors etc
     update_data()
 
     # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(s, rrd, envData, sysData, pinData, toggle_button)
+    serve_http(s, rrd, data, toggle_button)
 
     # Exit handler
     atexit.register(good_bye)

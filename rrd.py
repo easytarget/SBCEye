@@ -4,10 +4,8 @@ from pathlib import Path
 import rrdtool
 
 class Robin:
-    def __init__(self, s, env, sys, pin):
-        self.env = env
-        self.sys = sys
-        self.pin = pin
+    def __init__(self, s, data):
+        self.data = data
         self.pin_map = s.pin_map
         self.server_name = s.server_name
         self.time_format = s.time_format
@@ -29,7 +27,7 @@ class Robin:
         sources['sys-load'] = ('0','10')
         sources['sys-mem']  = ('0','100')
         for _, pin in enumerate(self.pin_map):
-            sources['pin-' + pin[0].lower()] = ('0','1')
+            sources['pin-' + pin[0]] = ('0','1')
 
         # File, create if necesscary
         self.db = Path(s.rrd_file_path + '/' + s.rrd_file_name).resolve()
@@ -76,10 +74,14 @@ class Robin:
         # Update the database with the latest readings
         dataline = "N"
         if len(self.env) > 0:
-            dataline += ':' + str(self.env["temperature"]) + ":" + str(self.env["humidity"]) + ":" + str(self.env["pressure"])
-        dataline += ':' + str(self.sys["temperature"]) + ":" + str(self.sys["load"]) + ":" + str(self.sys["memory"])
+            dataline += ':' + str(self.data['env-temp'])\
+                      + ":" + str(self.data['env-humi'])\
+                      + ":" + str(self.data['env-pres'])
+        dataline += ':' + str(self.data['sys-temp'])\
+                  + ":" + str(self.data['sys-load'])\
+                  + ":" + str(self.data['sys-mem'])
         for idx, pin in enumerate(self.pin):
-            dataline += ':' + str(pin)
+            dataline += ':' + str(self.data[f'pin-{pin[0]}'])
         rrdtool.update(
                 str(self.db),
                 "--template", self.update_template,
