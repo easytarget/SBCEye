@@ -37,7 +37,7 @@ import schedule
 
 # Local classes
 from saver import Saver
-from rrd import Robin
+from robin import Robin
 from httpserver import serve_http
 
 # Parse the arguments
@@ -121,7 +121,7 @@ print("Starting OverWatch")
 os.nice(10)
 
 # Logging
-s.log_file = Path(s.log_file_path + "/" + s.log_file_name).resolve()
+s.log_file = Path(s.log_file_dir + "/" + s.log_file_name).resolve()
 print(f"Logging to: {s.log_file}")
 handler = RotatingFileHandler(s.log_file, maxBytes=s.log_file_size, backupCount=s.log_file_count)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt=s.log_date_format, handlers=[handler])
@@ -132,7 +132,7 @@ schedule_logger.setLevel(level=logging.WARN)    # ignore anything less severe th
 
 # Now we have logging, notify we are starting up
 logging.info('')
-logging.info("Starting " + s.server_name)
+logging.info(f'Starting overwatch serice for: {s.server_name}')
 
 # Initialise the bus, display and sensor
 if HAVE_SCREEN or HAVE_SENSOR:
@@ -152,7 +152,7 @@ if HAVE_SCREEN:
         HAVE_SCREEN = True
         disp.contrast(s.display_contrast)
         disp.invert(s.display_invert)
-        disp.fill(0)  # And blank as fast as possible in case it is showing garbage
+        disp.fill(0)  # Blank as fast in case it is showing garbage
         disp.show()
         print("We have a ssd1306 display at address " + hex(disp.addr))
     except Exception as e:
@@ -181,12 +181,13 @@ if HAVE_SENSOR:
 DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
 # Use a dictionary to store current readings
+# start with the standard system readings
 data = {
     'sys-temp': 0,
     'sys-load': 0,
     'sys-mem': 0,
 }
-# add sensor data if needed
+# add sensor data if present
 if HAVE_SENSOR:
     data["env-temp"] = 0
     data["env-humi"] = 0
@@ -227,10 +228,10 @@ def bme_screen(xpos=0):
             "env-humi": ('Humi', '.0f', '%', 25),
             "env-pres": ('Pres', '.0f', 'mb', 45),
             }
-    for sense,value in LOGLIST.items():
-        if sense[:4] == 'env-':
-            line = f'{value[0]}: {data[sense]:{value[1]}}{value[2]}'
-            draw.text((xpos,  value[3]), line, font=font, fill=255)
+    for sense,(name,fmt,suffix,ypos) in ITEMS.items():
+        if sense in data.keys():
+            line = f'{name}: {data[sense]:{fmt}}{suffix}'
+            draw.text((xpos, ypos), line, font=font, fill=255)
 
 def sys_screen(xpos=0):
     # Dictionary of tuples specifying name,format,suffix and Y-position
@@ -239,38 +240,32 @@ def sys_screen(xpos=0):
             "sys-load": ('Load', '1.2f', '', 25),
             "sys-mem": ('Mem', '.1f', '%', 45),
             }
-    for sense,value in ITEMS.items():
-        if sense in ITEMS.keys():
-            line = f'{value[0]}: {data[sense]:{value[1]}}{value[2]}'
-            draw.text((xpos,  value[3]), line, font=font, fill=255)
+    for sense,(name,fmt,suffix,ypos) in ITEMS.items():
+        if sense in data.keys():
+            line = f'{name}: {data[sense]:{fmt}}{suffix}'
+            draw.text((xpos, ypos), line, font=font, fill=255)
 
 def toggle_button(action="toggle"):
     # Set the first pin to a specified state or read and toggle it..
     if len(pin_map) > 0:
-        if action.lower() in ['toggle','flip','invert','mirror','switch']:
-            if GPIO.input(pin_map[0][1]):
-                GPIO.output(pin_map[0][1],False)
-            else:
-                GPIO.output(pin_map[0][1],True)
-            ret =  pin_map[0][0] + ' Toggled: '
-        elif action.lower() in ['on','true','enabled','high','hi']:
+        ret = f'{pin_map[0][0]} '
+        if action.lower() in ['toggle','invert','button']:
+            GPIO.output(pin_map[0][1], not GPIO.input(pin_map[0][1]))
+            ret += 'Toggled: '
+        elif action.lower() in [s.pin_states[1].lower(),'on','true']:
             GPIO.output(pin_map[0][1],True)
-            ret = pin_map[0][0] + ' Switched: '
-        elif action.lower() in ['off','false','disabled','low','lo']:
+            ret += 'Switched: '
+        elif action.lower() in [s.pin_states[0].lower(),'off','false']:
             GPIO.output(pin_map[0][1],False)
-            ret = pin_map[0][0] + ' Switched: '
+            ret += 'Switched: '
         elif action.lower() in ['random','easter']:
-            pick_one = random.choice([True, False])
-            GPIO.output(pin_map[0][1],pick_one)
-            ret = pin_map[0][0] + ' Randomly Switched: '
+            GPIO.output(pin_map[0][1],random.choice([True, False]))
+            ret += 'Randomly Switched: '
         else:
-            return 'I dont know how to "' + action + '" the ' + pin_map[0][0] + '!'
-        if GPIO.input(pin_map[0][1]):
-            ret += "On"
-        else:
-            ret += "Off"
+            return f'I dont know how to "{action}" the {pin_map[0][0]}!'
+        ret += s.pin_states[GPIO.input(pin_map[0][1])]
     else:
-        ret = 'Not supported, no output pin defined'
+        ret = 'Not supported, no pin defined'
     return ret
 
 def button_interrupt(*_):
@@ -294,19 +289,16 @@ def update_data():
     data['sys-mem'] = psutil.virtual_memory().percent
 
     # Check if any pins have changed state, and log
-    for idx, pin in enumerate(pin_map):
-        this_pin_state =  GPIO.input(pin[1])
-        if this_pin_state != data[f"pin-{pin[0]}"]:
+    for name, pin in pin_map:
+        this_pin_state =  GPIO.input(pin)
+        if this_pin_state != data[f"pin-{name}"]:
             # Pin has changed state, remember new state and log
-            data[f"pin-{pin[0]}"] = this_pin_state
-            if this_pin_state:
-                logging.info(pin[0] + ': on')
-            else:
-                logging.info(pin[0] + ': off')
+            data[f'pin-{name}'] = this_pin_state
+            logging.info(f'{name}: {s.pin_states[this_pin_state]}')
 
 def update_db():
     # Runs 3x per minute, updates RRD database and processes screensaver
-    rrd.update()
+    rrd.update(data)
     if HAVE_SCREEN:
         screensaver.check()
 
@@ -322,8 +314,9 @@ def log_sensors():
             "sys-mem": ('Mem', '.1f', '%'),
             }
     log_line = ''
-    for sense,value in LOGLIST.items():
-        log_line += f'{value[0]}: {data[sense]:{value[1]}}{value[2]}, '
+    for sense,(name,fmt,suffix) in LOGLIST.items():
+        if sense in data.keys():
+            log_line += f'{name}: {data[sense]:{fmt}}{suffix}, '
     print(log_line[:-2])
     logging.info(log_line[:-2])
 
@@ -336,22 +329,13 @@ def scheduler_servicer(seconds=60):
 
 def good_bye():
     logging.info('Exiting')
-    print("Exit")
-
-print(data)
-ITEMS = {
-        "env-temp": ('Temp', '.1f', DEGREE_SIGN, 5),
-        "env-humi": ('Humi', '.0f', '%', 25),
-        "env-pres": ('Pres', '.0f', 'mb', 45),
-        }
-for sense,value in ITEMS.items():
-    if sense in ITEMS.keys():
-        print(f'{value[0]}: {data[sense]:{value[1]}}{value[2]}')
-log_sensors()
-exit()
+    print('Exit')
 
 # The fun starts here:
-if __name__ == "__main__":
+if __name__ == '__main__':
+
+    # Dump the data list we will be working with
+    print(f'{data.keys()}')
 
     # Display setup
     if HAVE_SCREEN:
@@ -379,15 +363,15 @@ if __name__ == "__main__":
         disp.show()
         # Start saver
         screensaver = Saver(s, disp)
-        logging.info("Display configured and enabled")
+        logging.info('Display configured and enabled')
     elif s.have_screen:
-        logging.warning("Display configured but not detected: Display features disabled")
+        logging.warning('Display configured but not detected: Display features disabled')
 
     # Log sensor status
     if HAVE_SENSOR:
-        logging.info("Environmental sensor configured and enabled")
+        logging.info('Environmental sensor configured and enabled')
     elif s.have_sensor:
-        logging.warning("Environmental data configured but no sensor detected: Environment status and logging disabled")
+        logging.warning('Environmental data configured but no sensor detected: Environment status and logging disabled')
 
     # GPIO mode and arrays for the pin database path and current status
     if len(pin_map) > 0:
@@ -397,28 +381,24 @@ if __name__ == "__main__":
     # We need to set them as outputs in our context in order to monitor their state.
     # - So long as we do not try to write to these pins this will not affect their status,
     #   nor will it prevent other processes (eg octoprint) reading and using them
-    pinData = []
-    for idx, pin in enumerate(pin_map):
-        GPIO.setup(pin[1], GPIO.OUT)
-        pinData.append(GPIO.input(pin[1]))
-        if pinData[idx]:
-            logging.info(pin[0] + ": on")
-        else:
-            logging.info(pin[0] + ": off")
-    if len(pinData) > 0:
+    for name, pin in pin_map:
+        GPIO.setup(pin, GPIO.OUT)
+        data[f'pin-{name}'] = GPIO.input(pin)
+        logging.info(f'{name}: {s.pin_states[data[f"pin-{name}"]]}')
+    if any(key.startswith('pin-') for key in data):
         logging.info('GPIO monitoring configured and logging enabled')
     elif len(s.pin_map) > 0:
         logging.warning("GPIO monitoring configured but unable to read pins: GPIO status and logging disabled")
 
     # Do we have a button, and a pin to control
-    if (len(pinData) > 0) and (s.button_pin > 0):
+    if (len(pin_map) > 0) and (s.button_pin > 0):
         # Set up the button pin interrupt, if defined
         GPIO.setup(s.button_pin, GPIO.IN)       # Set our button pin to be an input
         GPIO.add_event_detect(s.button_pin, GPIO.RISING, button_interrupt, bouncetime = 400)
         logging.info('Button enabled')
 
     # RRD init
-    rrd = Robin(s, data)
+    rrd = Robin(s)
 
     # Do an initial, early, data reading to settle sensors etc
     update_data()

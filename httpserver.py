@@ -12,9 +12,9 @@ from threading import Thread, current_thread
 import logging
 
 # RRD data
-from rrd import Robin
+from robin import Robin
 
-def serve_http(s, rrd, env, sys, pin, toggle_button):
+def serve_http(s, rrd, data, toggle_button):
     # Spawns a http.server.HTTPServer in a separate thread on the given port.
     handler = _BaseRequestHandler
     httpd = http.server.HTTPServer((s.host, s.port), handler, False)
@@ -26,9 +26,7 @@ def serve_http(s, rrd, env, sys, pin, toggle_button):
     # there is probably a better way to do this, eg using a meta-class and inheritance
     http.s = s
     http.rrd = rrd
-    http.sys = sys
-    http.env = env
-    http.pin = pin
+    http.data = data
     http.toggle_button = toggle_button
     # Start the server
     threadlog(f"HTTP server will bind to port {str(s.port)} on host {s.host}")
@@ -106,33 +104,48 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 'OverWatch</a></div>\n', 'utf-8'))
 
     def _give_env(self):
-        if len(http.env) > 0:
-            # room sensors
-            self.wfile.write(bytes('<tr><th>Room</th></tr>\n', 'utf-8'))
-            self.wfile.write(bytes('<tr><td>Temperature: </td><td>' + format(http.env['temperature'], '.1f') + '&deg;</td></tr>\n', 'utf-8'))
-            self.wfile.write(bytes('<tr><td>Humidity: </td><td>' + format(http.env['humidity'], '.1f') + '%</td></tr>\n', 'utf-8'))
-            self.wfile.write(bytes('<tr><td>Presssure: </td><td>' + format(http.env['pressure'], '.0f') + 'mb</td></tr>\n', 'utf-8'))
+        # Environmental sensor
+        SENSORLIST = {
+                'env-temp': ('Temperature','.1f','&deg;'),
+                'env-humi': ('Humidity','.1f','%'),
+                'env-pres': ('Presssure','.0f','mb'),
+                }
+        if len(http.data.keys() & SENSORLIST.keys()) > 0:
+            ret = f'<tr><th>{http.s.sensor_name}</th></tr>\n'
+            for sense,(name,fmt,suffix) in SENSORLIST.items():
+                if sense in http.data.keys():
+                    ret += f'<tr><td>{name}: </td><td>{http.data[sense]:{fmt}}{suffix}</td></tr>\n'
+            self.wfile.write(bytes(ret, 'utf-8'))
 
     def _give_sys(self):
         # Internal Sensors
-        self.wfile.write(bytes('<tr><th>Server</th></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>CPU Temperature: </td><td>' + format(http.sys['temperature'], '.1f') + '&deg;</td></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>CPU Load: </td><td>' + format(http.sys['load'], '1.2f') + '</td></tr>\n', 'utf-8'))
-        self.wfile.write(bytes('<tr><td>Memory used: </td><td>' + format(http.sys['memory'], '.1f') + '%</td></tr>\n', 'utf-8'))
+        SENSORLIST = {
+                'sys-temp': ('CPU Temperature','.1f','&deg;'),
+                'sys-load': ('CPU Load','1.2f',''),
+                'sys-mem': ('Memory used','.1f','%'),
+                }
+        if len(http.data.keys() & SENSORLIST.keys()) > 0:
+            ret = '<tr><th>Server</th></tr>\n'
+            for sense,(name,fmt,suffix) in SENSORLIST.items():
+                if sense in http.data.keys():
+                    ret += f'<tr><td>{name}: </td><td>{http.data[sense]:{fmt}}{suffix}</td></tr>\n'
+            self.wfile.write(bytes(ret, 'utf-8'))
 
     def _give_pins(self):
         # GPIO states
-        if len(http.pin) > 0:
-            self.wfile.write(bytes('<tr><th>GPIO</th></tr>\n', 'utf-8'))
-            for idx, pin in enumerate(http.s.pin_map):
-                if http.pin[idx]:
-                    self.wfile.write(bytes(f'<tr><td>{pin[0]}:</td><td>on</td></tr>\n', 'utf-8'))
-                else:
-                    self.wfile.write(bytes(f'<tr><td>{pin[0]}:</td><td>off</td></tr>\n', 'utf-8'))
+        PINLIST = {}
+        for key in http.data.keys():
+            if key[0:4] == 'pin-':
+                PINLIST[key] = key[4:]
+        if len(http.data.keys() & PINLIST.keys()) > 0:
+            ret = '<tr><th>GPIO</th></tr>\n'
+            for sense,name in PINLIST.items():
+                ret += f'<tr><td>{name}:</td><td>{http.s.pin_states[bool(http.data[sense])]}</td></tr>\n'
+            self.wfile.write(bytes(ret, 'utf-8'))
 
     def _give_graphlinks(self, skip=""):
         if len(skip) == 0:
-            self.wfile.write(bytes('<tr><th>Graphs:</th></tr>\n', 'utf-8'))
+            self.wfile.write(bytes('<tr><th>Graphs</th></tr>\n', 'utf-8'))
         self.wfile.write(bytes('<tr>', 'utf-8'))
         self.wfile.write(bytes('<td colspan="2" style="text-align: center;">', 'utf-8'))
         for g in http.s.default_graphs:
@@ -148,7 +161,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_links(self):
         self._give_graphlinks()
         self.wfile.write(bytes('<tr>', 'utf-8'))
-        self.wfile.write(bytes(f'<td colspan="2" style="text-align: center;"><a href="./?view=deco&view=log" title="Open the extended log in a new page" target="_blank">Main Log</a></td>', 'utf-8'))
+        self.wfile.write(bytes('<td colspan="2" style="text-align: center;"><a href="./?view=deco&view=log" title="Open the extended log in a new page" target="_blank">Main Log</a></td>', 'utf-8'))
         self.wfile.write(bytes('</tr>\n', 'utf-8'))
 
     def _give_log(self, lines=100):
@@ -177,21 +190,11 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('&nbsp;<a href="./" title="Main page">Home</a></div>\n', 'utf-8'))
 
     def _give_graphs(self, d):
-        allgraphs = []
-        if len(http.env) > 0:
-            allgraphs.extend([["env-temp", "Temperature"],
-                         ["env-humi", "Humidity"],
-                         ["env-pres", "Pressure"]])
-        allgraphs.extend([["sys-temp", "CPU Temperature"],
-                         ["sys-load", "CPU Load Average"],
-                         ["sys-mem", "System Memory Use"]])
-        for _, pin in enumerate(http.s.pin_map):
-            allgraphs.append(["pin-" + pin[0], pin[0] + " GPIO"])
         self.wfile.write(bytes('<table>\n', 'utf-8'))
         self.wfile.write(bytes(f'<tr><th>Graphs: -{d} -> now</th></tr>\n', 'utf-8'))
-        for [g,t] in allgraphs:
-            self.wfile.write(bytes(f'<tr><td><a href="graph?graph={g}&duration={d}">', 'utf-8'))
-            self.wfile.write(bytes(f'<img title="{t}" src="graph?graph={g}&duration={d}">', 'utf-8'))
+        for graph,(title, *_) in http.rrd.GRAPH_MAP.items():
+            self.wfile.write(bytes(f'<tr><td><a href="graph?graph={graph}&duration={d}">', 'utf-8'))
+            self.wfile.write(bytes(f'<img title="{title}" src="graph?graph={graph}&duration={d}">', 'utf-8'))
             self.wfile.write(bytes('</a></td></tr>\n', 'utf-8'))
         self._give_graphlinks(skip=d)
         self.wfile.write(bytes('</table>\n', 'utf-8'))
@@ -227,7 +230,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._give_graphs(duration)
             self._give_datetime()
             self._give_foot(refresh=300)
-        elif (urlparse(self.path).path == '/' + http.s.button_path) and (len(http.s.button_path) > 0) and (len(http.pin) > 0):
+        elif ((urlparse(self.path).path == '/' + http.s.button_path) and
+                (len(http.s.button_path) > 0) and (len(http.s.pin_map) > 0)):
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
             if not parsed:
                 action = 'toggle'
