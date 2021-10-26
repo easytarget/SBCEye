@@ -33,6 +33,7 @@ def serve_http(s, rrd, data, toggle_button):
     httpd.server_bind()
     address = f"http://{httpd.server_name}:{httpd.server_port}"
     threadlog(f"Access via: {address}")
+    print(f"Webserver started on`: {address}")
     httpd.server_activate()
     def serve_forever(httpd):
         with httpd:  # to make sure httpd.server_close is called
@@ -189,14 +190,15 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(bytes('&nbsp;<a href="./?view=deco&view=log&lines=2500" title="show 2500 lines">2500</a>&nbsp;:', 'utf-8'))
         self.wfile.write(bytes('&nbsp;<a href="./" title="Main page">Home</a></div>\n', 'utf-8'))
 
-    def _give_graphs(self, d):
+    def _give_graphs(self, duration):
         self.wfile.write(bytes('<table>\n', 'utf-8'))
-        self.wfile.write(bytes(f'<tr><th>Graphs: -{d} -> now</th></tr>\n', 'utf-8'))
-        for graph,(title, *_) in http.rrd.GRAPH_MAP.items():
-            self.wfile.write(bytes(f'<tr><td><a href="graph?graph={graph}&duration={d}">', 'utf-8'))
-            self.wfile.write(bytes(f'<img title="{title}" src="graph?graph={graph}&duration={d}">', 'utf-8'))
-            self.wfile.write(bytes('</a></td></tr>\n', 'utf-8'))
-        self._give_graphlinks(skip=d)
+        self.wfile.write(bytes(f'<tr><th>Graphs: {duration} -> now</th></tr>\n', 'utf-8'))
+        for graph,(title, *_) in http.rrd.graph_map.items():
+            if graph in http.rrd.sources:
+                self.wfile.write(bytes(f'<tr><td><a href="graph?graph={graph}&duration={duration}">', 'utf-8'))
+                self.wfile.write(bytes(f'<img title="{title}" src="graph?graph={graph}&duration={duration}">', 'utf-8'))
+                self.wfile.write(bytes('</a></td></tr>\n', 'utf-8'))
+        self._give_graphlinks(skip=duration)
         self.wfile.write(bytes('</table>\n', 'utf-8'))
 
     def do_GET(self):
@@ -230,17 +232,21 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._give_graphs(duration)
             self._give_datetime()
             self._give_foot(refresh=300)
-        elif ((urlparse(self.path).path == '/' + http.s.button_path) and
-                (len(http.s.button_path) > 0) and (len(http.s.pin_map) > 0)):
+        elif ((urlparse(self.path).path == '/' + http.s.button_url)
+                and (len(http.s.button_url) > 0)
+                and (len(http.s.pin_map.keys()) > 0)):
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
-            if not parsed:
-                action = 'toggle'
-            else:
+            if parsed:
                 action = parsed[0]
+            elif urlparse(self.path).query:
+                self.send_error(404, 'Unknown Parameters', 'This URL takes a single parameter: "?state=<new state>"')
+                return
+            else:
+                action = 'toggle'
             logging.info(f'Web button triggered by: {self.client_address[0]} with action: {action}')
             state = http.toggle_button(action)
             self._set_headers()
-            self._give_head(f" :: {http.s.pin_map[0][0]}")
+            self._give_head(f" :: {next(iter(http.s.pin_map))}")
             self.wfile.write(bytes(f'<h2>{state}</h2>\n', 'utf-8'))
             self.wfile.write(bytes('<div><a href="./" title="Main page">Home</a></div>\n', 'utf-8'))
             self._give_datetime()

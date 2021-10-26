@@ -1,5 +1,5 @@
-logs/*.log*
-DB/*.rrd
-*settings.py
+**/*.log*
+**/*.rrd
+**/__pycache__
+*overwatch_settings.py
 env
-__pycache__

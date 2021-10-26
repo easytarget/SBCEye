@@ -30,18 +30,21 @@ class Settings:
     # - List entries consist of ['Name', BCM Pin Number]
     # - The state will be read from the pins at startup and used to track changes
     # - An empty list disables the GPIO features
-    # - Example: pin_map = tuple(['Lamp', 16], ['Printer', 20], ['Enclosure', 21])
+    # - Example: pin_map = {"Lamp": 16,
+    #                       "Printer": 20,
+    #                       "Enclosure": 21,
+    #                        }
 
-    pin_map = tuple()
+    pin_map = {}
 
     # Button pin (set to `0` to disable button)
-    # Wnen enabled will always control the 1st entry in the pin list
+    # When enabled will always control the 1st entry in the pin list
     button_pin = 0                # BCM Pin Number
 
     # Web UI
     host = ''                     # Ip address to bind web server to, '' =  bind to all addresses
     port = 7080                   # Port number for web server
-    button_path = ''              # Web button url path, leave blank to disable
+    button_url = ''              # Web button url path, leave blank to disable
     sensor_name = 'Room'          # Sensor name (eg; location)
     pin_states = ('Off','On')         # Localisation for pin state (False,True)
 

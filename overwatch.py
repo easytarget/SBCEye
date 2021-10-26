@@ -49,21 +49,44 @@ parser = argparse.ArgumentParser(
     epilog=textwrap.dedent('''
         Homepage: https://github.com/easytarget/pi-overwatch
         '''))
-parser.add_argument("--datadir", "-d", help="Data directory, will be searched for settings.pl file, default = '.'", type=str)
+parser.add_argument("--config", "-c",
+        help="Config file name, default = config.ini",
+        type=str)
+parser.add_argument("--datadir", "-d",
+        help="Data directory, default = '.'",
+        type=str)
 args = parser.parse_args()
 
+data_dir = Path(os.path.dirname(os.path.abspath(__file__)))
 if args.datadir:
     data_dir = Path(args.datadir)
     if data_dir.is_dir():
-        sys.path.append(str(data_dir.resolve()))
+        os.chdir(data_dir)
+        print(f'Data_dir is: {data_dir}')
     else:
-        print(f"data_dir specified on commandline ({args.datadir}) not found; ignoring")
-else:
-    data_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+        print(f"Data_dir specified on commandline '{args.datadir}' not found; ignoring")
 
-os.chdir(data_dir)
-print(f"data directory = {os.getcwd()}")
-print(f"PYTHON_PATH = {sys.path}")
+if args.config:
+    config_file = Path(args.config).resolve()
+    if config_file.is_file():
+        print(f'Using custom configuration from {config_file}')
+    else:
+        print(f"Specified configuration file '{config_file}' not found, Exiting.")
+        exit()
+else:
+    config_file = Path('config.ini').resolve()
+    if config_file.is_file():
+        print(f'Using custom configuration from {config_file}')
+    else:
+        config_file = Path('default-config.ini').resolve()
+        if config_file.is_file():
+            print(f'Using default configuration from {config_file}')
+        else:
+            print('Cannot find configuration file, exiting')
+            exit()
+
+print(f'Config file: (NOT YET FULLY IMPLEMENTED) {config_file}')
+print(f"Working directory = {os.getcwd()}")
 
 try:
     from overwatch_settings import Settings as s
@@ -71,6 +94,7 @@ try:
 except ModuleNotFoundError:
     print("No user settings found in data directory or PYTHON_PATH, loading from 'default_overwatch_settings.py'")
     from default_overwatch_settings import Settings as s
+
 
 HAVE_SCREEN = s.have_screen
 HAVE_SENSOR = s.have_sensor
@@ -111,8 +135,9 @@ try:
 except Exception as e:
     print(e)
     print("GPIO monitorig requirements not met")
-    pin_map = []
+    pin_map.clear()
 
+print(pin_map)
 
 # Imports and settings should be OK now, let the console know we are starting
 print("Starting OverWatch")
@@ -193,7 +218,7 @@ if HAVE_SENSOR:
     data["env-humi"] = 0
     data["env-pres"] = 0
 # add pins
-for (name,pin) in pin_map:
+for name in pin_map.keys():
     data[f"pin-{name}"] = 0
 
 # Local functions
@@ -222,48 +247,51 @@ def slideout(step=s.slidespeed):
     show(width + margin)
 
 def bme_screen(xpos=0):
-    # Dictionary of tuples specifying name,format,suffix and Y-position
-    ITEMS = {
+    # Dictionary with tuples specifying name,format,suffix and Y-position
+    items = {
             "env-temp": ('Temp', '.1f', DEGREE_SIGN, 5),
             "env-humi": ('Humi', '.0f', '%', 25),
             "env-pres": ('Pres', '.0f', 'mb', 45),
             }
-    for sense,(name,fmt,suffix,ypos) in ITEMS.items():
+    for sense,(name,fmt,suffix,ypos) in items.items():
         if sense in data.keys():
             line = f'{name}: {data[sense]:{fmt}}{suffix}'
             draw.text((xpos, ypos), line, font=font, fill=255)
 
 def sys_screen(xpos=0):
-    # Dictionary of tuples specifying name,format,suffix and Y-position
-    ITEMS = {
+    # Dictionary with tuples specifying name,format,suffix and Y-position
+    items = {
             "sys-temp": ('CPU', '.1f', DEGREE_SIGN, 5),
             "sys-load": ('Load', '1.2f', '', 25),
             "sys-mem": ('Mem', '.1f', '%', 45),
             }
-    for sense,(name,fmt,suffix,ypos) in ITEMS.items():
+    for sense,(name,fmt,suffix,ypos) in items.items():
         if sense in data.keys():
             line = f'{name}: {data[sense]:{fmt}}{suffix}'
             draw.text((xpos, ypos), line, font=font, fill=255)
 
 def toggle_button(action="toggle"):
-    # Set the first pin to a specified state or read and toggle it..
-    if len(pin_map) > 0:
-        ret = f'{pin_map[0][0]} '
+    # Set the first pin in pin_map to a specified state
+    if len(pin_map.keys()) > 0:
+        name = next(iter(pin_map))
+        pin = pin_map[name]
+        print(f'toggle_button: {action} on {name}:{pin}')
+        ret = f'{name} '
         if action.lower() in ['toggle','invert','button']:
-            GPIO.output(pin_map[0][1], not GPIO.input(pin_map[0][1]))
+            GPIO.output(pin, not GPIO.input(pin))
             ret += 'Toggled: '
         elif action.lower() in [s.pin_states[1].lower(),'on','true']:
-            GPIO.output(pin_map[0][1],True)
+            GPIO.output(pin,True)
             ret += 'Switched: '
         elif action.lower() in [s.pin_states[0].lower(),'off','false']:
-            GPIO.output(pin_map[0][1],False)
+            GPIO.output(pin,False)
             ret += 'Switched: '
         elif action.lower() in ['random','easter']:
-            GPIO.output(pin_map[0][1],random.choice([True, False]))
+            GPIO.output(pin,random.choice([True, False]))
             ret += 'Randomly Switched: '
         else:
-            return f'I dont know how to "{action}" the {pin_map[0][0]}!'
-        ret += s.pin_states[GPIO.input(pin_map[0][1])]
+            return f'I dont know how to "{action}" the {name}!'
+        ret += s.pin_states[GPIO.input(pin)]
     else:
         ret = 'Not supported, no pin defined'
     return ret
@@ -289,7 +317,7 @@ def update_data():
     data['sys-mem'] = psutil.virtual_memory().percent
 
     # Check if any pins have changed state, and log
-    for name, pin in pin_map:
+    for name, pin in pin_map.items():
         this_pin_state =  GPIO.input(pin)
         if this_pin_state != data[f"pin-{name}"]:
             # Pin has changed state, remember new state and log
@@ -304,8 +332,8 @@ def update_db():
 
 def log_sensors():
     # Runs on a user defined schedule to dump a line of sensor data in the log
-    # Dictionary of tuples specifying name,format and suffix
-    LOGLIST = {
+    # Dictionary with tuples specifying name, format and suffix
+    loglist = {
             "env-temp": ('Temp', '.1f', DEGREE_SIGN),
             "env-humi": ('Humi', '.0f', '%'),
             "env-pres": ('Pres', '.0f', 'mb'),
@@ -314,7 +342,7 @@ def log_sensors():
             "sys-mem": ('Mem', '.1f', '%'),
             }
     log_line = ''
-    for sense,(name,fmt,suffix) in LOGLIST.items():
+    for sense,(name,fmt,suffix) in loglist.items():
         if sense in data.keys():
             log_line += f'{name}: {data[sense]:{fmt}}{suffix}, '
     print(log_line[:-2])
@@ -333,9 +361,6 @@ def good_bye():
 
 # The fun starts here:
 if __name__ == '__main__':
-
-    # Dump the data list we will be working with
-    print(f'{data.keys()}')
 
     # Display setup
     if HAVE_SCREEN:
@@ -365,40 +390,43 @@ if __name__ == '__main__':
         screensaver = Saver(s, disp)
         logging.info('Display configured and enabled')
     elif s.have_screen:
-        logging.warning('Display configured but not detected: Display features disabled')
+        logging.warning('Display configured but not detected:'\
+                'Display features disabled')
 
     # Log sensor status
     if HAVE_SENSOR:
         logging.info('Environmental sensor configured and enabled')
     elif s.have_sensor:
-        logging.warning('Environmental data configured but no sensor detected: Environment status and logging disabled')
+        logging.warning('Environmental data configured but no sensor detected:'\
+                'Environment status and logging disabled')
 
     # GPIO mode and arrays for the pin database path and current status
-    if len(pin_map) > 0:
+    if len(pin_map.keys()) > 0:
         GPIO.setmode(GPIO.BCM)  # Set all GPIO pins to BCM GPIO numbering
+        GPIO.setwarnings(False) # Dont warn if somethign already using channels
 
     # Set all gpio pins to 'output' and record their initial status
     # We need to set them as outputs in our context in order to monitor their state.
-    # - So long as we do not try to write to these pins this will not affect their status,
+    # - So long as we do not try to write this will not affect their status,
     #   nor will it prevent other processes (eg octoprint) reading and using them
-    for name, pin in pin_map:
+    for name, pin in pin_map.items():
         GPIO.setup(pin, GPIO.OUT)
         data[f'pin-{name}'] = GPIO.input(pin)
         logging.info(f'{name}: {s.pin_states[data[f"pin-{name}"]]}')
     if any(key.startswith('pin-') for key in data):
         logging.info('GPIO monitoring configured and logging enabled')
-    elif len(s.pin_map) > 0:
-        logging.warning("GPIO monitoring configured but unable to read pins: GPIO status and logging disabled")
+    else:
+        logging.info("No pins configured for GPIO monitoring, feature disabled")
 
     # Do we have a button, and a pin to control
-    if (len(pin_map) > 0) and (s.button_pin > 0):
+    if (len(pin_map.keys()) > 0) and (s.button_pin > 0):
         # Set up the button pin interrupt, if defined
         GPIO.setup(s.button_pin, GPIO.IN)       # Set our button pin to be an input
         GPIO.add_event_detect(s.button_pin, GPIO.RISING, button_interrupt, bouncetime = 400)
         logging.info('Button enabled')
 
     # RRD init
-    rrd = Robin(s)
+    rrd = Robin(s, data)
 
     # Do an initial, early, data reading to settle sensors etc
     update_data()
