@@ -270,12 +270,12 @@ def sys_screen(xpos=0):
             line = f'{name}: {data[sense]:{fmt}}{suffix}'
             draw.text((xpos, ypos), line, font=font, fill=255)
 
-def toggle_button(action="toggle"):
+def button_control(action="toggle"):
     # Set the first pin in pin_map to a specified state
     if len(pin_map.keys()) > 0:
         name = next(iter(pin_map))
         pin = pin_map[name]
-        print(f'toggle_button: {action} on {name}:{pin}')
+        print(f'button_control: {action} on {name} [pin {pin}]')
         ret = f'{name} '
         if action.lower() in ['toggle','invert','button']:
             GPIO.output(pin, not GPIO.input(pin))
@@ -290,11 +290,14 @@ def toggle_button(action="toggle"):
             GPIO.output(pin,random.choice([True, False]))
             ret += 'Randomly Switched: '
         else:
-            return f'I dont know how to "{action}" the {name}!'
-        ret += s.pin_states[GPIO.input(pin)]
+            ret += ': '
+        state = GPIO.input(pin)
+        ret += s.pin_states[state]
     else:
+        name = ''
+        state = False
         ret = 'Not supported, no pin defined'
-    return ret
+    return (ret, state, name)
 
 def button_interrupt(*_):
     # give a short delay, then re-read input to provide a minimum hold-down time
@@ -302,7 +305,7 @@ def button_interrupt(*_):
     time.sleep(0.1)
     if GPIO.input(s.button_pin):
         logging.info('Button pressed')
-        toggle_button()
+        button_control()
     elif not s.suppress_glitches:
         logging.info('Button GLITCH')
 
@@ -432,7 +435,7 @@ if __name__ == '__main__':
     update_data()
 
     # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(s, rrd, data, toggle_button)
+    serve_http(s, rrd, data, button_control)
 
     # Exit handler
     atexit.register(good_bye)

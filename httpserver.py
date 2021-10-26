@@ -13,9 +13,9 @@ from threading import Thread, current_thread
 import logging
 
 # RRD data
-from robin import Robin
+from robin import Robin, get_period
 
-def serve_http(s, rrd, data, toggle_button):
+def serve_http(s, rrd, data, button_control):
     # Spawns a http.server.HTTPServer in a separate thread on the given port.
     handler = _BaseRequestHandler
     httpd = http.server.HTTPServer((s.host, s.port), handler, False)
@@ -28,25 +28,25 @@ def serve_http(s, rrd, data, toggle_button):
     http.s = s
     http.rrd = rrd
     http.data = data
-    http.toggle_button = toggle_button
+    http.button_control = button_control
     # Start the server
-    threadlog(f"HTTP server will bind to port {str(s.port)} on host {s.host}")
+    _threadlog(f"HTTP server will bind to port {str(s.port)} on host {s.host}")
     httpd.server_bind()
     address = f"http://{httpd.server_name}:{httpd.server_port}"
-    threadlog(f"Access via: {address}")
+    _threadlog(f"Access via: {address}")
     print(f"Webserver started on`: {address}")
     httpd.server_activate()
     def serve_forever(httpd):
         with httpd:  # to make sure httpd.server_close is called
-            threadlog("Http Server start")
+            _threadlog("Http Server start")
             httpd.serve_forever()
-            threadlog("Http Server closing down")
+            _threadlog("Http Server closing down")
     thread = Thread(target=serve_forever, args=(httpd, ))
     thread.setDaemon(True)
     thread.start()
     return httpd, address
 
-def threadlog(logline):
+def _threadlog(logline):
     # A wrapper function around logging.info() that prepends the current thread name
     logging.info(f"[{current_thread().name}] : {logline}")
 
@@ -87,8 +87,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 </head>
                 <body>'''
 
-    def _give_foot(self,scroll = False, refresh = 0):
-        # DEBUG: self.wfile.write(bytes('<pre style="color:#888888">GET: ' + self.path + ' from: ' + self.client_address[0] + '</pre>\n', 'utf-8'))
+    def _give_foot(self, scroll = False, refresh = 0):
         ret = '''</body>\n
                 <script>\n'''
         if scroll:
@@ -98,7 +97,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                     }
                     window.onload = down;'''
         if refresh > 0:
-            ret += f'setTimeout(function(){{location.replace(document.URL);}}, {str(refresh*1000)});\n'
+            ret += 'setTimeout(function(){{location.replace(document.URL);}},'\
+                    '{str(refresh*1000)});\n'
         ret += '''</script>
                 </html>'''
         return ret
@@ -180,7 +180,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <tr>
                 <td colspan="2" style="text-align: center;">
                 <a href="./?view=deco&view=log" title="Open the log in a new page" target="_blank">
-                Main Log</a>
+                Log</a>
                 </td>
                 </tr>'''
 
@@ -253,7 +253,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 body = Robin.draw_graph(http.rrd, start, end, graph)
             if len(body) == 0:
                 self.send_error(404, 'Graph unavailable',
-                        'Check your parameters and try again, see the "/graphs/" page for examples.')
+                        'Check your parameters and try again,'\
+                        'see the "/graphs/" page for examples.')
                 return
             self._set_png_headers()
             self.wfile.write(body)
@@ -269,10 +270,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 end =''
             else:
                 end = parsed_end[0]
-            period = http.rrd.get_period(start, end)
-            response = ''
+            period = get_period(start, end)
             self._set_headers()
-            response += self._give_head(f" :: graphs {period}")
+            response = self._give_head(f" :: graphs {period}")
             response += f'<h2>{http.s.server_name}</h2>'
             response += self._give_graphs(start, end, period)
             response += self._give_datetime()
@@ -282,7 +282,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 and (len(http.s.button_url) > 0)
                 and (len(http.s.pin_map.keys()) > 0)):
             # Web Button
-            response = ''
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
             if parsed:
                 action = parsed[0]
@@ -291,25 +290,31 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                         'This URL takes a single parameter: "?state=<new state>"')
                 return
             else:
-                action = 'toggle'
+                action = 'status'
             logging.info(f'Web button triggered by: {self.client_address[0]}'\
-                    'with action: {action}')
-            state = http.toggle_button(action)
+                    f' with action: {action}')
+            status, state, name = http.button_control(action)
             self._set_headers()
-            response += self._give_head(f" :: {next(iter(http.s.pin_map))}")
-            response += f'<h2>{state}</h2>\n'
-            response += '<div><a href="./" title="Main page">Home</a></div>\n'
+            response = self._give_head(f" :: {name}")
+            response += f'<h2>{status}</h2>\n'
+            invert_state = http.s.pin_states[not state]
+            response += f'''<div>
+                    <a href="./{http.s.button_url}?state={invert_state}"
+                    title = "Switch {name} {invert_state}">
+                    Switch {invert_state}</a>
+                    </div>\n'''
+            response += '<div style="padding-top: 1em;">\n'\
+                    '<a href="./" title="Main page">Home</a></div>\n'
             response += self._give_datetime()
             response += self._give_foot()
             self._write_dedented(response)
         elif urlparse(self.path).path == '/':
-            response = ''
             # Main Page
             view = parse_qs(urlparse(self.path).query).get('view', None)
             if not view:
                 view = ["deco", "env", "sys", "gpio", "links"]
             self._set_headers()
-            response += self._give_head()
+            response = self._give_head()
             if "deco" in view:
                 response += f'<h2>{http.s.server_name}</h2>\n'
             response += '<table>\n'

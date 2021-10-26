@@ -3,6 +3,16 @@ import datetime
 from pathlib import Path
 import rrdtool
 
+def get_period(start, end):
+    if end == '':
+        period = f'last {start.lstrip("-")}'
+        start = f'end{start}'
+        end = 'now'
+    else:
+        period = f'{start} >> {end}'
+    return period
+
+
 class Robin:
     def __init__(self, s, data):
         self.graph_args = {}
@@ -98,20 +108,11 @@ class Robin:
                     "--template", template,
                     dataline)
 
-    def get_period(self, start, end):
-        if end == '':
-            period = f'last {start.lstrip("-")}'
-            start = f'end{start}'
-            end = 'now'
-        else:
-            period = f'{start} >> {end}'
-        return period
-
     def draw_graph(self, start, end, graph):
         # RRD graph generation
         # Returns the generated file for sending as the http response
         if (graph in self.sources) and (graph in self.graph_map.keys()):
-            period = self.get_period(start, end)
+            period = get_period(start, end)
             params = self.graph_map[graph]
             response = bytearray()
             with tempfile.NamedTemporaryFile(mode='rb', dir='/tmp',
