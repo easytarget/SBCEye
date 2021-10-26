@@ -78,7 +78,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <title>{title}</title>
                 <style>
                 body {{display:flex; flex-direction: column; align-items: center;}}
-                a {{color:#666666; text-decoration: none;}}
+                a {{color:#555555; text-decoration: none;}}
                 img {{width:auto; max-width:100%;}}
                 table {{border-spacing: 0.2em; width:auto; max-width:100%;}}
                 th {{font-size: 110%; text-align: left;}}
@@ -105,8 +105,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _give_datetime(self):
         timestamp = datetime.datetime.now().strftime(http.s.time_format)
-        return  f'''<div style="color:#666666;
-                font-size: 90%; padding-top: 0.5em;">{timestamp}</div>
+        return  f'''<div style="color:#555555;
+                font-size: 94%; padding-top: 0.5em;">{timestamp}</div>
                 <div style="color:#888888;
                 font-size: 66%; font-weight: lighter; padding-top:0.5em">
                 <a href="https://github.com/easytarget/pi-overwatch"
@@ -169,7 +169,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                            f'title="Graphs covering the last {duration} in time">'\
                            f'{duration}</a>&nbsp;\n'
                 else:
-                    ret += f'&nbsp;<span style="color: #AAAAAA;">{duration}</span>&nbsp;\n'
+                    ret += f'&nbsp;<span style="color: #BBBBBB;">{duration}</span>&nbsp;\n'
             if len(skip) > 0:
                 ret += '&nbsp;:&nbsp;&nbsp;<a href="./" title="Main page">Home</a>\n'
             ret += '</td></tr>\n'
