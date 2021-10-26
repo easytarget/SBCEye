@@ -98,16 +98,24 @@ class Robin:
                     "--template", template,
                     dataline)
 
-    def draw_graph(self, period, graph):
+    def get_period(self, start, end):
+        if end == '':
+            period = f'last {start.lstrip("-")}'
+            start = f'end{start}'
+            end = 'now'
+        else:
+            period = f'{start} >> {end}'
+        return period
+
+    def draw_graph(self, start, end, graph):
         # RRD graph generation
         # Returns the generated file for sending as the http response
         if (graph in self.sources) and (graph in self.graph_map.keys()):
+            period = self.get_period(start, end)
             params = self.graph_map[graph]
             response = bytearray()
             with tempfile.NamedTemporaryFile(mode='rb', dir='/tmp',
                     prefix='overwatch_graph') as temp_file:
-                start = f'end-{period}'
-                end = 'now'
                 timestamp = datetime.datetime.now()\
                         .strftime(self.graph_args['time_format'])
                 rrd_args = ["--full-size-mode",
@@ -120,7 +128,7 @@ class Robin:
                     rrd_args.extend(["--height", str(self.graph_args["high"]/2)])
                 else:
                     rrd_args.extend(["--height", str(self.graph_args["high"])])
-                rrd_args.extend(["--title", params[0] + ": last " + period,
+                rrd_args.extend(["--title", f'{params[0]}: {period}',
                                  "--upper-limit", params[1],
                                  "--lower-limit", params[2],
                                  "--left-axis-format", params[3]])
@@ -136,7 +144,7 @@ class Robin:
                     print(rrd_error)
                 response = temp_file.read()
                 if len(response) == 0:
-                    print(f'Error: png file generation failed for : {graph} : {period}')
+                    print(f'Error: png file generation failed for : {graph} : {start}>>{end}')
         else:
             print(f'Error: No graph available for type: {graph}')
         return response

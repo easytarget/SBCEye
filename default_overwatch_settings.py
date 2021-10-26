@@ -68,7 +68,7 @@ class Settings:
 
     # Default graph durations
     # See https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html#TIME%20OFFSET%20SPECIFICATION
-    default_graphs = ['3h','1d','3d','1w','1m','3m','1y','3y']
+    graph_durations = ['3h','1d','3d','1w','1m','3m','1y','3y']
     graph_wide = 1200  # Pixels
     graph_high = 300   # GPIO pin on/off graphs are 1/2 this height
     # Other graph attributes, see: https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html

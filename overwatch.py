@@ -22,8 +22,8 @@
 
 # Some general functions we will use
 import os
-import sys
 import time
+import sys
 import logging
 from logging.handlers import RotatingFileHandler
 import random
@@ -69,21 +69,21 @@ if args.datadir:
 if args.config:
     config_file = Path(args.config).resolve()
     if config_file.is_file():
-        print(f'Using custom configuration from {config_file}')
+        print(f'Using configuration from {config_file}')
     else:
         print(f"Specified configuration file '{config_file}' not found, Exiting.")
-        exit()
+        sys.exit()
 else:
     config_file = Path('config.ini').resolve()
     if config_file.is_file():
-        print(f'Using custom configuration from {config_file}')
+        print(f'Using configuration from {config_file}')
     else:
-        config_file = Path('default-config.ini').resolve()
+        config_file = Path('default_config.ini').resolve()
         if config_file.is_file():
             print(f'Using default configuration from {config_file}')
         else:
             print('Cannot find configuration file, exiting')
-            exit()
+            sys.exit()
 
 print(f'Config file: (NOT YET FULLY IMPLEMENTED) {config_file}')
 print(f"Working directory = {os.getcwd()}")
@@ -218,7 +218,7 @@ if HAVE_SENSOR:
     data["env-humi"] = 0
     data["env-pres"] = 0
 # add pins
-for name in pin_map.keys():
+for name,_ in pin_map.items():
     data[f"pin-{name}"] = 0
 
 # Local functions

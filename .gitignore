@@ -2,4 +2,5 @@
 **/*.rrd
 **/__pycache__
 *overwatch_settings.py
+config.ini
 env
