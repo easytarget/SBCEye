@@ -99,10 +99,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _give_datetime(self):
         timestamp = datetime.datetime.now().strftime(http.s.time_format)
-        self.wfile.write(bytes(f'<div style="color:#666666; font-size: 90%; padding-top: 0.5em;">{timestamp}</div>\n', 'utf-8'))
-        self.wfile.write(bytes('<div style="color:#888888; font-size: 66%; font-weight: lighter; padding-top:0.5em">'\
-                '<a href="https://github.com/easytarget/pi-overwatch" title="Project homepage on GitHub" target="_blank">'\
-                'OverWatch</a></div>\n', 'utf-8'))
+        ret = f'<div style="color:#666666; font-size: 90%; padding-top: 0.5em;">{timestamp}</div>'\
+                '<div style="color:#888888; font-size: 66%; font-weight: lighter; padding-top:0.5em">'\
+                '<a href="https://github.com/easytarget/pi-overwatch"'\
+                'title="Project homepage on GitHub" target="_blank">'\
+                'OverWatch</a></div>\n'
+        return ret
 
     def _give_env(self):
         # Environmental sensor
@@ -142,7 +144,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             ret = '<tr><th>GPIO</th></tr>\n'
             for sense,name in PINLIST.items():
                 ret += f'<tr><td>{name}:</td><td>{http.s.pin_states[bool(http.data[sense])]}</td></tr>\n'
-            self.wfile.write(bytes(ret, 'utf-8'))
+        return ret
 
     def _give_graphlinks(self, skip=""):
         if len(skip) == 0:
@@ -180,15 +182,17 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # There is doubtless a more 'python' way to do this, but it is fast, cheap and works..
         log_command = f"for a in `ls -tr {http.s.log_file}*`;do cat $a ; done | tail -{lines}"
         log = subprocess.check_output(log_command, shell=True).decode('utf-8')
-        self.wfile.write(bytes('<div style="overflow-x: auto; width: 100%;">\n', 'utf-8'))
-        self.wfile.write(bytes('<span style="font-size: 110%; font-weight: bold;">Recent log activity:</span>\n', 'utf-8'))
-        self.wfile.write(bytes(f'<hr><pre>\n{log}</pre><hr>\n', 'utf-8'))
-        self.wfile.write(bytes(f'<span style="font-size: 80%;">Latest {lines} lines shown</span>\n', 'utf-8'))
-        self.wfile.write(bytes('</div>\n', 'utf-8'))
-        self.wfile.write(bytes('<div><a href="./?view=deco&view=log&lines=25" title="show 25 lines">25</a>&nbsp;:', 'utf-8'))
-        self.wfile.write(bytes('&nbsp;<a href="./?view=deco&view=log&lines=250" title="show 250 lines">250</a>&nbsp;:', 'utf-8'))
-        self.wfile.write(bytes('&nbsp;<a href="./?view=deco&view=log&lines=2500" title="show 2500 lines">2500</a>&nbsp;:', 'utf-8'))
-        self.wfile.write(bytes('&nbsp;<a href="./" title="Main page">Home</a></div>\n', 'utf-8'))
+        ret = f'''
+            <div style="overflow-x: auto; width: 100%;">\n
+            <span style="font-size: 110%; font-weight: bold;">Recent log activity:</span>
+            <hr><pre>\n{log}</pre><hr>
+            <span style="font-size: 80%;">Latest {lines} lines shown</span>\n
+            </div>\n
+            <div><a href="./?view=deco&view=log&lines=25" title="show 25 lines">25</a>&nbsp;:
+            &nbsp;<a href="./?view=deco&view=log&lines=250" title="show 250 lines">250</a>&nbsp;:
+            &nbsp;<a href="./?view=deco&view=log&lines=2500" title="show 2500 lines">2500</a>&nbsp;:
+            &nbsp;<a href="./" title="Main page">Home</a></div>\n'''
+        return ret
 
     def _give_graphs(self, duration):
         self.wfile.write(bytes('<table>\n', 'utf-8'))
@@ -204,6 +208,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         # Process requests and parse their options
         if urlparse(self.path).path == '/graph':
+            # Individual Graph
             parsed_graph = parse_qs(urlparse(self.path).query).get('graph', None)
             parsed_duration = parse_qs(urlparse(self.path).query).get('duration', None)
             if not parsed_graph:
@@ -220,26 +225,28 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._set_png_headers()
             self.wfile.write(body)
         elif urlparse(self.path).path == '/graphs':
+            # Graph Index Page
             parsed = parse_qs(urlparse(self.path).query).get('duration', None)
             if not parsed:
                 duration = "1d"
             else:
                 duration = parsed[0]
-            # logging.info(f'Graph Page (-{duration} -> now) requested by: {self.client_address[0]}')
             self._set_headers()
             self._give_head(f" :: graphs -{duration}")
             self.wfile.write(bytes(f'<h2>{http.s.server_name}</h2>', 'utf-8'))
             self._give_graphs(duration)
-            self._give_datetime()
+            self.wfile.write(bytes(self._give_datetime(), 'utf-8'))
             self._give_foot(refresh=300)
         elif ((urlparse(self.path).path == '/' + http.s.button_url)
                 and (len(http.s.button_url) > 0)
                 and (len(http.s.pin_map.keys()) > 0)):
+            # Web Button
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
             if parsed:
                 action = parsed[0]
             elif urlparse(self.path).query:
-                self.send_error(404, 'Unknown Parameters', 'This URL takes a single parameter: "?state=<new state>"')
+                self.send_error(404, 'Unknown Parameters',
+                        'This URL takes a single parameter: "?state=<new state>"')
                 return
             else:
                 action = 'toggle'
@@ -249,9 +256,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._give_head(f" :: {next(iter(http.s.pin_map))}")
             self.wfile.write(bytes(f'<h2>{state}</h2>\n', 'utf-8'))
             self.wfile.write(bytes('<div><a href="./" title="Main page">Home</a></div>\n', 'utf-8'))
-            self._give_datetime()
+            self.wfile.write(bytes(self._give_datetime(), 'utf-8'))
             self._give_foot()
         elif urlparse(self.path).path == '/':
+            # Main Page
             view = parse_qs(urlparse(self.path).query).get('view', None)
             if not view:
                 view = ["deco", "env", "sys", "gpio", "links"]
@@ -265,18 +273,18 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             if "sys" in view:
                 self._give_sys()
             if "gpio" in view:
-                self._give_pins()
+                self.wfile.write(bytes(self._give_pins(), 'utf-8'))
             if "links" in view:
                 self._give_links()
             self.wfile.write(bytes('</table>\n', 'utf-8'))
             if "log" in view:
-                self._give_log()
+                self.wfile.write(bytes(self._give_log(), 'utf-8'))
                 if "deco" in view:
-                    self._give_datetime()
+                    self.wfile.write(bytes(self._give_datetime(), 'utf-8'))
                 self._give_foot(refresh = 60, scroll = True)
             else:
                 if "deco" in view:
-                    self._give_datetime()
+                    self.wfile.write(bytes(self._give_datetime(), 'utf-8'))
                 self._give_foot(refresh = 60)
         else:
             self.send_error(404, 'No Such Page', 'This site serves pages at "/" and "/graphs"')
