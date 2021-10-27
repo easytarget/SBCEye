@@ -1,43 +1,41 @@
 import time
-import logging
 
 class Saver:
-    # Current screensaver state
-    active = False
+    active = False  # Current state
 
-    def __init__(self, s, disp):
+    def __init__(self, settings, disp):
         self.disp = disp
-        self.mode = s.saver_mode
-        self.invert = s.display_invert
+        self.mode = settings.saver_mode
+        self.invert = settings.display_invert
         if self.mode != 'off':
-            print('Saver will ' + self.mode + ' display between: ' +
-                str(s.saver_on) + ':00 and ' + str(s.saver_off) + ':00')
-            if (s.saver_on == s.saver_off) or \
-               (s.saver_on < 0) or (s.saver_on > 23) or (s.saver_off < 0) or (s.saver_off > 23):
-                logging.warning("Saver start/end times are identical or out of range; disabling")
-                print("Disabling saver due to invalid time settings")
+            print(f'Saver will {self.mode} display between: '\
+                    f'{settings.saver_on}:00 and {settings.saver_off}:00')
+            if (settings.saver_on == settings.saver_off)\
+                    or settings.saver_on not in range(0,23)\
+                    or settings.saver_off not in range(0,23):
+                print('start/end times identical or out of range; disabling')
                 self.mode = 'off'
-            elif s.saver_on < s.saver_off:
+            elif settings.saver_on < settings.saver_off:
                 self.saver_map = [False]*24
-                for i in range(s.saver_on, s.saver_off):
+                for i in range(settings.saver_on, settings.saver_off):
                     self.saver_map[i] = True
             else:
                 self.saver_map = [True]*24
-                for i in range(s.saver_off, s.saver_on):
+                for i in range(settings.saver_off, settings.saver_on):
                     self.saver_map[i] = False
 
 
     def _apply_state(self, state):
         if state:
             self.active = True
-            print("Saver activated")
+            print('Saver activated')
             if self.mode == 'invert':
                 self.disp.invert(not self.invert)
             elif self.mode == 'blank':
                 self.disp.poweroff()
         else:
             self.active = False
-            print("Saver deactivated")
+            print('Saver deactivated')
             if self.mode == 'invert':
                 self.disp.invert(self.invert)
             elif self.mode == 'blank':
