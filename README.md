@@ -35,7 +35,7 @@ Embeddable Panels and Standalone Graphs
 ![Web](/docs/workshop-humi-graph.png)
 
 ## Requires:
-* [Python3.6+](https://www.python.org/), [pip](https://pypi.org/project/pip/) and [virtualenv](https://pypi.org/project/virtualenv/)
+* [Python3.7+](https://www.python.org/), [pip](https://pypi.org/project/pip/) and [virtualenv](https://pypi.org/project/virtualenv/)
 
 The [install guide](VENV.md) covers installing these, and the rest of the requirements:
 * [Schedule](https://github.com/dbader/schedule)

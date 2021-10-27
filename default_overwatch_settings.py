@@ -30,24 +30,29 @@ class Settings:
     # - List entries consist of ['Name', BCM Pin Number]
     # - The state will be read from the pins at startup and used to track changes
     # - An empty list disables the GPIO features
-    # - Example: pin_map = [['Lamp', 16], ['Printer', 20], ['Enclosure', 21]]
+    # - Example: pin_map = {"Lamp": 16,
+    #                       "Printer": 20,
+    #                       "Enclosure": 21,
+    #                        }
 
-    pin_map = []
+    pin_map = {}
 
     # Button pin (set to `0` to disable button)
-    # Wnen enabled will always control the 1st entry in the pin list
+    # When enabled will always control the 1st entry in the pin list
     button_pin = 0                # BCM Pin Number
 
     # Web UI
     host = ''                     # Ip address to bind web server to, '' =  bind to all addresses
     port = 7080                   # Port number for web server
-    button_path = ''              # Web button url path, leave blank to disable
+    button_url = ''              # Web button url path, leave blank to disable
+    sensor_name = 'Room'          # Sensor name (eg; location)
+    pin_states = ('Off','On')         # Localisation for pin state (False,True)
 
     # Sensor reading update frequency
     sensor_interval = 2           # Seconds
 
     # Logging
-    log_file_path = './logs/'        # Folder must be writable by the OverWatch process
+    log_file_dir = './logs'        # Folder must be writable by the OverWatch process
     log_file_name = 'overwatch.log'
     log_interval = 600               # Environmental and system log dump interval (seconds, zero to disable)
     log_file_count = 3               # Maximum number of old logfiles to retain
@@ -57,14 +62,13 @@ class Settings:
 
     # Location for RRD database files (folder must be writable by overwatch process)
     rrd_update_interval = 15
-    rrd_file_store = './DB'
-    rrd_file_path = './DB/'
+    rrd_file_dir = './DB'
     rrd_file_name = 'overwatch.rrd'
-    rrd_cache_socket = './DB/rrdcache.sock'
+    rrd_cache_socket = f'{rrd_file_dir}/rrdcache.sock'
 
     # Default graph durations
     # See https://oss.oetiker.ch/rrdtool/doc/rrdfetch.en.html#TIME%20OFFSET%20SPECIFICATION
-    default_graphs = ['3h','1d','3d','1w','1m','3m','1y','3y']
+    graph_durations = ['3h','1d','3d','1w','1m','3m','1y','3y']
     graph_wide = 1200  # Pixels
     graph_high = 300   # GPIO pin on/off graphs are 1/2 this height
     # Other graph attributes, see: https://oss.oetiker.ch/rrdtool/doc/rrdgraph_graph.en.html
