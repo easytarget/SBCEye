@@ -18,7 +18,7 @@ from robin import Robin, get_period
 def serve_http(s, rrd, data, button_control):
     # Spawns a http.server.HTTPServer in a separate thread on the given port.
     handler = _BaseRequestHandler
-    httpd = http.server.HTTPServer((s.host, s.port), handler, False)
+    httpd = http.server.HTTPServer((s.web_host, s.web_port), handler, False)
     # Block only for 0.5 seconds max
     httpd.timeout = 0.5
     # HTTPServer sets this as well (left here to make obvious).
@@ -30,7 +30,7 @@ def serve_http(s, rrd, data, button_control):
     http.data = data
     http.button_control = button_control
     # Start the server
-    _threadlog(f"HTTP server will bind to port {str(s.port)} on host {s.host}")
+    _threadlog(f"HTTP server will bind to port {str(s.web_port)} on host {s.web_host}")
     httpd.server_bind()
     address = f"http://{httpd.server_name}:{httpd.server_port}"
     _threadlog(f"Access via: {address}")
@@ -123,7 +123,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 }
         ret = ''
         if len(http.data.keys() & sensorlist.keys()) > 0:
-            ret += f'<tr><th>{http.s.sensor_name}</th></tr>\n'
+            ret += f'<tr><th>{http.s.web_sensor_name}</th></tr>\n'
             for sense,(name,fmt,suffix) in sensorlist.items():
                 if sense in http.data.keys():
                     ret += f'<tr><td>{name}: </td><td>{http.data[sense]:{fmt}}{suffix}</td></tr>\n'
@@ -155,7 +155,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             ret += '<tr><th>GPIO</th></tr>\n'
             for sense,name in pinlist.items():
                 ret += f'<tr><td>{name}:</td><td>'\
-                       f'{http.s.pin_states[bool(http.data[sense])]}</td></tr>\n'
+                       f'{http.s.web_pin_states[bool(http.data[sense])]}</td></tr>\n'
         return ret
 
     def _give_graphlinks(self, skip=""):
@@ -302,7 +302,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._set_headers()
             response = self._give_head(f" :: {name}")
             response += f'<h2>{status}</h2>\n'
-            invert_state = http.s.pin_states[not state]
+            invert_state = http.s.web_pin_states[not state]
             response += f'''<div>
                     <a href="./{http.s.button_url}?state={invert_state}"
                     title = "Switch {name} {invert_state}">

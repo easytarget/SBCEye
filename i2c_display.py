@@ -74,7 +74,7 @@ class Screen:
 
     # Put a specific area of the canvas onto display
     def _show(xpos=0):
-        if settings.rotate_display:
+        if settings.display_rotate:
             disp.image(image.transform((width,height),
                        Image.EXTENT,(xpos,0,xpos+width,height))
                        .transpose(Image.ROTATE_180))
@@ -84,7 +84,7 @@ class Screen:
         disp.show()
 
     # Slide the display view across the canvas to animate between screens
-    def _slideout(step=settings.slidespeed):
+    def _slideout(step=settings.animate_speed):
         x_pos = 0
         while x_pos < width + margin:
             show(x_pos)
@@ -124,34 +124,34 @@ class Screen:
             if HAVE_SCREEN:
                 if HAVE_SENSOR:
                     # Environment Screen
-                    for this_passp in range(settings.passes):
+                    for this_passp in range(settings.animate_passes):
                         clean()
                         bme_screen()
                         show()
-                        scheduler_servicer(settings.passtime)
+                        scheduler_servicer(settings.animate_passtime)
                     # Update and transition to system screen
                     bme_screen()
                     sys_screen(width+margin)
                     slideout()
-                    scheduler_servicer(settings.passtime)
+                    scheduler_servicer(settings.animate_passtime)
                     # System screen
-                    for this_pass in range(settings.passes):
+                    for this_pass in range(settings.animate_passes):
                         clean()
                         sys_screen()
                         show()
-                        scheduler_servicer(settings.passtime)
+                        scheduler_servicer(settings.animate_passtime)
                     # Update and transition back to environment screen
                     sys_screen()
                     bme_screen(width+margin)
                     slideout()
-                    scheduler_servicer(settings.passtime)
+                    scheduler_servicer(settings.animate_passtime)
                 else:
                     # Just loop refreshing the system screen
-                    for i in range(settings.passes):
+                    for i in range(settings.animate_passes):
                         clean()
                         sys_screen()
                         show()
-                        scheduler_servicer(settings.passtime)
+                        scheduler_servicer(settings.animate_passtime)
             else:
                 # No screen, so just run schedule jobs in a loop
                 scheduler_servicer()

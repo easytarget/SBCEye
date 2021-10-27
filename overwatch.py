@@ -36,7 +36,7 @@ import psutil
 import schedule
 
 # Local classes
-from settings import Settings
+from load_config import Settings
 from saver import Saver
 from robin import Robin
 from httpserver import serve_http
@@ -64,14 +64,15 @@ if args.datadir:
     data_dir = Path(args.datadir)
     if data_dir.is_dir():
         os.chdir(data_dir)
-        print(f'Data_dir is: {data_dir}')
     else:
         print(f"Data_dir specified on commandline '{args.datadir}' not found; ignoring")
+
+print(f"Working directory: {os.getcwd()}")
 
 if args.config:
     config_file = Path(args.config).resolve()
     if config_file.is_file():
-        print(f'Using configuration from {config_file}')
+        print(f'Using user configuration from {config_file}')
     else:
         print(f"Specified configuration file '{config_file}' not found, Exiting.")
         sys.exit()
@@ -80,15 +81,13 @@ else:
     if config_file.is_file():
         print(f'Using configuration from {config_file}')
     else:
-        config_file = Path('default_config.ini').resolve()
+        config_file = Path('defaults.ini').resolve()
         if config_file.is_file():
             print(f'Using default configuration from {config_file}')
         else:
-            print('Cannot find configuration file, exiting')
+            print('Cannot find a configuration file, exiting')
             sys.exit()
 
-print(f'Config file: (NOT YET FULLY IMPLEMENTED) {config_file}')
-print(f"Working directory = {os.getcwd()}")
 settings = Settings(config_file)
 
 HAVE_SCREEN = settings.have_screen
@@ -120,7 +119,7 @@ if HAVE_SENSOR:
         import adafruit_bme280
     except Exception as e:
         print(e)
-        print("BME280 ienvironment sensor requirements not met")
+        print("BME280 environment sensor requirements not met")
         HAVE_SENSOR = False
 
 # GPIO light control
@@ -144,9 +143,9 @@ print(f"Logging to: {settings.log_file}")
 handler = RotatingFileHandler(settings.log_file, maxBytes=settings.log_file_size, backupCount=settings.log_file_count)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt=settings.log_date_format, handlers=[handler])
 
-# Older scheduler versions sometimes log actions to 'INFO' not 'DEBUG', spewing debug into the log, sigh..
-schedule_logger = logging.getLogger('schedule') # For the scheduler..
-schedule_logger.setLevel(level=logging.WARN)    # ignore anything less severe than 'WARN'
+# Older scheduler versions can log debug to 'INFO' not 'DEBUG', ignore it.
+schedule_logger = logging.getLogger('schedule')
+schedule_logger.setLevel(level=logging.WARN)
 
 # Now we have logging, notify we are starting up
 logging.info('')
@@ -222,7 +221,7 @@ def clean():
 
 # Put a specific area of the canvas onto display
 def show(xpos=0):
-    if settings.rotate_display:
+    if settings.display_rotate:
         disp.image(image.transform((width,height),
                    Image.EXTENT,(xpos,0,xpos+width,height))
                    .transpose(Image.ROTATE_180))
@@ -232,7 +231,7 @@ def show(xpos=0):
     disp.show()
 
 # Slide the display view across the canvas to animate between screens
-def slideout(step=settings.slidespeed):
+def slideout(step=settings.animate_speed):
     x_pos = 0
     while x_pos < width + margin:
         show(x_pos)
@@ -268,15 +267,14 @@ def button_control(action="toggle"):
     if len(pin_map.keys()) > 0:
         name = next(iter(pin_map))
         pin = pin_map[name]
-        print(f'button_control: {action} on {name} [pin {pin}]')
         ret = f'{name} '
         if action.lower() in ['toggle','invert','button']:
             GPIO.output(pin, not GPIO.input(pin))
             ret += 'Toggled: '
-        elif action.lower() in [settings.pin_states[1].lower(),'on','true']:
+        elif action.lower() in [settings.web_pin_states[1].lower(),'on','true']:
             GPIO.output(pin,True)
             ret += 'Switched: '
-        elif action.lower() in [settings.pin_states[0].lower(),'off','false']:
+        elif action.lower() in [settings.web_pin_states[0].lower(),'off','false']:
             GPIO.output(pin,False)
             ret += 'Switched: '
         elif action.lower() in ['random','easter']:
@@ -285,7 +283,7 @@ def button_control(action="toggle"):
         else:
             ret += ': '
         state = GPIO.input(pin)
-        ret += settings.pin_states[state]
+        ret += settings.web_pin_states[state]
     else:
         name = ''
         state = False
@@ -295,12 +293,12 @@ def button_control(action="toggle"):
 def button_interrupt(*_):
     # give a short delay, then re-read input to provide a minimum hold-down time
     # and suppress false triggers from other gpio operations
-    time.sleep(0.1)
+    time.sleep(settings.button_hold)
     if GPIO.input(settings.button_pin):
         logging.info('Button pressed')
         button_control()
-    elif not settings.suppress_glitches:
-        logging.info('Button GLITCH')
+    else:
+        logging.info('Button glitch')
 
 def update_data():
     # Runs every few seconds to get current environmental and system data
@@ -318,7 +316,7 @@ def update_data():
         if this_pin_state != data[f"pin-{name}"]:
             # Pin has changed state, remember new state and log
             data[f'pin-{name}'] = this_pin_state
-            logging.info(f'{name}: {settings.pin_states[this_pin_state]}')
+            logging.info(f'{name}: {settings.web_pin_states[this_pin_state]}')
 
 def update_db():
     # Runs 3x per minute, updates RRD database and processes screensaver
@@ -408,7 +406,7 @@ if __name__ == '__main__':
     for name, pin in pin_map.items():
         GPIO.setup(pin, GPIO.OUT)
         data[f'pin-{name}'] = GPIO.input(pin)
-        logging.info(f'{name}: {settings.pin_states[data[f"pin-{name}"]]}')
+        logging.info(f'{name}: {settings.web_pin_states[data[f"pin-{name}"]]}')
     if any(key.startswith('pin-') for key in data):
         logging.info('GPIO monitoring configured and logging enabled')
     else:
@@ -453,34 +451,34 @@ if __name__ == '__main__':
         if HAVE_SCREEN:
             if HAVE_SENSOR:
                 # Environment Screen
-                for this_passp in range(settings.passes):
+                for this_passp in range(settings.animate_passes):
                     clean()
                     bme_screen()
                     show()
-                    scheduler_servicer(settings.passtime)
+                    scheduler_servicer(settings.animate_passtime)
                 # Update and transition to system screen
                 bme_screen()
                 sys_screen(width+margin)
                 slideout()
-                scheduler_servicer(settings.passtime)
+                scheduler_servicer(settings.animate_passtime)
                 # System screen
-                for this_pass in range(settings.passes):
+                for this_pass in range(settings.animate_passes):
                     clean()
                     sys_screen()
                     show()
-                    scheduler_servicer(settings.passtime)
+                    scheduler_servicer(settings.animate_passtime)
                 # Update and transition back to environment screen
                 sys_screen()
                 bme_screen(width+margin)
                 slideout()
-                scheduler_servicer(settings.passtime)
+                scheduler_servicer(settings.animate_passtime)
             else:
                 # Just loop refreshing the system screen
-                for i in range(settings.passes):
+                for i in range(settings.animate_passes):
                     clean()
                     sys_screen()
                     show()
-                    scheduler_servicer(settings.passtime)
+                    scheduler_servicer(settings.animate_passtime)
         else:
             # No screen, so just run schedule jobs in a loop
             scheduler_servicer()
