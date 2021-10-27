@@ -14,25 +14,25 @@ Written in Python as a learning excercise, it draws heavily on [RRDtool](https:/
 
 Default Web Interface
 
-![env](/docs/default-main.png)![env](/docs/default-graphs.png)
+![env](/images/default-main.png)![env](/images/default-graphs.png)
 
 Add a BME280 sensor and/or some GPIO pins to monitor
 
-![bme280](/docs/pihat-bme280-thumb.jpg)
-![Web](/docs/workshop-main.png)![Web](/docs/workshop-graphs.png)
+![bme280](/images/pihat-bme280-thumb.jpg)
+![Web](/images/workshop-main.png)![Web](/images/workshop-graphs.png)
 
 Add a 128x64 OLED display
 
-![env](/docs/pihat-env-thumb.jpg)![sys](/docs/pihat-sys-thumb.jpg)
+![env](/images/pihat-env-thumb.jpg)![sys](/images/pihat-sys-thumb.jpg)
 
 Log GPIO actions etc..
 
-![Web](/docs/workshop-log.png)
+![Web](/images/workshop-log.png)
 
 Embeddable Panels and Standalone Graphs
 
-![Web](/docs/workshop-sys-panel.png)
-![Web](/docs/workshop-humi-graph.png)
+![Web](/images/workshop-sys-panel.png)
+![Web](/images/workshop-humi-graph.png)
 
 ## Requires:
 * [Python3.7+](https://www.python.org/), [pip](https://pypi.org/project/pip/) and [virtualenv](https://pypi.org/project/virtualenv/)
@@ -56,7 +56,7 @@ The sensor, display and GPIO control is all optional. The unit itself can only c
 * GPIO outputs controlling lights etc; opto-isolated relay boards are your friend here.
 * Button goes to a spare GPIO with a pulldown resistor
 
-![schematic](/docs/OverWatch-hardware-small.png)
+![schematic](/images/OverWatch-hardware-small.png)
 
 ### Docs for CP libs:
 https://circuitpython.readthedocs.io/en/latest/shared-bindings/index.html

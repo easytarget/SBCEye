@@ -21,7 +21,7 @@ class Settings:
     sensor_interval = 2           # Seconds
 
     # Logging
-    log_file_dir = './logs'        # Folder must be writable by the OverWatch process
+    log_file_dir = './data'        # Folder must be writable by the OverWatch process
     log_file_name = 'overwatch.log'
     log_interval = 600               # Environmental and system log dump interval (seconds, zero to disable)
     log_file_count = 3               # Maximum number of old logfiles to retain
@@ -31,7 +31,7 @@ class Settings:
 
     # Location for RRD database files (folder must be writable by overwatch process)
     rrd_update_interval = 15
-    rrd_file_dir = './DB'
+    rrd_file_dir = './data'
     rrd_file_name = 'overwatch.rrd'
     rrd_cache_socket = f'{rrd_file_dir}/rrdcache.sock'
 

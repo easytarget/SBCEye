@@ -17,8 +17,8 @@
 # bme280 I2C address should be 0x76 or 0x77 (this is selectable via a jumper) and we will search for it there
 # The SSD1306 I2C address should be automagically found; the driver will bind to the first matching display
 
-# Default settings are in the file 'settings_default.py'
-# Copy this to 'settings.py' and edit as appropriate
+# Default settings are in the file 'default_config.ini'
+# Copy this to 'config.ini' and edit as appropriate
 
 # Some general functions we will use
 import os
