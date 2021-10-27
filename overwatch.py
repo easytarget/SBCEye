@@ -36,9 +36,11 @@ import psutil
 import schedule
 
 # Local classes
+from settings import Settings
 from saver import Saver
 from robin import Robin
 from httpserver import serve_http
+#from i2c_display import Screen
 
 # Parse the arguments
 parser = argparse.ArgumentParser(
@@ -87,14 +89,7 @@ else:
 
 print(f'Config file: (NOT YET FULLY IMPLEMENTED) {config_file}')
 print(f"Working directory = {os.getcwd()}")
-
-try:
-    from overwatch_settings import Settings as s
-    print("Loaded settings from 'overwatch_settings.py'")
-except ModuleNotFoundError:
-    print("No user settings found in data directory or PYTHON_PATH, loading from 'default_overwatch_settings.py'")
-    from default_overwatch_settings import Settings as s
-
+s = Settings(config_file)
 
 HAVE_SCREEN = s.have_screen
 HAVE_SENSOR = s.have_sensor
@@ -129,15 +124,13 @@ if HAVE_SENSOR:
         HAVE_SENSOR = False
 
 # GPIO light control
+pin_map = s.pin_map
 try:
     from RPi import GPIO
-    pin_map = s.pin_map
 except Exception as e:
     print(e)
     print("GPIO monitorig requirements not met")
     pin_map.clear()
-
-print(pin_map)
 
 # Imports and settings should be OK now, let the console know we are starting
 print("Starting OverWatch")
