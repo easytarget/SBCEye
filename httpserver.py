@@ -146,18 +146,20 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _give_pins(self):
         # GPIO states
+        ret = ''
         pinlist = {}
         for key in http.data.keys():
             if key[0:4] == 'pin-':
                 pinlist[key] = key[4:]
         if len(http.data.keys() & pinlist.keys()) > 0:
-            ret = '<tr><th>GPIO</th></tr>\n'
+            ret += '<tr><th>GPIO</th></tr>\n'
             for sense,name in pinlist.items():
                 ret += f'<tr><td>{name}:</td><td>'\
                        f'{http.s.pin_states[bool(http.data[sense])]}</td></tr>\n'
         return ret
 
     def _give_graphlinks(self, skip=""):
+        # A list of available graph pages
         ret = ''
         skip = skip.lstrip('-')
         if len(http.s.graph_durations) > 0:
@@ -177,6 +179,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         return ret
 
     def _give_links(self):
+        # Currently just a link to the log
         return f'''{self._give_graphlinks()}
                 <tr>
                 <td colspan="2" style="text-align: center;">
@@ -186,6 +189,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 </tr>'''
 
     def _give_log(self, lines=100):
+        # Combine and give last (lines) lines of log
         parsed_lines = parse_qs(urlparse(self.path).query).get('lines', None)
         if isinstance(parsed_lines, list):
             lines = parsed_lines[0]
