@@ -273,10 +273,10 @@ def button_control(action="toggle"):
         if action.lower() in ['toggle','invert','button']:
             GPIO.output(pin, not GPIO.input(pin))
             ret += 'Toggled: '
-        elif action.lower() in [s.pin_states[1].lower(),'on','true']:
+        elif action.lower() in [settings.pin_states[1].lower(),'on','true']:
             GPIO.output(pin,True)
             ret += 'Switched: '
-        elif action.lower() in [s.pin_states[0].lower(),'off','false']:
+        elif action.lower() in [settings.pin_states[0].lower(),'off','false']:
             GPIO.output(pin,False)
             ret += 'Switched: '
         elif action.lower() in ['random','easter']:
