@@ -88,6 +88,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <body>'''
 
     def _give_foot(self, scroll = False, refresh = 0):
+        # DEBUG: f'<pre style="color:#888888">GET: {self.path} from: {self.client_address[0]}</pre>\n'
         ret = '''</body>\n
                 <script>\n'''
         if scroll:
@@ -194,7 +195,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 lines = int(lines)
             except ValueError:
                 lines = int(100)
-        lines = max(1, min(lines, 100000))
+        lines = max(1, min(lines, 250000))
         # Use a shell one-liner used to extract the last {lines} of data from the logs
         # There is doubtless a more 'python' way to do this, but it is fast, cheap and works..
         log_command = f"for a in `ls -tr {http.s.log_file}*`;do cat $a ; done | tail -{lines}"
