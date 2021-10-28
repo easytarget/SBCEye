@@ -298,7 +298,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             else:
                 action = 'status'
                 timeout = 60
-            if not action == 'status'
+            if not action == 'status':
                 logging.info(f'Web button triggered by: {self.client_address[0]}'\
                             f' with action: {action}')
             status, state, name = http.button_control(action)
