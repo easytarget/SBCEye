@@ -66,9 +66,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def _give_head(self, title_extra=""):
-        title = http.s.server_name
+        title = http.s.name
         if len(title_extra) > 0:
-            title = f"{http.s.server_name}{title_extra}"
+            title = f"{http.s.name}{title_extra}"
         return f'''
                 <!DOCTYPE html>
                 <html>
@@ -278,7 +278,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             period = get_period(start, end)
             self._set_headers()
             response = self._give_head(f" :: graphs {period}")
-            response += f'<h2>{http.s.server_name}</h2>'
+            response += f'<h2>{http.s.name}</h2>'
             response += self._give_graphs(start, end, period)
             response += self._give_datetime()
             response += self._give_foot(refresh=300)
@@ -321,7 +321,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._set_headers()
             response = self._give_head()
             if "deco" in view:
-                response += f'<h2>{http.s.server_name}</h2>\n'
+                response += f'<h2>{http.s.name}</h2>\n'
             response += '<table>\n'
             if "env" in view:
                 response += self._give_env()

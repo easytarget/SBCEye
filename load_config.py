@@ -14,7 +14,7 @@ class Settings:
         # Set attributes from .ini file
 
         general = config["general"]
-        self.server_name = general["server_name"]
+        self.name = general["name"]
         self.time_format = general["time_format"]
         self.have_sensor = bool(general["sensor"])
         self.have_screen = bool(general["screen"])
@@ -40,7 +40,10 @@ class Settings:
         self.graph_high = int(graph["high"])
         self.graph_line = graph["line"]
         self.graph_area = graph["area"]
-        self.graph_comment = graph["comment"]
+        self.graph_comment_l = graph["comment_l"].replace(':','\:')
+        self.graph_comment_r = graph["comment_r"].replace(':','\:')
+        if not self.graph_comment_l and self.graph_comment_r:
+            self.graph_comment_l = " "
 
         sensor = config["sensor"]
         self.sensor_interval = int(sensor["interval"])

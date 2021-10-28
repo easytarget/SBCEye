@@ -16,15 +16,17 @@ def get_period(start, end):
 class Robin:
     def __init__(self, s, data):
         self.graph_args = {}
-        self.graph_args['server_name'] = s.server_name
+        self.graph_args['name'] = s.name
         self.graph_args['time_format'] = s.time_format
         self.graph_args['wide'] = s.graph_wide
         self.graph_args['high'] = s.graph_high
         self.graph_args['style'] = [s.graph_line]
         if s.graph_area:
             self.graph_args['style'].insert(0, s.graph_area)
-        if s.graph_comment:
-            self.graph_args['style'].append(f'COMMENT: {s.graph_comment}')
+        if s.graph_comment_l:
+            self.graph_args['style'].append(f'COMMENT: {s.graph_comment_l}')
+        if s.graph_comment_r:
+            self.graph_args['style'].append(f'COMMENT: {s.graph_comment_r}')
 
         # Sensor and system sources with limits (min,max)
         self.data_sources = {
@@ -122,7 +124,7 @@ class Robin:
                 rrd_args = ["--full-size-mode",
                             "--start", start,
                             "--end", end,
-                            "--watermark", f'{self.graph_args["server_name"]} :: {timestamp}',
+                            "--watermark", f'{self.graph_args["name"]} :: {timestamp}',
                             "--width", str(self.graph_args["wide"])
                             ]
                 if graph[:4] == 'pin-':
