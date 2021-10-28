@@ -137,11 +137,13 @@ class Robin:
                     rrd_args.extend(["--units-exponent", params[4]])
                 rrd_args.extend([f'DEF:data={str(self.db_file)}:{graph}:AVERAGE',
                                  *self.graph_args["style"]])
+                print(rrd_args)
                 try:
                     rrdtool.graph(
                             temp_file.name,
                             *rrd_args)
                 except Exception as rrd_error:
+                    print("RRDTool graph error:")
                     print(rrd_error)
                 response = temp_file.read()
                 if len(response) == 0:
