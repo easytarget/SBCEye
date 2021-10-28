@@ -98,8 +98,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                     }
                     window.onload = down;'''
         if refresh > 0:
-            ret += 'setTimeout(function(){{location.replace(document.URL);}},'\
-                    '{str(refresh*1000)});\n'
+            ret += f'setTimeout(function(){{location.replace(document.URL);}}, '\
+                    f'{str(refresh*1000)});\n'
         ret += '''</script>
                 </html>'''
         return ret
@@ -288,6 +288,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 and (len(http.s.pin_map.keys()) > 0)):
             # Web Button
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
+            timeout = 0
             if parsed:
                 action = parsed[0]
             elif urlparse(self.path).query:
@@ -296,8 +297,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 return
             else:
                 action = 'status'
-            logging.info(f'Web button triggered by: {self.client_address[0]}'\
-                    f' with action: {action}')
+                timeout = 60
+            if not action == 'status'
+                logging.info(f'Web button triggered by: {self.client_address[0]}'\
+                            f' with action: {action}')
             status, state, name = http.button_control(action)
             self._set_headers()
             response = self._give_head(f" :: {name}")
@@ -311,7 +314,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += '<div style="padding-top: 1em;">\n'\
                     '<a href="./" title="Main page">Home</a></div>\n'
             response += self._give_datetime()
-            response += self._give_foot()
+            response += self._give_foot(refresh = timeout)
             self._write_dedented(response)
         elif urlparse(self.path).path == '/':
             # Main Page

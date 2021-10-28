@@ -139,7 +139,6 @@ class Robin:
                     rrd_args.extend(["--units-exponent", params[4]])
                 rrd_args.extend([f'DEF:data={str(self.db_file)}:{graph}:AVERAGE',
                                  *self.graph_args["style"]])
-                print(rrd_args)
                 try:
                     rrdtool.graph(
                             temp_file.name,
