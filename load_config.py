@@ -14,67 +14,67 @@ class Settings:
         # Set attributes from .ini file
 
         general = config["general"]
-        self.name = general["name"]
-        self.time_format = general["time_format"]
-        self.have_sensor = bool(general["sensor"])
-        self.have_screen = bool(general["screen"])
+        self.name = general.get("name")
+        self.time_format = general.get("time_format")
+        self.have_sensor = general.getboolean("sensor")
+        self.have_screen = general.getboolean("screen")
 
         self.pin_map = {}
         for key in config["pins"]:
-            self.pin_map[key] = int(config["pins"][key])
+            self.pin_map[key] = config.getint("pins",key)
 
         button = config["button"]
-        self.button_pin = int(button["pin"])
-        self.button_url = button["url"]
-        self.button_hold = float(button["hold"])
+        self.button_pin = button.getint("pin")
+        self.button_url = button.get("url")
+        self.button_hold = button.getfloat("hold")
 
         web = config["web"]
-        self.web_host = web["host"]
-        self.web_port = int(web["port"])
-        self.web_sensor_name = web["sensor_name"]
-        self.web_pin_states = tuple(web["pin_states"].split(','))
+        self.web_host = web.get("host")
+        self.web_port = web.getint("port")
+        self.web_sensor_name = web.get("sensor_name")
+        self.web_pin_states = tuple(web.get("pin_states").split(','))
 
         graph = config["graph"]
-        self.graph_durations = graph["durations"].split(',')
-        self.graph_wide = int(graph["wide"])
-        self.graph_high = int(graph["high"])
-        self.graph_line = graph["line"]
-        self.graph_area = graph["area"]
-        self.graph_comment_l = graph["comment_l"].replace(':','\:')
-        self.graph_comment_r = graph["comment_r"].replace(':','\:')
+        self.graph_durations = graph.get("durations").split(',')
+        self.graph_wide = graph.getint("wide")
+        self.graph_high = graph.getint("high")
+        self.graph_line = graph.get("line")
+        self.graph_area = graph.get("area")
+        self.graph_comment_l = graph.get("comment_l").replace(':','\:')
+        self.graph_comment_r = graph.get("comment_r").replace(':','\:')
         if not self.graph_comment_l and self.graph_comment_r:
             self.graph_comment_l = " "
 
         sensor = config["sensor"]
-        self.sensor_interval = int(sensor["interval"])
+        self.sensor_interval = sensor.getint("interval")
 
         log = config["log"]
-        self.log_file_dir = log["file_dir"]
-        self.log_file_name = log["file_name"]
-        self.log_interval = int(log["interval"])
-        self.log_file_count = int(log["file_count"])
-        self.log_file_size = int(log["file_size"]) * 1024
-        self.log_date_format = log["date_format"]
+        self.log_file_dir = log.get("file_dir")
+        self.log_file_name = log.get("file_name")
+        self.log_interval = log.getint("interval")
+        self.log_file_count = log.getint("file_count")
+        self.log_file_size = log.getint("file_size") * 1024
+        self.log_date_format = log.get("date_format")
 
         rrd = config["rrd"]
-        self.rrd_update_interval = int(rrd["update_interval"])
-        self.rrd_file_dir = rrd["file_dir"]
-        self.rrd_file_name = rrd["file_name"]
-        self.rrd_cache_socket = rrd["cache_socket"]
+        self.rrd_update_interval = rrd.getint("update_interval")
+        self.rrd_file_dir = rrd.get("file_dir")
+        self.rrd_file_name = rrd.get("file_name")
+        self.rrd_cache_socket = rrd.get("cache_socket")
 
         display = config["display"]
-        self.display_rotate = bool(display["rotate"])
-        self.display_contrast = int(display["contrast"])
-        self.display_invert = bool(display["invert"])
+        self.display_rotate = display.getboolean("rotate")
+        self.display_contrast = display.getint("contrast")
+        self.display_invert = display.getboolean("invert")
 
         saver = config["saver"]
-        self.saver_mode = saver["mode"]
-        self.saver_on = int(saver["on"])
-        self.saver_off = int(saver["off"])
+        self.saver_mode = saver.get("mode")
+        self.saver_on = saver.getint("on")
+        self.saver_off = saver.getint("off")
 
         animate = config["animate"]
-        self.animate_passtime = int(animate["passtime"])
-        self.animate_passes = int(animate["passes"])
-        self.animate_speed = int(animate["speed"])
+        self.animate_passtime = animate.getint("passtime")
+        self.animate_passes = animate.getint("passes")
+        self.animate_speed = animate.getint("speed")
 
         print(f"Settings loaded from configuration file successfully")
