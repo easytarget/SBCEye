@@ -310,6 +310,7 @@ def update_data():
     data['sys-load'] = psutil.getloadavg()[0]
     data['sys-mem'] = psutil.virtual_memory().percent
 
+def update_pins():
     # Check if any pins have changed state, and log
     for name, pin in pin_map.items():
         this_pin_state =  GPIO.input(pin)
@@ -435,8 +436,10 @@ if __name__ == '__main__':
     logging.info("Init complete, starting schedule and entering main loop")
 
     # Schedule sensor readings, database updates and logging events
-    schedule.every(settings.sensor_interval).seconds.do(update_data)
-    schedule.every(settings.rrd_update_interval).seconds.do(update_db)
+    if (len(pin_map.keys()) > 0):
+        schedule.every(settings.pin_interval).seconds.do(update_pins)
+    schedule.every(settings.data_interval).seconds.do(update_data)
+    schedule.every(settings.rrd_interval).seconds.do(update_db)
     if settings.log_interval > 0:
         schedule.every(settings.log_interval).seconds.do(log_sensors)
 

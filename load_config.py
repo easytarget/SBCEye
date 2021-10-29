@@ -19,15 +19,6 @@ class Settings:
         self.have_sensor = general.getboolean("sensor")
         self.have_screen = general.getboolean("screen")
 
-        self.pin_map = {}
-        for key in config["pins"]:
-            self.pin_map[key] = config.getint("pins",key)
-
-        button = config["button"]
-        self.button_pin = button.getint("pin")
-        self.button_url = button.get("url")
-        self.button_hold = button.getfloat("hold")
-
         web = config["web"]
         self.web_host = web.get("host")
         self.web_port = web.getint("port")
@@ -45,19 +36,29 @@ class Settings:
         if not self.graph_comment_l and self.graph_comment_r:
             self.graph_comment_l = " "
 
-        sensor = config["sensor"]
-        self.sensor_interval = sensor.getint("interval")
+        self.pin_map = {}
+        for key in config["pins"]:
+            self.pin_map[key] = config.getint("pins",key)
+
+        button = config["button"]
+        self.button_pin = button.getint("pin")
+        self.button_url = button.get("url")
+        self.button_hold = button.getfloat("hold")
+
+        interval = config["interval"]
+        self.pin_interval = interval.getint("pin")
+        self.data_interval = interval.getint("data")
+        self.rrd_interval = interval.getint("rrd")
+        self.log_interval = interval.getint("log")
 
         log = config["log"]
         self.log_file_dir = log.get("file_dir")
         self.log_file_name = log.get("file_name")
-        self.log_interval = log.getint("interval")
         self.log_file_count = log.getint("file_count")
         self.log_file_size = log.getint("file_size") * 1024
         self.log_date_format = log.get("date_format")
 
         rrd = config["rrd"]
-        self.rrd_update_interval = rrd.getint("update_interval")
         self.rrd_file_dir = rrd.get("file_dir")
         self.rrd_file_name = rrd.get("file_name")
         self.rrd_cache_socket = rrd.get("cache_socket")
