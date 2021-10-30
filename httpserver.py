@@ -15,7 +15,7 @@ import logging
 # RRD data
 from robin import Robin, get_period
 
-def serve_http(s, rrd, data, button_control):
+def serve_http(s, rrd, data, helpers):
     # Spawns a http.server.HTTPServer in a separate thread on the given port.
     handler = _BaseRequestHandler
     httpd = http.server.HTTPServer((s.web_host, s.web_port), handler, False)
@@ -28,7 +28,9 @@ def serve_http(s, rrd, data, button_control):
     http.s = s
     http.rrd = rrd
     http.data = data
-    http.button_control = button_control
+    http.button_control = helpers[0]
+    http.update_data = helpers[1]
+    http.update_pins = helpers[2]
     # Start the server
     _threadlog(f"HTTP server will bind to port {str(s.web_port)} on host {s.web_host}")
     httpd.server_bind()
@@ -87,19 +89,19 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 </head>
                 <body>'''
 
-    def _give_foot(self, scroll = False, refresh = 0):
+    def _give_foot(self, refresh = 0, scroll = False):
         # DEBUG: f'<pre style="color:#888888">GET: {self.path} from: {self.client_address[0]}</pre>\n'
         ret = '''</body>\n
                 <script>\n'''
+        if refresh > 0:
+            ret += 'setTimeout(function(){location.replace(document.URL);}, '\
+                    f'{str(refresh*1000)});\n'
         if scroll:
             ret += '''function down() {
                         window.scrollTo(0,document.body.scrollHeight);
                         console.log("SCROLL" + document.body.scrollHeight);
                     }
                     window.onload = down;'''
-        if refresh > 0:
-            ret += f'setTimeout(function(){{location.replace(document.URL);}}, '\
-                    f'{str(refresh*1000)});\n'
         ret += '''</script>
                 </html>'''
         return ret
@@ -287,8 +289,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 and (len(http.s.button_url) > 0)
                 and (len(http.s.pin_map.keys()) > 0)):
             # Web Button
+            http.update_pins()
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
-            timeout = 0
             if parsed:
                 action = parsed[0]
             elif urlparse(self.path).query:
@@ -297,11 +299,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 return
             else:
                 action = 'status'
-                timeout = 60
-            if not action == 'status':
+            status, state, name = http.button_control(action)
+            if not status == f'{name} : {http.s.web_pin_states[state]}':
                 logging.info(f'Web button triggered by: {self.client_address[0]}'\
                             f' with action: {action}')
-            status, state, name = http.button_control(action)
             self._set_headers()
             response = self._give_head(f" :: {name}")
             response += f'<h2>{status}</h2>\n'
@@ -314,15 +315,20 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += '<div style="padding-top: 1em;">\n'\
                     '<a href="./" title="Main page">Home</a></div>\n'
             response += self._give_datetime()
-            response += self._give_foot(refresh = timeout)
+            response += '<script>\n'\
+                    'setTimeout(function(){location.replace(location.pathname);}, '\
+                    '60000);\n</script>\n'
+            response += self._give_foot()
             self._write_dedented(response)
         elif urlparse(self.path).path == '/':
             # Main Page
+            http.update_data()
             view = parse_qs(urlparse(self.path).query).get('view', None)
             if not view:
                 view = ["deco", "env", "sys", "gpio", "links"]
             self._set_headers()
             response = self._give_head()
+            scroll_page = False
             if "deco" in view:
                 response += f'<h2>{http.s.name}</h2>\n'
             response += '<table>\n'
@@ -337,13 +343,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += '</table>\n'
             if "log" in view:
                 response += self._give_log()
-                if "deco" in view:
-                    response += self._give_datetime()
-                response += self._give_foot(refresh = 60, scroll = True)
-            else:
-                if "deco" in view:
-                    response += self._give_datetime()
-                response += self._give_foot(refresh = 60)
+                scroll_page = True
+            if "deco" in view:
+                response += self._give_datetime()
+            response += self._give_foot(refresh= 60, scroll= scroll_page)
             self._write_dedented(response)
         else:
             self.send_error(404, 'No Such Page', 'This site serves pages at "/" and "/graphs"')

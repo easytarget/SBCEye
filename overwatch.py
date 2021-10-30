@@ -197,6 +197,9 @@ if HAVE_SENSOR:
 # Unicode degrees character used for display and logging
 DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
+# Set the time of last data update so that a new update is forced
+data_updated = time.time() - settings.data_interval
+
 # Use a dictionary to store current readings
 # start with the standard system readings
 data = {
@@ -264,6 +267,7 @@ def sys_screen(xpos=0):
 
 def button_control(action="toggle"):
     # Set the first pin in pin_map to a specified state
+    log_this = False
     if len(pin_map.keys()) > 0:
         name = next(iter(pin_map))
         pin = pin_map[name]
@@ -301,27 +305,44 @@ def button_interrupt(*_):
     #    logging.info('Button glitch')
 
 def update_data():
-    # Runs every few seconds to get current environmental and system data
-    if HAVE_SENSOR:
-        data['env-temp'] = bme280.temperature
-        data['env-humi'] = bme280.relative_humidity
-        data['env-pres'] = bme280.pressure
-    data['sys-temp'] = psutil.sensors_temperatures()["cpu_thermal"][0].current
-    data['sys-load'] = psutil.getloadavg()[0]
-    data['sys-mem'] = psutil.virtual_memory().percent
+    #print("data", end='')
+    # Get current environmental and system data
+    global data_updated
+    #print(f': age: {time.time() - data_updated} : ', end = '')
+    if (time.time() - data_updated) >= settings.data_interval:
+        if HAVE_SENSOR:
+            data['env-temp'] = bme280.temperature
+            data['env-humi'] = bme280.relative_humidity
+            data['env-pres'] = bme280.pressure
+            # Failed pressure measurements really foul up the graph, skip
+            if data['env-pres'] == 0:
+                data['env-pres'] = 'U'
+        data['sys-temp'] = psutil.sensors_temperatures()["cpu_thermal"][0].current
+        data['sys-load'] = psutil.getloadavg()[0]
+        data['sys-mem'] = psutil.virtual_memory().percent
+        data_updated = time.time()
+        #print(" recorded")
+    #else:
+        #print(" skipped")
+
 
 def update_pins():
     # Check if any pins have changed state, and log
+    #print("pin", end='')
     for name, pin in pin_map.items():
         this_pin_state =  GPIO.input(pin)
         if this_pin_state != data[f"pin-{name}"]:
             # Pin has changed state, remember new state and log
             data[f'pin-{name}'] = this_pin_state
             logging.info(f'{name}: {settings.web_pin_states[this_pin_state]}')
+    #print(" tick")
 
 def update_db():
     # Runs 3x per minute, updates RRD database and processes screensaver
+    update_data()
+    #print("rrd", end='')
     rrd.update(data)
+    #print(" tick")
     if HAVE_SCREEN:
         screensaver.check()
 
@@ -337,6 +358,7 @@ def log_sensors():
             "sys-mem": ('Mem', '.1f', '%'),
             }
     log_line = ''
+    update_data()
     for sense,(name,fmt,suffix) in loglist.items():
         if sense in data.keys():
             log_line += f'{name}: {data[sense]:{fmt}}{suffix}, '
@@ -344,7 +366,7 @@ def log_sensors():
     logging.info(log_line[:-2])
 
 def scheduler_servicer(seconds=60):
-    # Approximate delay while checking for pending scheduled jobs every second
+    # delay while checking for pending scheduled jobs
     schedule.run_pending()
     for _ in range(seconds):
         time.sleep(1)
@@ -427,7 +449,7 @@ if __name__ == '__main__':
     update_data()
 
     # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(settings, rrd, data, button_control)
+    serve_http(settings, rrd, data, (button_control, update_data, update_pins))
 
     # Exit handler
     atexit.register(good_bye)
@@ -435,10 +457,9 @@ if __name__ == '__main__':
     # We got this far... time to start the show
     logging.info("Init complete, starting schedule and entering main loop")
 
-    # Schedule sensor readings, database updates and logging events
+    # Schedule pin monitoring, database updates and logging events
     if (len(pin_map.keys()) > 0):
         schedule.every(settings.pin_interval).seconds.do(update_pins)
-    schedule.every(settings.data_interval).seconds.do(update_data)
     schedule.every(settings.rrd_interval).seconds.do(update_db)
     if settings.log_interval > 0:
         schedule.every(settings.log_interval).seconds.do(log_sensors)

@@ -40,17 +40,18 @@ class Robin:
 
         # Graphs and parameters
         self.graph_map = {
-                'env-temp': ('Environment Temperature','50','10','%3.1lf\u00B0C'),
-                'env-humi': ('Environment Humidity','100','0','%3.0lf%%'),
-                'env-pres': ('Environment Pressure','1040','970','%4.0lfmb','0'),
+                'env-temp': (f'{s.web_sensor_name} Temperature','40','10','%3.1lf\u00B0C','--alt-autoscale'),
+                'env-humi': (f'{s.web_sensor_name} Humidity','100','0','%3.0lf%%'),
+                'env-pres': (f'{s.web_sensor_name} Pressure','1100','900','%4.0lfmb',
+                    '--units-exponent','0','--alt-autoscale', '--y-grid','25:1'),
                 'sys-temp': ('CPU Temperature','80','40','%3.1lf\u00B0C'),
-                'sys-load': ('CPU Load Average','3','0','%2.3lf','0'),
+                'sys-load': ('CPU Load Average','3','0','%2.3lf','--alt-autoscale-max'),
                 'sys-mem':  ('System Memory Use','100','0','%3.0lf%%'),
                 }
         # pins
         for name in s.pin_map.keys():
             self.data_sources[f'pin-{name}'] = ('0','1')
-            self.graph_map[f'pin-{name}'] = f'{name} Pin State','1.1','-0.1','%3.1lf'
+            self.graph_map[f'pin-{name}'] = f'{name} Pin State','1','0','%3.1lf','--y-grid','1:1'
 
         # set the list of active and storable sources
         self.sources = []
@@ -136,9 +137,10 @@ class Robin:
                                  "--lower-limit", params[2],
                                  "--left-axis-format", params[3]])
                 if len(params) > 4:
-                    rrd_args.extend(["--units-exponent", params[4]])
+                    rrd_args.extend(params[4:])
                 rrd_args.extend([f'DEF:data={str(self.db_file)}:{graph}:AVERAGE',
                                  *self.graph_args["style"]])
+                print(rrd_args)
                 try:
                     rrdtool.graph(
                             temp_file.name,
