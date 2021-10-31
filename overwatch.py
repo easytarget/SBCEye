@@ -34,6 +34,8 @@ from pathlib import Path
 import atexit
 import psutil
 import schedule
+import subprocess
+import signal
 
 # Local classes
 from load_config import Settings
@@ -41,6 +43,9 @@ from saver import Saver
 from robin import Robin
 from httpserver import serve_http
 #from i2c_display import Screen
+
+my_version = subprocess.check_output(["git", "describe", "--tags",
+        "--always", "--dirty"], cwd=sys.path[0]).decode('ascii').strip()
 
 # Parse the arguments
 parser = argparse.ArgumentParser(
@@ -51,12 +56,20 @@ parser = argparse.ArgumentParser(
     epilog=textwrap.dedent('''
         Homepage: https://github.com/easytarget/pi-overwatch
         '''))
-parser.add_argument("--config", "-c",
-        help="Config file name, default = config.ini",
-        type=str)
+parser.add_argument("--config", "-c", type=str,
+        help="Config file name, default = config.ini")
+parser.add_argument("--version", "-v", action='store_true',
+        help="Return Overwatch version string and exit")
 args = parser.parse_args()
 
+if args.version:
+    # Dump version and quit
+    print(f'{sys.argv[0]} {my_version}')
+    sys.exit()
+
 print(f"Working directory: {os.getcwd()}")
+print(f'Running: {sys.argv[0]}  @ {my_version}')
+
 
 if args.config:
     config_file = Path(args.config).resolve()
@@ -140,6 +153,7 @@ schedule_logger.setLevel(level=logging.WARN)
 # Now we have logging, notify we are starting up
 logging.info('')
 logging.info(f'Starting overwatch serice for: {settings.name}')
+logging.info(f'Version: {my_version}')
 
 # Initialise the bus, display and sensor
 if HAVE_SCREEN or HAVE_SENSOR:
@@ -353,9 +367,15 @@ def scheduler_servicer(seconds=60):
         time.sleep(1)
         schedule.run_pending()
 
+def signal_bye(*_):
+    print("Caught a signal..")
+    # Calling sys.exit() will invoke the exit handler
+    sys.exit()
+
 def good_bye():
     logging.info('Exiting')
-    print('Exit')
+    print('\n===============')
+    print('= Graceful Exit\n')
 
 # The fun starts here:
 if __name__ == '__main__':
@@ -401,7 +421,7 @@ if __name__ == '__main__':
     # GPIO mode and arrays for the pin database path and current status
     if len(pin_map.keys()) > 0:
         GPIO.setmode(GPIO.BCM)  # Set all GPIO pins to BCM GPIO numbering
-        GPIO.setwarnings(False) # Dont warn if somethign already using channels
+        GPIO.setwarnings(False) # Dont warn if channels accessed outside this processes
 
     # Set all gpio pins to 'output' and record their initial status
     # We need to set them as outputs in our context in order to monitor their state.
@@ -421,11 +441,16 @@ if __name__ == '__main__':
     if (len(pin_map.keys()) > 0) and (settings.button_pin > 0):
         # Set up the button pin interrupt, if defined
         GPIO.setup(settings.button_pin, GPIO.IN)       # Set our button pin to be an input
-        GPIO.add_event_detect(settings.button_pin, GPIO.RISING, button_interrupt, bouncetime = 400)
+        GPIO.add_event_detect(settings.button_pin, GPIO.RISING, button_interrupt, bouncetime = 100)
         logging.info('Button enabled')
 
     # RRD init
     rrd = Robin(settings, data)
+
+    # Exit handler (needed for rrd data-safe shutdown)
+    signal.signal(signal.SIGTERM, signal_bye)
+    signal.signal(signal.SIGINT, signal_bye)
+    atexit.register(good_bye)
 
     # Schedule pin monitoring, database updates and logging events
     if (len(pin_map.keys()) > 0):
@@ -439,9 +464,6 @@ if __name__ == '__main__':
 
     # Start the web server, it will fork into a seperate thread and run continually
     serve_http(settings, rrd, data, (button_control, update_data, update_pins))
-
-    # Exit handler
-    atexit.register(good_bye)
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedule and entering main loop")
