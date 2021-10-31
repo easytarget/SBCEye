@@ -36,7 +36,7 @@ def serve_http(s, rrd, data, helpers):
     httpd.server_bind()
     address = f"http://{httpd.server_name}:{httpd.server_port}"
     _threadlog(f"Access via: {address}")
-    print(f"Webserver started on`: {address}")
+    print(f"Webserver started on : {address}")
     httpd.server_activate()
     def serve_forever(httpd):
         with httpd:  # to make sure httpd.server_close is called
