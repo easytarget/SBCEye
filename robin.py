@@ -40,10 +40,11 @@ class Robin:
 
         # Graphs and parameters
         self.graph_map = {
-                'env-temp': (f'{s.web_sensor_name} Temperature','40','10','%3.1lf\u00B0C','--alt-autoscale'),
+                'env-temp': (f'{s.web_sensor_name} Temperature','40','10','%3.1lf\u00B0C',
+                    '--alt-autoscale'),
                 'env-humi': (f'{s.web_sensor_name} Humidity','100','0','%3.0lf%%'),
                 'env-pres': (f'{s.web_sensor_name} Pressure','1100','900','%4.0lfmb',
-                    '--units-exponent','0','--alt-autoscale', '--y-grid','25:1'),
+                    '--alt-autoscale', '--units-exponent','0', '--y-grid','25:1'),
                 'sys-temp': ('CPU Temperature','80','40','%3.1lf\u00B0C'),
                 'sys-load': ('CPU Load Average','3','0','%2.3lf','--alt-autoscale-max'),
                 'sys-mem':  ('System Memory Use','100','0','%3.0lf%%'),
@@ -140,7 +141,6 @@ class Robin:
                     rrd_args.extend(params[4:])
                 rrd_args.extend([f'DEF:data={str(self.db_file)}:{graph}:AVERAGE',
                                  *self.graph_args["style"]])
-                print(rrd_args)
                 try:
                     rrdtool.graph(
                             temp_file.name,

@@ -54,18 +54,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--config", "-c",
         help="Config file name, default = config.ini",
         type=str)
-parser.add_argument("--datadir", "-d",
-        help="Data directory, default = '.'",
-        type=str)
 args = parser.parse_args()
-
-data_dir = Path(os.path.dirname(os.path.abspath(__file__)))
-if args.datadir:
-    data_dir = Path(args.datadir)
-    if data_dir.is_dir():
-        os.chdir(data_dir)
-    else:
-        print(f"Data_dir specified on commandline '{args.datadir}' not found; ignoring")
 
 print(f"Working directory: {os.getcwd()}")
 
@@ -123,13 +112,14 @@ if HAVE_SENSOR:
         HAVE_SENSOR = False
 
 # GPIO light control
-pin_map = settings.pin_map
-try:
-    from RPi import GPIO
-except Exception as e:
-    print(e)
-    print("GPIO monitorig requirements not met")
-    pin_map.clear()
+pin_map = settings.pin_map.copy()
+if len(pin_map.keys()) > 0:
+    try:
+        from RPi import GPIO
+    except Exception as e:
+        print(e)
+        print("GPIO monitoring requirements not met, features disabled")
+        pin_map.clear()
 
 # Imports and settings should be OK now, let the console know we are starting
 print("Starting OverWatch")
@@ -305,10 +295,8 @@ def button_interrupt(*_):
     #    logging.info('Button glitch')
 
 def update_data():
-    #print("data", end='')
-    # Get current environmental and system data
+    # Get current environmental and system data, called on demand
     global data_updated
-    #print(f': age: {time.time() - data_updated} : ', end = '')
     if (time.time() - data_updated) >= settings.data_interval:
         if HAVE_SENSOR:
             data['env-temp'] = bme280.temperature
@@ -321,28 +309,21 @@ def update_data():
         data['sys-load'] = psutil.getloadavg()[0]
         data['sys-mem'] = psutil.virtual_memory().percent
         data_updated = time.time()
-        #print(" recorded")
-    #else:
-        #print(" skipped")
 
 
 def update_pins():
     # Check if any pins have changed state, and log
-    #print("pin", end='')
     for name, pin in pin_map.items():
         this_pin_state =  GPIO.input(pin)
         if this_pin_state != data[f"pin-{name}"]:
             # Pin has changed state, remember new state and log
             data[f'pin-{name}'] = this_pin_state
             logging.info(f'{name}: {settings.web_pin_states[this_pin_state]}')
-    #print(" tick")
 
 def update_db():
-    # Runs 3x per minute, updates RRD database and processes screensaver
+    # Runs on a scedule, updates RRD database and processes screensaver
     update_data()
-    #print("rrd", end='')
     rrd.update(data)
-    #print(" tick")
     if HAVE_SCREEN:
         screensaver.check()
 
@@ -407,14 +388,14 @@ if __name__ == '__main__':
         screensaver = Saver(settings, disp)
         logging.info('Display configured and enabled')
     elif settings.have_screen:
-        logging.warning('Display configured but not detected:'\
+        logging.warning('Display configured but not detected: '\
                 'Display features disabled')
 
     # Log sensor status
     if HAVE_SENSOR:
         logging.info('Environmental sensor configured and enabled')
     elif settings.have_sensor:
-        logging.warning('Environmental data configured but no sensor detected:'\
+        logging.warning('Environmental data configured but no sensor detected: '\
                 'Environment status and logging disabled')
 
     # GPIO mode and arrays for the pin database path and current status
@@ -424,7 +405,7 @@ if __name__ == '__main__':
 
     # Set all gpio pins to 'output' and record their initial status
     # We need to set them as outputs in our context in order to monitor their state.
-    # - So long as we do not try to write this will not affect their status,
+    # - So long as we do not try to write this will not affect their physical status,
     #   nor will it prevent other processes (eg octoprint) reading and using them
     for name, pin in pin_map.items():
         GPIO.setup(pin, GPIO.OUT)
@@ -432,10 +413,11 @@ if __name__ == '__main__':
         logging.info(f'{name}: {settings.web_pin_states[data[f"pin-{name}"]]}')
     if any(key.startswith('pin-') for key in data):
         logging.info('GPIO monitoring configured and logging enabled')
-    else:
-        logging.info("No pins configured for GPIO monitoring, feature disabled")
+    elif len(settings.pin_map.keys()) > 0:
+        logging.info('GPIO monitoring configured but pin setup failed: '\
+                'GPIO features disabled')
 
-    # Do we have a button, and a pin to control
+    # Enable interrupt if we have a button and a pin to control
     if (len(pin_map.keys()) > 0) and (settings.button_pin > 0):
         # Set up the button pin interrupt, if defined
         GPIO.setup(settings.button_pin, GPIO.IN)       # Set our button pin to be an input
@@ -445,8 +427,15 @@ if __name__ == '__main__':
     # RRD init
     rrd = Robin(settings, data)
 
-    # Do an initial, early, data reading to settle sensors etc
-    update_data()
+    # Schedule pin monitoring, database updates and logging events
+    if (len(pin_map.keys()) > 0):
+        schedule.every(settings.pin_interval).seconds.do(update_pins)
+    schedule.every(settings.rrd_interval).seconds.do(update_db)
+    if settings.log_interval > 0:
+        schedule.every(settings.log_interval).seconds.do(log_sensors)
+
+    # Run all the schedule jobs once, so we have data ready to serve
+    schedule.run_all()
 
     # Start the web server, it will fork into a seperate thread and run continually
     serve_http(settings, rrd, data, (button_control, update_data, update_pins))
@@ -456,15 +445,6 @@ if __name__ == '__main__':
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedule and entering main loop")
-
-    # Schedule pin monitoring, database updates and logging events
-    if (len(pin_map.keys()) > 0):
-        schedule.every(settings.pin_interval).seconds.do(update_pins)
-    schedule.every(settings.rrd_interval).seconds.do(update_db)
-    if settings.log_interval > 0:
-        schedule.every(settings.log_interval).seconds.do(log_sensors)
-
-    schedule.run_all()  # do the initial log and database update
 
     # A brief pause for splash
     if HAVE_SCREEN:
