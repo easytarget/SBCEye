@@ -39,10 +39,9 @@ import signal
 
 # Local classes
 from load_config import Settings
-from saver import Saver
 from robin import Robin
 from httpserver import serve_http
-#from i2c_display import Screen
+from animate import Animator
 
 my_version = subprocess.check_output(["git", "describe", "--tags",
         "--always", "--dirty"], cwd=sys.path[0]).decode('ascii').strip()
@@ -170,7 +169,6 @@ if HAVE_SCREEN:
         # Create the I2C SSD1306 OLED object
         # The first two parameters are the pixel width and pixel height.
         disp = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
-        HAVE_SCREEN = True
         disp.contrast(settings.display_contrast)
         disp.invert(settings.display_invert)
         disp.fill(0)  # Blank as fast in case it is showing garbage
@@ -221,53 +219,6 @@ for name,_ in pin_map.items():
     data[f"pin-{name}"] = 0
 
 # Local functions
-
-# Draw a black filled box to clear the canvas.
-def clean():
-    draw.rectangle((0,0,span-1,height-1), outline=0, fill=0)
-
-# Put a specific area of the canvas onto display
-def show(xpos=0):
-    if settings.display_rotate:
-        disp.image(image.transform((width,height),
-                   Image.EXTENT,(xpos,0,xpos+width,height))
-                   .transpose(Image.ROTATE_180))
-    else:
-        disp.image(image.transform((width,height),
-                   Image.EXTENT,(xpos,0,xpos+width,height)))
-    disp.show()
-
-# Slide the display view across the canvas to animate between screens
-def slideout(step=settings.animate_speed):
-    x_pos = 0
-    while x_pos < width + margin:
-        show(x_pos)
-        x_pos = x_pos + step
-    show(width + margin)
-
-def bme_screen(xpos=0):
-    # Dictionary with tuples specifying name,format,suffix and Y-position
-    items = {
-            "env-temp": ('Temp', '.1f', DEGREE_SIGN, 5),
-            "env-humi": ('Humi', '.0f', '%', 25),
-            "env-pres": ('Pres', '.0f', 'mb', 45),
-            }
-    for sense,(name,fmt,suffix,ypos) in items.items():
-        if sense in data.keys():
-            line = f'{name}: {data[sense]:{fmt}}{suffix}'
-            draw.text((xpos, ypos), line, font=font, fill=255)
-
-def sys_screen(xpos=0):
-    # Dictionary with tuples specifying name,format,suffix and Y-position
-    items = {
-            "sys-temp": ('CPU', '.1f', DEGREE_SIGN, 5),
-            "sys-load": ('Load', '1.2f', '', 25),
-            "sys-mem": ('Mem', '.1f', '%', 45),
-            }
-    for sense,(name,fmt,suffix,ypos) in items.items():
-        if sense in data.keys():
-            line = f'{name}: {data[sense]:{fmt}}{suffix}'
-            draw.text((xpos, ypos), line, font=font, fill=255)
 
 def button_control(action="toggle"):
     # Set the first pin in pin_map to a specified state
@@ -335,11 +286,9 @@ def update_pins():
             logging.info(f'{name}: {settings.web_pin_states[this_pin_state]}')
 
 def update_db():
-    # Runs on a scedule, updates RRD database and processes screensaver
+    # Runs on a scedule, refresh readings and update RRD
     update_data()
     rrd.update(data)
-    if HAVE_SCREEN:
-        screensaver.check()
 
 def log_sensors():
     # Runs on a user defined schedule to dump a line of sensor data in the log
@@ -381,33 +330,11 @@ def good_bye():
 if __name__ == '__main__':
 
     # Display setup
+    # The animator class will start the screen display and saver loops
+    #  and add them as scheduled jobs to run forever
     if HAVE_SCREEN:
-        # Image canvas
-        margin = 20           # Space between the screens while transitioning
-        width  = disp.width
-        span   = width*2 + margin
-        height = disp.height
-
-        # Create image canvas (with mode '1' for 1-bit color)
-        image = Image.new("1", (span, height))
-
-        # Get drawing object so we can easily draw on canvas.
-        draw = ImageDraw.Draw(image)
-
-        # LiberationMono-Regular : nice font that looks clear on the small display
-        # This font is located in: /usr/share/fonts/truetype/liberation/ on Raspian.
-        # If you get an error that it is not present, install it with:
-        #   sudo apt install fonts-liberation
-        font = ImageFont.truetype('LiberationMono-Regular.ttf', 16)
-
-        # Splash!
-        draw.text((10, 10), 'Over-',  font=font, fill=255)
-        draw.text((28, 28), 'Watch',  font=font, fill=255)
-        disp.show()
-        # Start saver
-        screensaver = Saver(settings, disp)
-        logging.info('Display configured and enabled')
-    elif settings.have_screen:
+        screen = Animator(settings, disp, data)
+    if not screen and settings.have_screen:
         logging.warning('Display configured but not detected: '\
                 'Display features disabled')
 
@@ -469,7 +396,8 @@ if __name__ == '__main__':
     logging.info("Init complete, starting schedule and entering main loop")
 
     # A brief pause for splash
-    if HAVE_SCREEN:
+    print(f'Main Loop; screen={screen}')
+    if screen:
         scheduler_servicer(3)
 
     # Main loop now runs forever
@@ -478,32 +406,32 @@ if __name__ == '__main__':
             if HAVE_SENSOR:
                 # Environment Screen
                 for this_passp in range(settings.animate_passes):
-                    clean()
-                    bme_screen()
-                    show()
+                    screen._clean()
+                    screen._bme_screen()
+                    screen._show()
                     scheduler_servicer(settings.animate_passtime)
                 # Update and transition to system screen
-                bme_screen()
-                sys_screen(width+margin)
-                slideout()
+                screen._bme_screen()
+                screen._sys_screen(screen.width+screen.margin)
+                screen._slideout()
                 scheduler_servicer(settings.animate_passtime)
                 # System screen
                 for this_pass in range(settings.animate_passes):
-                    clean()
-                    sys_screen()
-                    show()
+                    screen._clean()
+                    screen._sys_screen()
+                    screen._show()
                     scheduler_servicer(settings.animate_passtime)
                 # Update and transition back to environment screen
-                sys_screen()
-                bme_screen(width+margin)
-                slideout()
+                screen._sys_screen()
+                screen._bme_screen(screen.width+screen.margin)
+                screen._slideout()
                 scheduler_servicer(settings.animate_passtime)
             else:
                 # Just loop refreshing the system screen
                 for i in range(settings.animate_passes):
-                    clean()
-                    sys_screen()
-                    show()
+                    screen._clean()
+                    screen._sys_screen()
+                    screen._show()
                     scheduler_servicer(settings.animate_passtime)
         else:
             # No screen, so just run schedule jobs in a loop

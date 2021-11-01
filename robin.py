@@ -46,7 +46,7 @@ class Robin:
                 'env-pres': (f'{s.web_sensor_name} Pressure','1100','900','%4.0lfmb',
                     '--alt-autoscale', '--units-exponent','0', '--y-grid','25:1'),
                 'sys-temp': ('CPU Temperature','80','40','%3.1lf\u00B0C'),
-                'sys-load': ('CPU Load Average','3','0','%2.3lf','--alt-autoscale-max'),
+                'sys-load': ('CPU Load Average','2','0','%2.3lf','--alt-autoscale-max'),
                 'sys-mem':  ('System Memory Use','100','0','%3.0lf%%'),
                 }
         # pins
