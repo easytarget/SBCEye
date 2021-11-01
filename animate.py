@@ -6,7 +6,6 @@ from PIL import Image, ImageDraw, ImageFont
 # Local classes
 from saver import Saver
 
-
 # Unicode degrees character
 DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
@@ -18,8 +17,8 @@ class Animator:
 
         self.margin = 20           # Space between the screens while transitioning
         self.width  = self.disp.width
-        self.span   = self.width*2 + self.margin
         self.height = self.disp.height
+        self.span   = self.width*2 + self.margin
 
         self.display_rotate = settings.display_rotate
         self.animate_speed = settings.animate_speed
@@ -45,12 +44,20 @@ class Animator:
         self.screen_list = ['_sys_screen']
         if any(key.startswith("env-") for key in self.data):
             self.screen_list .append('_bme_screen')
-        print(f'SCREEN LIST = {self.screen_list}')
+        self.screen_items = len(self.screen_list)
+        self.screen_list.append(self.screen_list[0])
+        print(f'SCREEN LIST = {self.screen_list}, SCREEN_ITEMS = {self.screen_items}')
+
+        # Start animator
+        self.passes = self.current_pass = settings.animate_passes
+        self.current_screen = self.screen_items - 1
+        schedule.every(settings.animate_passtime).seconds.do(self.frame)
+
+        logging.info('Display configured and enabled')
+
         # Start saver
         screensaver = Saver(settings, disp)
         schedule.every(60).seconds.do(screensaver.check)
-
-        logging.info('Display configured and enabled')
 
 
     # Draw a black filled box to clear the canvas.
@@ -99,6 +106,17 @@ class Animator:
             if sense in self.data.keys():
                 line = f'{name}: {self.data[sense]:{fmt}}{suffix}'
                 self.draw.text((xpos, ypos), line, font=self.font, fill=255)
+
+    def frame(self):
+        print(f'Frame: {self.current_pass} : ', end='')
+        self.current_pass += 1
+        if self.current_pass >= self.passes:
+            self.current_pass = 0
+            self.current_screen += 1
+            self.current_screen %= self.screen_items
+            print(f'Slide: {self.screen_list[self.current_screen+1]} -> {self.screen_list[self.current_screen]}')
+        else:
+            print(f'Display: {self.screen_list[self.current_screen]}')
 
     def update(self):
         # UNUSED: WE WILL PUT THE STEP_BY_STEP ANIMATOR HERE
