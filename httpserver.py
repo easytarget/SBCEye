@@ -293,11 +293,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_foot(refresh=300)
             self._write_dedented(response)
         elif urlparse(self.path).path == '/favicon.ico':
-            print('ICON')
             fi_file = 'favicon.ico'
             if not os.path.exists(fi_file):
                 fi_file = f'{sys.path[0]}/{fi_file}'
-            print(fi_file)
             if not os.path.exists(fi_file):
                 self.send_error(404, 'unavailable',
                         f'{fi_file} not found.')

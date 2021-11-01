@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 # Some general functions we will use
 import logging
 import schedule

@@ -41,7 +41,6 @@ import signal
 from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
-from animate import Animator
 
 my_version = subprocess.check_output(["git", "describe", "--tags",
         "--always", "--dirty"], cwd=sys.path[0]).decode('ascii').strip()
@@ -75,7 +74,7 @@ if args.config:
     if config_file.is_file():
         print(f'Using user configuration from {config_file}')
     else:
-        print(f"Specified configuration file '{config_file}' not found, Exiting.")
+        print(f"ERROR: Specified configuration file '{config_file}' not found, Exiting.")
         sys.exit()
 else:
     config_file = Path('config.ini').resolve()
@@ -86,7 +85,7 @@ else:
         if config_file.is_file():
             print(f'Using default configuration from {config_file}')
         else:
-            print('Cannot find a configuration file, exiting')
+            print('ERROR: Cannot find a configuration file, exiting')
             sys.exit()
 
 settings = Settings(config_file)
@@ -101,17 +100,24 @@ if HAVE_SCREEN or HAVE_SENSOR:
         import busio
     except Exception as e:
         print(e)
-        print("I2C bus requirements not met")
+        print("ERROR: I2C bus requirements not met")
         HAVE_SCREEN = HAVE_SENSOR = False
 
 if HAVE_SCREEN:
     # I2C 128x64 OLED Display
-    from PIL import Image, ImageDraw, ImageFont
     try:
         import adafruit_ssd1306
     except Exception as e:
         print(e)
-        print("ssd1306 display requirements not met")
+        print("ERROR: ssd1306 display requirements not met")
+        HAVE_SCREEN = False
+
+if HAVE_SCREEN:
+    try:
+        from animate import Animator
+    except Exception as e:
+        print(e)
+        print("ERROR: Screen animator requirements not met")
         HAVE_SCREEN = False
 
 if HAVE_SENSOR:
@@ -120,7 +126,7 @@ if HAVE_SENSOR:
         import adafruit_bme280
     except Exception as e:
         print(e)
-        print("BME280 environment sensor requirements not met")
+        print("ERROR: BME280 environment sensor requirements not met")
         HAVE_SENSOR = False
 
 # GPIO light control
@@ -130,7 +136,7 @@ if len(pin_map.keys()) > 0:
         from RPi import GPIO
     except Exception as e:
         print(e)
-        print("GPIO monitoring requirements not met, features disabled")
+        print("ERROR: GPIO monitoring requirements not met, features disabled")
         pin_map.clear()
 
 # Imports and settings should be OK now, let the console know we are starting
@@ -329,14 +335,15 @@ def good_bye():
 # The fun starts here:
 if __name__ == '__main__':
 
-    # Display setup
-    # The animator class will start the screen display and saver loops
-    #  and add them as scheduled jobs to run forever
+    # Display animation setup
+    # The animator class will start the screen display and saver
+    # as scheduled jobs to run forever
     if HAVE_SCREEN:
         screen = Animator(settings, disp, data)
-    if not screen and settings.have_screen:
-        logging.warning('Display configured but not detected: '\
-                'Display features disabled')
+    else:
+        if settings.have_screen:
+            logging.warning('Display configured but did not initialise properly: '\
+                    'Display features disabled')
 
     # Log sensor status
     if HAVE_SENSOR:
@@ -396,8 +403,8 @@ if __name__ == '__main__':
     logging.info("Init complete, starting schedule and entering main loop")
 
     # A brief pause for splash
-    print(f'Main Loop; screen={screen}')
-    if screen:
+    if HAVE_SCREEN:
+        print('scheduling saver')
         scheduler_servicer(3)
 
     # Main loop now runs forever
