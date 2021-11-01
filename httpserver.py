@@ -1,5 +1,7 @@
 # Provides the http handler and request server for the Pi OverWatch
 
+import sys
+import os.path
 import datetime
 import subprocess
 import re
@@ -65,6 +67,11 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "image/png")
         self.send_header("Cache-Control", "max-age=60")
+        self.end_headers()
+
+    def _set_icon_headers(self):
+        self.send_response(200)
+        self.send_header("Content-type", "image/x-icon")
         self.end_headers()
 
     def _give_head(self, title_extra=""):
@@ -285,6 +292,19 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_datetime()
             response += self._give_foot(refresh=300)
             self._write_dedented(response)
+        elif urlparse(self.path).path == '/favicon.ico':
+            print('ICON')
+            fi_file = 'favicon.ico'
+            if not os.path.exists(fi_file):
+                fi_file = f'{sys.path[0]}/{fi_file}'
+            print(fi_file)
+            if not os.path.exists(fi_file):
+                self.send_error(404, 'unavailable',
+                        f'{fi_file} not found.')
+            else:
+                self._set_icon_headers()
+                with open(fi_file,'rb') as fi:
+                    self.wfile.write(fi.read())
         elif ((urlparse(self.path).path == '/' + http.s.button_url)
                 and (len(http.s.button_url) > 0)
                 and (len(http.s.pin_map.keys()) > 0)):
