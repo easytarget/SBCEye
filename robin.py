@@ -115,16 +115,11 @@ class Robin:
 
     def write_updates(self):
         if len(self.cache) > 0:
-            print(f'UPDATE:\n{self.template}')
-            for line in self.cache:
-                print(line)
             rrdtool.update(
                     str(self.db_file),
                     "--template", self.template,
                     *self.cache)
             self.cache = []
-        else:
-            print(f'UPDATE: skipped')
         self.last_write = time.time()
 
     def draw_graph(self, start, end, duration, graph):
