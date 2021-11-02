@@ -1,9 +1,13 @@
 # Some general functions we will use
+import os.path
+import time
+import datetime
 import logging
 import schedule
 from PIL import Image, ImageDraw, ImageFont
 
 # Local classes
+import __main__ as main
 from saver import Saver
 
 # Unicode degrees character
@@ -33,31 +37,30 @@ class Animator:
         # This font is located in: /usr/share/fonts/truetype/liberation/ on Raspian.
         # If you get an error that it is not present, install it with:
         #   sudo apt install fonts-liberation
-        self.font = ImageFont.truetype('LiberationMono-Regular.ttf', 16)
-
-        # Splash!
-        self.draw.text((10, 10), 'Over-',  font=self.font, fill=255)
-        self.draw.text((28, 28), 'Watch',  font=self.font, fill=255)
-        self.disp.show()
+        self.font = ImageFont.truetype('LiberationMono-Bold.ttf', 16)
+        self.splash_font = ImageFont.truetype('LiberationMono-Bold.ttf', 36)
 
         # Screen list
-        self.screen_list = ['_sys_screen']
+        self.screen_list = []
         if any(key.startswith("env-") for key in self.data):
-            self.screen_list .append('_bme_screen')
-        self.screen_items = len(self.screen_list)
-        self.screen_list.append(self.screen_list[0])
-        print(f'SCREEN LIST = {self.screen_list}, SCREEN_ITEMS = {self.screen_items}')
+            self.screen_list.append('_bme_screen')
+        self.screen_list.append('_sys_screen')
 
-        # Start animator
-        self.passes = self.current_pass = settings.animate_passes
-        self.current_screen = self.screen_items - 1
+        # Start main animator
+        self.passes = settings.animate_passes
+        self.current_pass = -3
+        self.current_screen = 0
         schedule.every(settings.animate_passtime).seconds.do(self.frame)
-
         logging.info('Display configured and enabled')
+        print('Display configured and enabled')
 
         # Start saver
-        screensaver = Saver(settings, disp)
-        schedule.every(60).seconds.do(screensaver.check)
+        self.time_format = settings.time_format
+        self.screensaver = Saver(settings, disp)
+        schedule.every().hour.at(":00").do(self._hourly)
+
+        # Splash!
+        #self._splash()
 
 
     # Draw a black filled box to clear the canvas.
@@ -86,72 +89,61 @@ class Animator:
     def _bme_screen(self, xpos=0):
         # Draw screen for environmental data
         items = {
-                "env-temp": ('Temp', '.1f', DEGREE_SIGN, 5),
-                "env-humi": ('Humi', '.0f', '%', 25),
-                "env-pres": ('Pres', '.0f', 'mb', 45),
+                "env-temp": (' Temp: ', '.1f', DEGREE_SIGN, 5),
+                "env-humi": (' Humi: ', '.0f', '%', 25),
+                "env-pres": (' Pres: ', '.0f', 'mb', 45),
                 }
         for sense,(name,fmt,suffix,ypos) in items.items():
             if sense in self.data.keys():
-                line = f'{name}: {self.data[sense]:{fmt}}{suffix}'
+                line = f'{name}{self.data[sense]:{fmt}}{suffix}'
                 self.draw.text((xpos, ypos), line, font=self.font, fill=255)
 
     def _sys_screen(self,xpos=0):
         # Draw screen for system data
         items = {
-                "sys-temp": ('CPU', '.1f', DEGREE_SIGN, 5),
-                "sys-load": ('Load', '1.2f', '', 25),
-                "sys-mem": ('Mem', '.1f', '%', 45),
+                "sys-temp": (' CPU:  ', '.1f', DEGREE_SIGN, 5),
+                "sys-load": (' Load: ', '1.2f', '', 25),
+                "sys-mem":  (' Mem:  ', '.1f', '%', 45),
                 }
         for sense,(name,fmt,suffix,ypos) in items.items():
             if sense in self.data.keys():
-                line = f'{name}: {self.data[sense]:{fmt}}{suffix}'
+                line = f'{name}{self.data[sense]:{fmt}}{suffix}'
                 self.draw.text((xpos, ypos), line, font=self.font, fill=255)
 
+    def _splash(self):
+        def _text(xpos):
+            self.draw.text((8 + xpos, 0), 'Over-',  font=self.splash_font, fill=255)
+            self.draw.text((8 + xpos, 30), 'Watch',  font=self.splash_font, fill=255)
+        self.current_pass = -3
+        self.current_screen = 0
+        self.draw.rectangle((self.width + self.margin,0,self.span-1,self.height-1),
+                outline=0, fill=0)
+        _text(self.width + self.margin)
+        self._slideout()
+        self._clean()
+        _text(0)
+        self._show()
+
+    def _hourly(self):
+        myself = os.path.basename(main.__file__)
+        timestamp = datetime.datetime.now().strftime(self.time_format)
+        print(f'{myself} :: {timestamp} :: watchdog')
+        self.screensaver.check()
+        self._splash()
+
     def frame(self):
-        print(f'Frame: {self.current_pass} : ', end='')
+        # Run from the scheduler, animates each step of the cycle in sequence
         self.current_pass += 1
         if self.current_pass >= self.passes:
             self.current_pass = 0
             self.current_screen += 1
-            self.current_screen %= self.screen_items
-            print(f'Slide: {self.screen_list[self.current_screen+1]} -> {self.screen_list[self.current_screen]}')
-        else:
-            print(f'Display: {self.screen_list[self.current_screen]}')
-
-    def update(self):
-        # UNUSED: WE WILL PUT THE STEP_BY_STEP ANIMATOR HERE
-        while True:
-            if HAVE_SCREEN:
-                if HAVE_SENSOR:
-                    # Environment Screen
-                    for this_passp in range(settings.animate_passes):
-                        clean()
-                        bme_screen()
-                        show()
-                        scheduler_servicer(settings.animate_passtime)
-                    # Update and transition to system screen
-                    bme_screen()
-                    sys_screen(width+margin)
-                    slideout()
-                    scheduler_servicer(settings.animate_passtime)
-                    # System screen
-                    for this_pass in range(settings.animate_passes):
-                        clean()
-                        sys_screen()
-                        show()
-                        scheduler_servicer(settings.animate_passtime)
-                    # Update and transition back to environment screen
-                    sys_screen()
-                    bme_screen(width+margin)
-                    slideout()
-                    scheduler_servicer(settings.animate_passtime)
-                else:
-                    # Just loop refreshing the system screen
-                    for i in range(settings.animate_passes):
-                        clean()
-                        sys_screen()
-                        show()
-                        scheduler_servicer(settings.animate_passtime)
-            else:
-                # No screen, so just run schedule jobs in a loop
-                scheduler_servicer()
+            self.current_screen %= len(self.screen_list)
+            getattr(self,self.screen_list[self.current_screen])(self.width + self.margin)
+            self._slideout()
+        elif self.current_pass >= 0:
+            self._clean()
+            getattr(self,self.screen_list[self.current_screen])()
+            self._show()
+        elif self.current_pass == -1:
+            getattr(self,self.screen_list[self.current_screen])(self.width + self.margin)
+            self._slideout()

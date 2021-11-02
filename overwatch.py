@@ -315,13 +315,6 @@ def log_sensors():
     print(log_line[:-2])
     logging.info(log_line[:-2])
 
-def scheduler_servicer(seconds=60):
-    # delay while checking for pending scheduled jobs
-    schedule.run_pending()
-    for _ in range(seconds):
-        time.sleep(1)
-        schedule.run_pending()
-
 def signal_bye(*_):
     print("Caught a signal..")
     # Calling sys.exit() will invoke the exit handler
@@ -400,46 +393,9 @@ if __name__ == '__main__':
     serve_http(settings, rrd, data, (button_control, update_data, update_pins))
 
     # We got this far... time to start the show
-    logging.info("Init complete, starting schedule and entering main loop")
+    logging.info("Init complete, starting schedules and entering service loop")
 
-    # A brief pause for splash
-    if HAVE_SCREEN:
-        print('scheduling saver')
-        scheduler_servicer(3)
-
-    # Main loop now runs forever
+    # Main loop now runs forever while servicing the scheduler
     while True:
-        if HAVE_SCREEN:
-            if HAVE_SENSOR:
-                # Environment Screen
-                for this_passp in range(settings.animate_passes):
-                    screen._clean()
-                    screen._bme_screen()
-                    screen._show()
-                    scheduler_servicer(settings.animate_passtime)
-                # Update and transition to system screen
-                screen._bme_screen()
-                screen._sys_screen(screen.width+screen.margin)
-                screen._slideout()
-                scheduler_servicer(settings.animate_passtime)
-                # System screen
-                for this_pass in range(settings.animate_passes):
-                    screen._clean()
-                    screen._sys_screen()
-                    screen._show()
-                    scheduler_servicer(settings.animate_passtime)
-                # Update and transition back to environment screen
-                screen._sys_screen()
-                screen._bme_screen(screen.width+screen.margin)
-                screen._slideout()
-                scheduler_servicer(settings.animate_passtime)
-            else:
-                # Just loop refreshing the system screen
-                for i in range(settings.animate_passes):
-                    screen._clean()
-                    screen._sys_screen()
-                    screen._show()
-                    scheduler_servicer(settings.animate_passtime)
-        else:
-            # No screen, so just run schedule jobs in a loop
-            scheduler_servicer()
+        schedule.run_pending()
+        time.sleep(1)

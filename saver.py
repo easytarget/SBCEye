@@ -23,6 +23,7 @@ class Saver:
                 self.saver_map = [True]*24
                 for i in range(settings.saver_off, settings.saver_on):
                     self.saver_map[i] = False
+        self.check()
 
 
     def _apply_state(self, state):
