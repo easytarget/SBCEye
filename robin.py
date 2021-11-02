@@ -101,7 +101,7 @@ class Robin:
         self.last_write = 0
         self.cache_age = s.rrd_cache_age
         print('RRD database and cache configured and enabled')
-        logging.info('RRD database is: {str(self.db_file)}')
+        logging.info(f'RRD database is: {str(self.db_file)}')
 
     def update(self, data):
         # Update the database with the latest readings
