@@ -45,7 +45,7 @@ class Robin:
         for name in s.pin_map.keys():
             self.data_sources[f'pin-{name}'] = ('0','1')
             self.graph_map[f'pin-{name}'] = (f'{name} Pin State','1','-0.01','%3.1lf',
-                    '--alt-autoscale-min')
+                    '--alt-autoscale')
 
         # set the list of active and storable sources
         self.template= ''
