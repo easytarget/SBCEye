@@ -32,10 +32,10 @@ import argparse
 from argparse import RawTextHelpFormatter
 from pathlib import Path
 import atexit
-import psutil
 import schedule
 import subprocess
 import signal
+import psutil
 
 # Local classes
 from load_config import Settings
@@ -228,7 +228,6 @@ for name,_ in pin_map.items():
 
 def button_control(action="toggle"):
     # Set the first pin in pin_map to a specified state
-    log_this = False
     if len(pin_map.keys()) > 0:
         name = next(iter(pin_map))
         pin = pin_map[name]
@@ -388,7 +387,7 @@ if __name__ == '__main__':
     # Schedule pin monitoring, database updates and logging events
     schedule.every().hour.at(":00").do(hourly)
     schedule.every(settings.rrd_interval).seconds.do(update_db)
-    if (len(pin_map.keys()) > 0):
+    if len(pin_map.keys()) > 0:
         schedule.every(settings.pin_interval).seconds.do(update_pins)
     if settings.log_interval > 0:
         schedule.every(settings.log_interval).seconds.do(log_data)

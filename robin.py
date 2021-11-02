@@ -1,9 +1,8 @@
 import tempfile
 import time
 from pathlib import Path
-import rrdtool
-import schedule
 import logging
+import rrdtool
 
 class Robin:
     def __init__(self, s, data):

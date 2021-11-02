@@ -31,8 +31,8 @@ class Settings:
         self.graph_high = graph.getint("high")
         self.graph_line = graph.get("line")
         self.graph_area = graph.get("area")
-        self.graph_comment_l = graph.get("comment_l").replace(':','\:')
-        self.graph_comment_r = graph.get("comment_r").replace(':','\:')
+        self.graph_comment_l = graph.get("comment_l").replace(':',r'\:')
+        self.graph_comment_r = graph.get("comment_r").replace(':',r'\:')
         if not self.graph_comment_l and self.graph_comment_r:
             self.graph_comment_l = " "
 
@@ -78,4 +78,4 @@ class Settings:
         self.animate_passes = animate.getint("passes")
         self.animate_speed = animate.getint("speed")
 
-        print(f"Settings loaded from configuration file successfully")
+        print("Settings loaded from configuration file successfully")
