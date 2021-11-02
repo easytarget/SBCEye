@@ -1,6 +1,5 @@
 import tempfile
 import time
-import datetime
 from pathlib import Path
 import rrdtool
 import schedule
@@ -131,8 +130,7 @@ class Robin:
             response = bytearray()
             with tempfile.NamedTemporaryFile(mode='rb', dir='/tmp',
                     prefix='overwatch_graph') as temp_file:
-                timestamp = datetime.datetime.now()\
-                        .strftime(self.graph_args['time_format'])
+                timestamp = time.strftime(self.graph_args['time_format'])
                 rrd_args = ["--full-size-mode",
                             "--start", start,
                             "--end", end,

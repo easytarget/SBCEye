@@ -2,7 +2,7 @@
 
 import sys
 import os.path
-import datetime
+import time
 import subprocess
 import re
 
@@ -123,8 +123,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 </html>'''
         return ret
 
-    def _give_datetime(self):
-        timestamp = datetime.datetime.now().strftime(http.s.time_format)
+    def _give_timestamp(self):
+        timestamp = time.strftime(http.s.time_format)
         return  f'''<div style="color:#555555;
                 font-size: 94%; padding-top: 0.5em;">{timestamp}</div>
                 <div style="color:#888888;
@@ -302,7 +302,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response = self._give_head(f" :: graphs {stamp}")
             response += f'<h2>{http.s.name}</h2>'
             response += self._give_graphs(start, end, stamp)
-            response += self._give_datetime()
+            response += self._give_timestamp()
             response += self._give_foot(refresh=300)
             self._write_dedented(response)
         elif urlparse(self.path).path == '/favicon.ico':
@@ -345,7 +345,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                     </div>\n'''
             response += '<div style="padding-top: 1em;">\n'\
                     '<a href="./" title="Main page">Home</a></div>\n'
-            response += self._give_datetime()
+            response += self._give_timestamp()
             response += '<script>\n'\
                     'setTimeout(function(){location.replace(location.pathname);}, '\
                     '60000);\n</script>\n'
@@ -376,7 +376,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 response += self._give_log()
                 scroll_page = True
             if "deco" in view:
-                response += self._give_datetime()
+                response += self._give_timestamp()
             response += self._give_foot(refresh= 60, scroll= scroll_page)
             self._write_dedented(response)
         else:
