@@ -59,9 +59,9 @@ class Settings:
         self.log_date_format = log.get("date_format")
 
         rrd = config["rrd"]
-        self.rrd_file_dir = rrd.get("file_dir")
+        self.rrd_dir = rrd.get("dir")
         self.rrd_file_name = rrd.get("file_name")
-        self.rrd_cache_socket = rrd.get("cache_socket")
+        self.rrd_cache_age = rrd.getint("cache_age")
 
         display = config["display"]
         self.display_rotate = display.getboolean("rotate")

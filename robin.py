@@ -1,17 +1,10 @@
 import tempfile
+import time
 import datetime
 from pathlib import Path
 import rrdtool
-
-def get_period(start, end):
-    if end == '':
-        period = f'last {start.lstrip("-")}'
-        start = f'end{start}'
-        end = 'now'
-    else:
-        period = f'{start} >> {end}'
-    return period
-
+import schedule
+import logging
 
 class Robin:
     def __init__(self, s, data):
@@ -52,17 +45,22 @@ class Robin:
         # pins
         for name in s.pin_map.keys():
             self.data_sources[f'pin-{name}'] = ('0','1')
-            self.graph_map[f'pin-{name}'] = f'{name} Pin State','1','0','%3.1lf','--y-grid','1:1'
+            self.graph_map[f'pin-{name}'] = (f'{name} Pin State','1','-0.01','%3.1lf',
+                    '--alt-autoscale-min')
 
         # set the list of active and storable sources
+        self.template= ''
         self.sources = []
         for source,_ in self.data_sources.items():
             if source in data.keys():
                 self.sources.append(source)
+                self.template += f'{source}:'
         print(f'Storable sources = {self.sources}')
+        self.template = self.template.rstrip(':')
+        print(f'Template = {self.template}')
 
         # Database File
-        self.db_file = Path(f'{s.rrd_file_dir}/{s.rrd_file_name}').resolve()
+        self.db_file = Path(f'{s.rrd_dir}/{s.rrd_file_name}').resolve()
         if not self.db_file.is_file():
             # Generate a new file when none present
             print(f'Generating {str(self.db_file)}')
@@ -98,25 +96,42 @@ class Robin:
                     str(self.db_file),
                     f"DS:{source}:GAUGE:60:{mini}:{maxi}")
 
+        # use a home-brew local cache (list) here, rrdcache does not like templates
+        self.cache = []
+        self.last_write = 0
+        self.cache_age = s.rrd_cache_age
+        print('RRD database and cache configured and enabled')
+        logging.info('RRD database is: {str(self.db_file)}')
+
     def update(self, data):
         # Update the database with the latest readings
-        template = ''
-        dataline = 'N'
+        dataline = str(int(time.time()))
         for source in self.sources:
-            template += f':{source}'
             dataline += f':{data[source]}'
-        template = template.lstrip(':')
-        if template and dataline:
+        if dataline:
+            self.cache.append(dataline)
+        if time.time() > (self.last_write + self.cache_age):
+            self.write_updates()
+
+    def write_updates(self):
+        if len(self.cache) > 0:
+            print(f'UPDATE:\n{self.template}')
+            for line in self.cache:
+                print(line)
             rrdtool.update(
                     str(self.db_file),
-                    "--template", template,
-                    dataline)
+                    "--template", self.template,
+                    *self.cache)
+            self.cache = []
+        else:
+            print(f'UPDATE: skipped')
+        self.last_write = time.time()
 
-    def draw_graph(self, start, end, graph):
+    def draw_graph(self, start, end, duration, graph):
         # RRD graph generation
         # Returns the generated file for sending as the http response
         if (graph in self.sources) and (graph in self.graph_map.keys()):
-            period = get_period(start, end)
+            self.write_updates()
             params = self.graph_map[graph]
             response = bytearray()
             with tempfile.NamedTemporaryFile(mode='rb', dir='/tmp',
@@ -133,7 +148,7 @@ class Robin:
                     rrd_args.extend(["--height", str(self.graph_args["high"]/2)])
                 else:
                     rrd_args.extend(["--height", str(self.graph_args["high"])])
-                rrd_args.extend(["--title", f'{params[0]}: {period}',
+                rrd_args.extend(["--title", f'{params[0]}: {duration}',
                                  "--upper-limit", params[1],
                                  "--lower-limit", params[2],
                                  "--left-axis-format", params[3]])

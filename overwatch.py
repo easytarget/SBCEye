@@ -296,7 +296,7 @@ def update_db():
     update_data()
     rrd.update(data)
 
-def log_sensors():
+def log_data():
     # Runs on a user defined schedule to dump a line of sensor data in the log
     # Dictionary with tuples specifying name, format and suffix
     loglist = {
@@ -315,15 +315,21 @@ def log_sensors():
     print(log_line[:-2])
     logging.info(log_line[:-2])
 
+def hourly():
+    # Remind everybody we are alive
+    myself = os.path.basename(__file__)
+    timestamp = time.strftime(settings.time_format)
+    print(f'{myself} :: {timestamp}')
+
 def signal_bye(*_):
-    print("Caught a signal..")
-    # Calling sys.exit() will invoke the exit handler
+    # Calling sys.exit() will invoke the good_bye() exit handler
     sys.exit()
 
 def good_bye():
     logging.info('Exiting')
-    print('\n===============')
-    print('= Graceful Exit\n')
+    rrd.write_updates()
+    print('Graceful Exit\n')
+
 
 # The fun starts here:
 if __name__ == '__main__':
@@ -380,11 +386,12 @@ if __name__ == '__main__':
     atexit.register(good_bye)
 
     # Schedule pin monitoring, database updates and logging events
+    schedule.every().hour.at(":00").do(hourly)
+    schedule.every(settings.rrd_interval).seconds.do(update_db)
     if (len(pin_map.keys()) > 0):
         schedule.every(settings.pin_interval).seconds.do(update_pins)
-    schedule.every(settings.rrd_interval).seconds.do(update_db)
     if settings.log_interval > 0:
-        schedule.every(settings.log_interval).seconds.do(log_sensors)
+        schedule.every(settings.log_interval).seconds.do(log_data)
 
     # Run all the schedule jobs once, so we have data ready to serve
     schedule.run_all()

@@ -1,7 +1,5 @@
 # Some general functions we will use
-import os.path
 import time
-import datetime
 import logging
 import schedule
 from PIL import Image, ImageDraw, ImageFont
@@ -60,7 +58,8 @@ class Animator:
         schedule.every().hour.at(":00").do(self._hourly)
 
         # Splash!
-        #self._splash()
+        # Will be run automagicallly by the scheduled hourly job
+        # when the main loop force-runs all schedules during initialisation
 
 
     # Draw a black filled box to clear the canvas.
@@ -125,9 +124,7 @@ class Animator:
         self._show()
 
     def _hourly(self):
-        myself = os.path.basename(main.__file__)
-        timestamp = datetime.datetime.now().strftime(self.time_format)
-        print(f'{myself} :: {timestamp} :: watchdog')
+        # Check for screensaver changes
         self.screensaver.check()
         self._splash()
 

@@ -15,7 +15,17 @@ from threading import Thread, current_thread
 import logging
 
 # RRD data
-from robin import Robin, get_period
+from robin import Robin
+
+def get_period(start, end):
+    if end == '':
+        period = f'last {start.lstrip("-")}'
+        start = f'end{start}'
+        end = 'now'
+    else:
+        period = f'{start} >> {end}'
+    return period
+
 
 def serve_http(s, rrd, data, helpers):
     # Spawns a http.server.HTTPServer in a separate thread on the given port.
@@ -177,7 +187,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             ret += '<tr><td colspan="2" style="text-align: center;">\n'
             for duration in http.s.graph_durations:
                 if duration != skip:
-                    ret += f'&nbsp;<a href="./graphs?start=-{duration}" '\
+                    ret += f'&nbsp;<a href="./graphs?start=end-{duration}" '\
                            f'title="Graphs covering the last {duration} in time">'\
                            f'{duration}</a>&nbsp;\n'
                 else:
@@ -225,9 +235,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 &nbsp;<a href="./" title="Main page">Home</a></div>\n'''
         return ret
 
-    def _give_graphs(self, start, end, period):
+    def _give_graphs(self, start, end, stamp):
         ret = f'''<table>\n
-                <tr><th>Graphs: {period}</th></tr>\n'''
+                <tr><th>Graphs: {stamp}</th></tr>\n'''
         for graph,(title,*_) in http.rrd.graph_map.items():
             if graph in http.rrd.sources:
                 ret += f'''<tr><td>\n
@@ -262,9 +272,11 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                     start = parsed_start[0]
                 if not parsed_end:
                     end = "now"
+                    stamp = f'{start.replace("end","")} >> now'
                 else:
                     end = parsed_end[0]
-                body = Robin.draw_graph(http.rrd, start, end, graph)
+                    stamp = f'{start} >> {end}'
+                body = Robin.draw_graph(http.rrd, start, end, stamp, graph)
             if len(body) == 0:
                 self.send_error(404, 'Graph unavailable',
                         'Check your parameters and try again,'\
@@ -282,13 +294,14 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 start = parsed_start[0]
             if not parsed_end:
                 end =''
+                stamp = f'{start.replace("end","")} >> now'
             else:
                 end = parsed_end[0]
-            period = get_period(start, end)
+                stamp = f'{start} >> {end}'
             self._set_headers()
-            response = self._give_head(f" :: graphs {period}")
+            response = self._give_head(f" :: graphs {stamp}")
             response += f'<h2>{http.s.name}</h2>'
-            response += self._give_graphs(start, end, period)
+            response += self._give_graphs(start, end, stamp)
             response += self._give_datetime()
             response += self._give_foot(refresh=300)
             self._write_dedented(response)
