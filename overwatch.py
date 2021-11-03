@@ -69,6 +69,7 @@ print(f"Working directory: {os.getcwd()}")
 print(f'Running: {sys.argv[0]}  @ {my_version}')
 
 
+default_config = False
 if args.config:
     config_file = Path(args.config).resolve()
     if config_file.is_file():
@@ -81,11 +82,13 @@ else:
     if config_file.is_file():
         print(f'Using configuration from {config_file}')
     else:
-        config_file = Path('defaults.ini').resolve()
+        config_file = Path(f'{sys.path[0]}/defaults.ini').resolve()
         if config_file.is_file():
             print(f'Using default configuration from {config_file}')
+            print(f'\nWARNING: Copy "defaults.ini" to "config.ini" for customisation\n')
+            default_config = True
         else:
-            print('ERROR: Cannot find a configuration file, exiting')
+            print('\nERROR: Cannot find a configuration file, exiting')
             sys.exit()
 
 settings = Settings(config_file)
@@ -146,10 +149,12 @@ print("Starting OverWatch")
 os.nice(10)
 
 # Logging
-settings.log_file = Path(settings.log_file_dir + "/" + settings.log_file_name).resolve()
+settings.log_file = Path(f'{settings.log_file_dir}/{settings.log_file_name}').resolve()
 print(f"Logging to: {settings.log_file}")
-handler = RotatingFileHandler(settings.log_file, maxBytes=settings.log_file_size, backupCount=settings.log_file_count)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s', datefmt=settings.log_date_format, handlers=[handler])
+handler = RotatingFileHandler(settings.log_file, maxBytes=settings.log_file_size,
+            backupCount=settings.log_file_count)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s',
+            datefmt=settings.log_date_format, handlers=[handler])
 
 # Older scheduler versions can log debug to 'INFO' not 'DEBUG', ignore it.
 schedule_logger = logging.getLogger('schedule')
@@ -159,6 +164,9 @@ schedule_logger.setLevel(level=logging.WARN)
 logging.info('')
 logging.info(f'Starting overwatch service for: {settings.name}')
 logging.info(f'Version: {my_version}')
+if default_config:
+    logging.warning('Running from default Configuration!')
+    logging.warning('- copy "default.ini" to "config.ini" to customise')
 
 # Initialise the bus, display and sensor
 if HAVE_SCREEN or HAVE_SENSOR:
