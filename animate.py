@@ -24,6 +24,7 @@ class Animator:
 
         self.display_rotate = settings.display_rotate
         self.animate_speed = settings.animate_speed
+        self.time_format = settings.time_format
 
         # Create image canvas (with mode '1' for 1-bit color)
         self.image = Image.new("1", (self.span, self.height))
@@ -49,13 +50,12 @@ class Animator:
         self.current_pass = -3
         self.current_screen = 0
         schedule.every(settings.animate_passtime).seconds.do(self.frame)
+        schedule.every().hour.at(":00").do(self._hourly)
         logging.info('Display configured and enabled')
         print('Display configured and enabled')
 
         # Start saver
-        self.time_format = settings.time_format
         self.screensaver = Saver(settings, disp)
-        schedule.every().hour.at(":00").do(self._hourly)
 
         # Splash!
         # Will be run automagicallly by the scheduled hourly job
@@ -124,8 +124,7 @@ class Animator:
         self._show()
 
     def _hourly(self):
-        # Check for screensaver changes
-        self.screensaver.check()
+        # totally frivously do a spash screen once an hour.
         self._splash()
 
     def frame(self):

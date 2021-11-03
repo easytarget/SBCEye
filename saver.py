@@ -1,4 +1,5 @@
 import time
+import schedule
 
 class Saver:
     active = False  # Current state
@@ -23,7 +24,8 @@ class Saver:
                 self.saver_map = [True]*24
                 for i in range(settings.saver_off, settings.saver_on):
                     self.saver_map[i] = False
-        self.check()
+            schedule.every().hour.at(":00").do(self.check)
+            self.check()
 
 
     def _apply_state(self, state):
