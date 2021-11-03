@@ -1,7 +1,9 @@
+import os
 import tempfile
 import time
 from pathlib import Path
 import logging
+import gzip
 import rrdtool
 
 class Robin:
@@ -104,6 +106,29 @@ class Robin:
         self.cache_age = s.rrd_cache_age
         print('RRD database and cache configured and enabled')
         logging.info(f'RRD database is: {str(self.db_file)}')
+
+    def dump(self):
+        ret = ''
+        with tempfile.NamedTemporaryFile(mode='rb', dir='/tmp',
+                prefix='overwatch_dump') as temp_file:
+            rrdtool.dump(str(self.db_file), temp_file.name)
+            print(f'Dump is: {os.stat(temp_file.name).st_size} bytes in size')
+            ret = gzip.compress(temp_file.read())
+            print(f'Dump is: {len(ret)} bytes compressed')
+        return ret
+
+    def dump_fail(self):
+        import io
+        from contextlib import redirect_stdout,redirect_stderr
+
+        f = io.StringIO()
+        with redirect_stdout(f):
+            rrdtool.dump(str(self.db_file))
+        dump = f.getvalue()
+        print(f'Dump is: {len(dump)} bytes in size')
+        ret = gzip.compress(dump)
+        print(f'Dump is: {len(ret)} bytes compressed')
+        return ret
 
     def update(self, data):
         # Update the database with the latest readings

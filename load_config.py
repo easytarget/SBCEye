@@ -24,6 +24,7 @@ class Settings:
         self.web_port = web.getint("port")
         self.web_sensor_name = web.get("sensor_name")
         self.web_pin_states = tuple(web.get("pin_states").split(','))
+        self.web_allow_dump = web.getboolean("allow_dump")
 
         graph = config["graph"]
         self.graph_durations = graph.get("durations").split(',')

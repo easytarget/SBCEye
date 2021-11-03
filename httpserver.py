@@ -79,6 +79,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "max-age=60")
         self.end_headers()
 
+    def _set_xml_headers(self):
+        self.send_response(200)
+        self.send_header("Content-Encoding", "gzip")
+        self.send_header("Content-type", "application/xml")
+        self.end_headers()
+
     def _set_icon_headers(self):
         self.send_response(200)
         self.send_header("Content-type", "image/x-icon")
@@ -276,7 +282,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 else:
                     end = parsed_end[0]
                     stamp = f'{start} >> {end}'
-                body = Robin.draw_graph(http.rrd, start, end, stamp, graph)
+                #body = Robin.draw_graph(http.rrd, start, end, stamp, graph)
+                body = http.rrd.draw_graph(start, end, stamp, graph)
             if len(body) == 0:
                 self.send_error(404, 'Graph unavailable',
                         'Check your parameters and try again,'\
@@ -351,6 +358,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                     '60000);\n</script>\n'
             response += self._give_foot()
             self._write_dedented(response)
+        elif (urlparse(self.path).path == '/dump') and http.s.web_allow_dump:
+            self._set_xml_headers()
+            self.wfile.write(http.rrd.dump())
         elif urlparse(self.path).path == '/':
             # Main Page
             http.update_data()
