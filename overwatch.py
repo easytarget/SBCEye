@@ -157,7 +157,7 @@ schedule_logger.setLevel(level=logging.WARN)
 
 # Now we have logging, notify we are starting up
 logging.info('')
-logging.info(f'Starting overwatch serice for: {settings.name}')
+logging.info(f'Starting overwatch service for: {settings.name}')
 logging.info(f'Version: {my_version}')
 
 # Initialise the bus, display and sensor

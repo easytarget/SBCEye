@@ -14,30 +14,30 @@ Written in Python as a learning excercise, it draws heavily on [RRDtool](https:/
 
 Default Web Interface
 
-![env](/Images/default-main.png)![env](/Images/default-graphs.png)
+![env](/docs/img/default-main.png)![env](/docs/img/default-graphs.png)
 
 Add a BME280 sensor and/or some GPIO pins to monitor
 
-![bme280](/Images/pihat-bme280-thumb.jpg)
-![Web](/Images/workshop-main.png)![Web](/Images/workshop-graphs.png)
+![bme280](/docs/img/pihat-bme280-thumb.jpg)
+![Web](/docs/img/workshop-main.png)![Web](/docs/img/workshop-graphs.png)
 
 Add a 128x64 OLED display
 
-![env](/Images/pihat-env-thumb.jpg)![sys](/Images/pihat-sys-thumb.jpg)
+![env](/docs/img/pihat-env-thumb.jpg)![sys](/docs/img/pihat-sys-thumb.jpg)
 
 Log GPIO actions etc..
 
-![Web](/Images/workshop-log.png)
+![Web](/docs/img/workshop-log.png)
 
 Embeddable Panels and Standalone Graphs
 
-![Web](/Images/workshop-sys-panel.png)
-![Web](/Images/workshop-humi-graph.png)
+![Web](/docs/img/workshop-sys-panel.png)
+![Web](/docs/img/workshop-humi-graph.png)
 
 ## Requires:
 * [Python3.7+](https://www.python.org/), [pip](https://pypi.org/project/pip/) and [virtualenv](https://pypi.org/project/virtualenv/)
 
-The [install guide](VENV.md) covers installing these, and the rest of the requirements:
+The [install guide](docs/INSTALL.md) covers installing these, and the rest of the requirements in a way that wont conflict with other python tools and versions on your system:
 * [Schedule](https://github.com/dbader/schedule)
 * [python RRDtool](https://pythonhosted.org/rrdtool/index.html)
 * [psutil](https://psutil.readthedocs.io/en/latest/)
@@ -47,8 +47,18 @@ The [install guide](VENV.md) covers installing these, and the rest of the requir
 * [Liberation Fonts](https://en.wikipedia.org/wiki/Liberation_fonts)
 
 ## Install:
-This is covered in detail in [this guide](VENV.md)
+This is covered in detail here: [docs/INSTALL.md](docs/INSTALL.md)
 - Install is done via a python virtual environment to avoid any conflicts with other Python installs (such as OctoPrint)
+
+## Configuration
+Copy the `default.ini` file in the repo to `config.ini` and edit..
+* All the useful options are commented in the file
+* Restart Overwatch to apply any changes
+
+## Customisation and Architecture
+I need to flesh this out in a sepaerate document.
+
+In brief: Customising should be relatively easy, add a data source and commands to gather it in `overwatch.py` (see how this is done for the CPU temperature, etc); then add it to the graph structures in `robin.py` and the sensorlist in `httpserver.py`. Customising the screens for an OLED display can be done in `animate.py`
 
 ## Wiring:
 The sensor, display and GPIO control is all optional. The unit itself can only control a single pin, but it can monitor and log multiple pins if you are also using GPIO for controlling other aparatus (eg 3d printer power supplies)
@@ -56,7 +66,10 @@ The sensor, display and GPIO control is all optional. The unit itself can only c
 * GPIO outputs controlling lights etc; opto-isolated relay boards are your friend here.
 * Button goes to a spare GPIO with a pulldown resistor
 
-![schematic](/Images/OverWatch-hardware-small.png)
+![schematic](/docs/img/OverWatch-hardware-small.png)
+
+## Plans
+I want to add an extensible alerting function.. see [#15](https://github.com/easytarget/pi-overwatch/issues/15)
 
 ### Docs for CP libs:
 https://circuitpython.readthedocs.io/en/latest/shared-bindings/index.html
