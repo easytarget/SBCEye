@@ -59,6 +59,7 @@ class Robin:
 
         # Database File
         self.db_file = Path(f'{s.rrd_dir}/{s.rrd_file_name}').resolve()
+        source_file = Path(f'{s.rrd_dir}/{s.rrd_file_name}.old').resolve()
         if not self.db_file.is_file():
             # Generate a new file when none present
             print(f'Generating {str(self.db_file)}')
@@ -67,14 +68,17 @@ class Robin:
                 mini = self.data_sources[source][0]
                 maxi = self.data_sources[source][1]
                 ds_list.append(f'DS:{source}:GAUGE:60:{mini}:{maxi}')
-                print(f" source: {source} ({mini},{maxi})")
-            rrdtool.create(
-                str(self.db_file),
-                "--start", "now",
-                "--step", "60",
-                "RRA:AVERAGE:0.5:1:131040",   # 3 months per minute
-                "RRA:AVERAGE:0.5:60:26352",  # 3 years per hour
-                *ds_list)
+                print(f" data source: {source} ({mini},{maxi})")
+            args = [str(self.db_file)]
+            if source_file.is_file():
+                print(f'Importing from previous {source_file}')
+                args.append(["--source",str(source_file)])
+            args.append(["--start", "now-10s",
+                    "--step", "10s",
+                    "RRA:AVERAGE:0.5:1:181440",    # 3 weeks per 10s
+                    "RRA:AVERAGE:0.5:6:786240",    # 3 months per minute
+                    "RRA:AVERAGE:0.5:360:158112"]) # 3 years per hour
+            rrdtool.create(*args,*ds_list)
         else:
             print(f'Using existing: {str(self.db_file)}')
 
