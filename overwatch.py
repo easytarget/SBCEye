@@ -288,7 +288,6 @@ def update_data():
         data['sys-mem'] = psutil.virtual_memory().percent
         data_updated = time.time()
 
-
 def update_pins():
     # Check if any pins have changed state, and log
     for name, pin in pin_map.items():
@@ -341,6 +340,13 @@ def good_bye():
 # The fun starts here:
 if __name__ == '__main__':
 
+    # Log sensor status
+    if HAVE_SENSOR:
+        logging.info('Environmental sensor configured and enabled')
+    elif settings.have_sensor:
+        logging.warning('Environmental data configured but no sensor detected: '\
+                'Environment status and logging disabled')
+
     # Display animation setup
     # The animator class will start the screen display and saver
     # as scheduled jobs to run forever
@@ -351,12 +357,8 @@ if __name__ == '__main__':
             logging.warning('Display configured but did not initialise properly: '\
                     'Display features disabled')
 
-    # Log sensor status
-    if HAVE_SENSOR:
-        logging.info('Environmental sensor configured and enabled')
-    elif settings.have_sensor:
-        logging.warning('Environmental data configured but no sensor detected: '\
-                'Environment status and logging disabled')
+    # Get an initial data reading for system and sensor values
+    update_data()
 
     # GPIO mode and arrays for the pin database path and current status
     if len(pin_map.keys()) > 0:
@@ -387,6 +389,9 @@ if __name__ == '__main__':
     # RRD init
     rrd = Robin(settings, data)
 
+    # Start the web server, it will fork into a seperate thread and run continually
+    serve_http(settings, rrd, data, (button_control, update_data, update_pins))
+
     # Exit handler (needed for rrd data-safe shutdown)
     signal.signal(signal.SIGTERM, signal_bye)
     signal.signal(signal.SIGINT, signal_bye)
@@ -400,14 +405,11 @@ if __name__ == '__main__':
     if settings.log_interval > 0:
         schedule.every(settings.log_interval).seconds.do(log_data)
 
-    # Run all the schedule jobs once, so we have data ready to serve
-    schedule.run_all()
-
-    # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(settings, rrd, data, (button_control, update_data, update_pins))
-
     # We got this far... time to start the show
     logging.info("Init complete, starting schedules and entering service loop")
+
+    # Run all the schedule jobs once, so we have data ready to serve
+    schedule.run_all()
 
     # Main loop now runs forever while servicing the scheduler
     while True:
