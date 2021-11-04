@@ -271,7 +271,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <div style="text-align: center;">
                 <hr>
                 Generating the dump imposes a high load on the overwatch process and
-                could potentially negatively impact other software running on the system.
+                can potentially impact other software running on the system.
                 <br>
                 It can take several minutes to complete (depending on the
                 host machine/data complexity), and will block other overwatch
