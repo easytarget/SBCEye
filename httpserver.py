@@ -35,6 +35,11 @@ def serve_http(s, rrd, data, helpers):
     httpd.timeout = 0.5
     # HTTPServer sets this as well (left here to make obvious).
     httpd.allow_reuse_address = True
+    if s.web_allow_dump and rrd.dumpable:
+        _threadlog(f"RRD database is dumpable via web")
+        http.db_dumpable = True
+    else:
+        http.db_dumpable = False
     # I'm just passing objects blindly into the http class itself, quick and dirty but it works
     # there is probably a better way to do this, eg using a meta-class and inheritance
     http.s = s
@@ -79,10 +84,11 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "max-age=60")
         self.end_headers()
 
-    def _set_xml_headers(self):
+    def _set_download_headers(self, size, name):
         self.send_response(200)
-        self.send_header("Content-Encoding", "gzip")
-        self.send_header("Content-type", "application/xml")
+        self.send_header("Content-Type", 'application/octet-stream')
+        self.send_header("Content-Disposition", f'attachment; filename="{name}"')
+        self.send_header("Content-Length", str(size))
         self.end_headers()
 
     def _set_icon_headers(self):
@@ -255,6 +261,27 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         ret += '</table>\n'
         return ret
 
+    def _give_dump_portal(self):
+        return '''
+                <h2>RRD database dump in gzipped XML format</h2>
+                <div style="text-align: center; width: 80%">What is this?
+                See: <a href="https://oss.oetiker.ch/rrdtool/doc/rrddump.en.html"
+                title = "RRDTool documentation" target="_blank">The Docs</a>
+                </div>
+                <div style="text-align: center;">
+                <hr>
+                Generating the dump imposes a high load on the overwatch process and
+                could potentially negatively impact other software running on the system.
+                <br>
+                It can take several minutes to complete (depending on the
+                host machine/data complexity), and will block other overwatch
+                operations while it runs. <em>Use with care!</em>
+                <hr>
+                If you are sure you wish to proceed:<br>
+                <a href="./dump_gz" title = "Direct download link">Download</a>
+                </div>
+                '''
+
     def _write_dedented(self, html):
         # Strip leading whitespace and write
         response = re.sub(r'^\s*','', html, flags=re.MULTILINE)
@@ -358,9 +385,20 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                     '60000);\n</script>\n'
             response += self._give_foot()
             self._write_dedented(response)
-        elif (urlparse(self.path).path == '/dump') and http.s.web_allow_dump:
-            self._set_xml_headers()
-            self.wfile.write(http.rrd.dump())
+        elif (urlparse(self.path).path == '/dump_gz') and http.db_dumpable:
+            start = time.time()
+            _threadlog(f"RRD database dump requested by {self.client_address[0]}")
+            response = http.rrd.dump()
+            self._set_download_headers(len(response),
+                    f'{http.s.name}-rrd-{time.strftime("%Y%m%d-%H%M%S")}.xml.gz')
+            self.wfile.write(response)
+            _threadlog(f"Dump completed in {(time.time() - start):.2f}s")
+        elif (urlparse(self.path).path == '/dump') and http.db_dumpable:
+            self._set_headers()
+            response = self._give_head(f" :: RRD Dump")
+            response += self._give_dump_portal()
+            response += self._give_foot()
+            self._write_dedented(response)
         elif urlparse(self.path).path == '/':
             # Main Page
             http.update_data()

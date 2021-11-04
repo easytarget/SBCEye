@@ -1,9 +1,10 @@
-import os
 import tempfile
 import time
 from pathlib import Path
 import logging
 import gzip
+import subprocess
+from shutil import which
 import rrdtool
 
 class Robin:
@@ -100,6 +101,12 @@ class Robin:
                     str(self.db_file),
                     f"DS:{source}:GAUGE:60:{mini}:{maxi}")
 
+        # Disable dumping if rrdtool not in path
+        if which("rrdtool"):
+            self.dumpable = True
+        else:
+            self.dumpable = False
+
         # use a home-brew local cache (list) here, rrdcache does not like templates
         self.cache = []
         self.last_write = 0
@@ -108,27 +115,17 @@ class Robin:
         logging.info(f'RRD database is: {str(self.db_file)}')
 
     def dump(self):
-        ret = ''
-        with tempfile.NamedTemporaryFile(mode='rb', dir='/tmp',
-                prefix='overwatch_dump') as temp_file:
-            rrdtool.dump(str(self.db_file), temp_file.name)
-            print(f'Dump is: {os.stat(temp_file.name).st_size} bytes in size')
-            ret = gzip.compress(temp_file.read())
-            print(f'Dump is: {len(ret)} bytes compressed')
-        return ret
-
-    def dump_fail(self):
-        import io
-        from contextlib import redirect_stdout,redirect_stderr
-
-        f = io.StringIO()
-        with redirect_stdout(f):
-            rrdtool.dump(str(self.db_file))
-        dump = f.getvalue()
-        print(f'Dump is: {len(dump)} bytes in size')
-        ret = gzip.compress(dump)
-        print(f'Dump is: {len(ret)} bytes compressed')
-        return ret
+        if self.dumpable:
+            print('Dump requested')
+            start = time.time()
+            dump = subprocess.check_output(["rrdtool", 'dump', str(self.db_file)])
+            print(f'Dump is: {len(dump)} bytes raw, ', end='')
+            zipped = gzip.compress(dump, compresslevel=6)
+            print(f'{len(zipped)} bytes compressed and took {(time.time() - start):.2f}s')
+        else:
+            print('Dump requested but denied because commandline "rrdtool" unavailable')
+            zipped = bytearray()
+        return zipped
 
     def update(self, data):
         # Update the database with the latest readings
