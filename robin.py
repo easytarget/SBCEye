@@ -138,7 +138,7 @@ class Robin:
         logging.info(f'RRD database is: {str(self.db_file)}')
 
 
-    def start_backup(self):
+    def start_backups(self):
         # Start the backup schedule
         if self.backup_count > 0:
             schedule.every().day.at("23:45").do(self._backup)
@@ -147,10 +147,13 @@ class Robin:
         if self.backup_count > 0:
             # Copy to a timestamped file
             self.write_updates()
-            suffix = time.strftime("%Y-%m-%d.%H:%M:%S")
-            shutil.copy(self.db_file,
-                    f'{str(self.backup_path)}/{self.backup_name}.{suffix}')
-            logging.info(f'Database backup saved as: {self.backup_name}.{suffix}')
+            suffix = time.strftime("%Y-%m-%d.%H:%M:%S.gz")
+            with open(f'{self.db_file}', 'rb') as dbfile:
+                with gzip.GzipFile(
+                        f'{str(self.backup_path)}/{self.backup_name}.{suffix}',
+                        mode = 'wb', compresslevel = 6) as zipfile:
+                    zipfile.write(dbfile.read())
+            #logging.info(f'Database backup saved as: {self.backup_name}.{suffix}')
             print(f'Database backup saved as: {self.backup_name}.{suffix}')
 
             # Process old backups
@@ -169,7 +172,7 @@ class Robin:
                     retain += 1
                 else:
                     os.remove(f'{self.backup_path}/{name}')
-                    logging.info(f'Removed stale backup: {name}')
+                    #logging.info(f'Removed stale backup: {name}')
                     print(f'Removed stale backup: {name}')
 
     def dump(self):
