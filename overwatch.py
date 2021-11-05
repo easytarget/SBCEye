@@ -411,6 +411,9 @@ if __name__ == '__main__':
     # Run all the schedule jobs once, so we have data ready to serve
     schedule.run_all()
 
+    # Start the backup schedule after the run_all()
+    rrd.start_backup()
+
     # Main loop now runs forever while servicing the scheduler
     while True:
         schedule.run_pending()

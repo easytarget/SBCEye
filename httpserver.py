@@ -309,7 +309,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 else:
                     end = parsed_end[0]
                     stamp = f'{start} >> {end}'
-                #body = Robin.draw_graph(http.rrd, start, end, stamp, graph)
                 body = http.rrd.draw_graph(start, end, stamp, graph)
             if len(body) == 0:
                 self.send_error(404, 'Graph unavailable',
@@ -319,9 +318,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._set_png_headers()
             self.wfile.write(body)
         elif urlparse(self.path).path == '/graphs':
+            # Graph Index Page
             parsed_start = parse_qs(urlparse(self.path).query).get('start', None)
             parsed_end = parse_qs(urlparse(self.path).query).get('end', None)
-            # Graph Index Page
             if not parsed_start:
                 start = "end-1d"
             else:
@@ -340,6 +339,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_foot(refresh=300)
             self._write_dedented(response)
         elif urlparse(self.path).path == '/favicon.ico':
+            # Favicon
             fi_file = 'favicon.ico'
             if not os.path.exists(fi_file):
                 fi_file = f'{sys.path[0]}/{fi_file}'
@@ -353,7 +353,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         elif ((urlparse(self.path).path == '/' + http.s.button_url)
                 and (len(http.s.button_url) > 0)
                 and (len(http.s.pin_map.keys()) > 0)):
-            # Web Button
+            # Web button control
             http.update_pins()
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
             if parsed:
@@ -386,6 +386,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_foot()
             self._write_dedented(response)
         elif (urlparse(self.path).path == '/dump_gz') and http.db_dumpable:
+            # Raw dump download
             start = time.time()
             _threadlog(f"RRD database dump requested by {self.client_address[0]}")
             response = http.rrd.dump()
@@ -394,6 +395,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(response)
             _threadlog(f"Dump completed in {(time.time() - start):.2f}s")
         elif (urlparse(self.path).path == '/dump') and http.db_dumpable:
+            # Dump warning and link page
             self._set_headers()
             response = self._give_head(f" :: RRD Dump")
             response += self._give_dump_portal()

@@ -4,7 +4,9 @@ from pathlib import Path
 import logging
 import gzip
 import subprocess
-from shutil import which
+import os
+import shutil
+import schedule
 import rrdtool
 
 class Robin:
@@ -60,9 +62,28 @@ class Robin:
         self.template = self.template.rstrip(':')
         print(f'Template = {self.template}')
 
-        # Database File
+        # Backup settings
+        self.backup_count = s.rrd_backup_count
+        self.backup_age = s.rrd_backup_age
+
+        # File paths
+        db_path = Path(f'{s.rrd_dir}').resolve()
         self.db_file = Path(f'{s.rrd_dir}/{s.rrd_file_name}').resolve()
         source_file = Path(f'{s.rrd_dir}/{s.rrd_file_name}.old').resolve()
+        if s.rrd_backup_count > 0:
+            try:
+                os.mkdir(f'{str(db_path)}/backup/')
+            except FileExistsError:
+                pass
+            except:
+                logging.warning('Disabling database backups because the'\
+                        'backup folder could not be created')
+                print(f'Database backup folder creation failed ({str(db_path)}/backup/)')
+                self.backup_count = 0
+            self.backup_path = str(Path(f'{s.rrd_dir}/backup/').resolve())
+            self.backup_name = f'{s.rrd_file_name}'
+
+        # Database
         if not self.db_file.is_file():
             # Generate a new file when none present
             print(f'Generating {str(self.db_file)}')
@@ -102,20 +123,59 @@ class Robin:
                     f"DS:{source}:GAUGE:60:{mini}:{maxi}")
 
         # Disable dumping if rrdtool not in path
-        if which("rrdtool"):
+        if shutil.which("rrdtool"):
             self.dumpable = True
         else:
             self.dumpable = False
 
-        # use a home-brew local cache (list) here, rrdcache does not like templates
+        # Use a home-brew local cache
         self.cache = []
         self.last_write = 0
         self.cache_age = s.rrd_cache_age
+
+        # Notify
         print('RRD database and cache configured and enabled')
         logging.info(f'RRD database is: {str(self.db_file)}')
 
+
+    def start_backup(self):
+        # Start the backup schedule
+        if self.backup_count > 0:
+            schedule.every().day.at("23:45").do(self._backup)
+
+    def _backup(self):
+        if self.backup_count > 0:
+            # Copy to a timestamped file
+            self.write_updates()
+            suffix = time.strftime("%Y-%m-%d.%H:%M:%S")
+            shutil.copy(self.db_file,
+                    f'{str(self.backup_path)}/{self.backup_name}.{suffix}')
+            logging.info(f'Database backup saved as: {self.backup_name}.{suffix}')
+            print(f'Database backup saved as: {self.backup_name}.{suffix}')
+
+            # Process old backups
+            now = time.time()
+            candidates = {}
+            retain = 0
+            for entry in os.scandir(self.backup_path):
+                if entry.name.startswith(f'{self.backup_name}.'):
+                    age = now - os.stat(entry).st_mtime
+                    if age > self.backup_age:
+                        candidates[entry.name] = age
+                    else:
+                        retain += 1
+            for name,age in sorted(candidates.items(), key=lambda x: x[1]):
+                if retain < self.backup_count:
+                    retain += 1
+                else:
+                    os.remove(f'{self.backup_path}/{name}')
+                    logging.info(f'Removed stale backup: {name}')
+                    print(f'Removed stale backup: {name}')
+
     def dump(self):
+        # provide a gzipped dump of database
         if self.dumpable:
+            self.write_updates()
             print('Dump requested')
             start = time.time()
             dump = subprocess.check_output(["rrdtool", 'dump', str(self.db_file)])
@@ -138,6 +198,7 @@ class Robin:
             self.write_updates()
 
     def write_updates(self):
+        # write any cached updates to the database
         if len(self.cache) > 0:
             rrdtool.update(
                     str(self.db_file),
