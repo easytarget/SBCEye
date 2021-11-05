@@ -62,9 +62,9 @@ class Settings:
         rrd = config["rrd"]
         self.rrd_dir = rrd.get("dir")
         self.rrd_file_name = rrd.get("file_name")
-        self.rrd_cache_age = rrd.getint("cache_age")
+        self.rrd_cache_age = abs(rrd.getint("cache_age"))
         self.rrd_backup_count = rrd.getint("backup_count")
-        self.rrd_backup_age = int(rrd.getfloat("backup_age") * 86400)
+        self.rrd_backup_age = int(abs(rrd.getfloat("backup_age")) * 86400)
 
         display = config["display"]
         self.display_rotate = display.getboolean("rotate")

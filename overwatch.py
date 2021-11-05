@@ -210,9 +210,6 @@ if HAVE_SENSOR:
             print("We do not have an environmental sensor")
             HAVE_SENSOR = False
 
-# Unicode degrees character used for display and logging
-DEGREE_SIGN= u'\N{DEGREE SIGN}'
-
 # Set the time of last data update so that a new update is forced
 data_updated = time.time() - settings.data_interval
 
@@ -231,6 +228,9 @@ if HAVE_SENSOR:
 # add pins
 for name,_ in pin_map.items():
     data[f"pin-{name}"] = 0
+
+# Unicode degrees character
+DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
 # Local functions
 
