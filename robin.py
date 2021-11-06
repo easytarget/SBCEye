@@ -2,11 +2,12 @@ import tempfile
 import time
 from pathlib import Path
 import logging
-import gzip
+from gzip import GzipFile, compress
 import subprocess
 import os
-import shutil
+from shutil import which
 import schedule
+from threading import Thread
 import rrdtool
 
 class Robin:
@@ -124,7 +125,7 @@ class Robin:
                     f"DS:{source}:GAUGE:60:{mini}:{maxi}")
 
         # Disable dumping if rrdtool not in path
-        if shutil.which("rrdtool"):
+        if which("rrdtool"):
             self.dumpable = True
         else:
             self.dumpable = False
@@ -178,7 +179,7 @@ class Robin:
     def start_backups(self):
         # Start the backup schedule
         if self.backup_count > 0:
-            schedule.every().day.at(self.backup_time).do(_run_threaded, self._backup)
+            schedule.every().day.at(self.backup_time).do(self._run_threaded, self._backup)
 
     def dump(self):
         # provide a gzipped dump of database
