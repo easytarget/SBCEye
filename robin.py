@@ -139,10 +139,9 @@ class Robin:
         logging.info(f'RRD database is: {str(self.db_file)}')
 
 
-    def start_backups(self):
-        # Start the backup schedule
-        if self.backup_count > 0:
-            schedule.every().day.at(self.backup_time).do(self._backup)
+    def _run_threaded(job_func):
+        job_thread = Thread(target=job_func)
+        job_thread.start()
 
     def _backup(self):
         if self.backup_count > 0:
@@ -175,6 +174,11 @@ class Robin:
                     os.remove(f'{self.backup_path}/{name}')
                     #logging.info(f'Removed stale backup: {name}')
                     print(f'Removed stale backup: {name}')
+
+    def start_backups(self):
+        # Start the backup schedule
+        if self.backup_count > 0:
+            schedule.every().day.at(self.backup_time).do(_run_threaded, self._backup)
 
     def dump(self):
         # provide a gzipped dump of database
