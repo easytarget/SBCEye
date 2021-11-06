@@ -210,14 +210,17 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         return ret
 
     def _give_links(self):
-        # Currently just a link to the log
-        return f'''{self._give_graphlinks()}
-                <tr>
-                <td colspan="2" style="text-align: center;">
+        # Link to the log and pin contol pages
+        ret = f'''{self._give_graphlinks()}
+                <tr><td colspan="2" style="text-align: center;">
                 <a href="./?view=deco&view=log" title="Open the log in a new page" target="_blank">
-                Log</a>
-                </td>
-                </tr>'''
+                Log</a>\n'''
+        if http.s.web_show_control and (len(http.s.pin_map.keys()) > 0):
+            name = next(iter(http.s.pin_map))
+            ret += f'&nbsp;&nbsp;<a href="./{http.s.button_url}" '\
+                    f'title="{name} status and control page">{name}</a>\n'
+        ret += '</td></tr>\n'
+        return ret
 
     def _give_log(self, lines=100):
         # Combine and give last (lines) lines of log
