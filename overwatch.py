@@ -45,6 +45,12 @@ from httpserver import serve_http
 my_version = subprocess.check_output(["git", "describe", "--tags",
         "--always", "--dirty"], cwd=sys.path[0]).decode('ascii').strip()
 
+# Re-nice to reduce blocking of other processes
+os.nice(10)
+
+# Let the console know we are starting
+print("Starting OverWatch")
+
 # Parse the arguments
 parser = argparse.ArgumentParser(
     formatter_class=RawTextHelpFormatter,
@@ -92,6 +98,14 @@ else:
             sys.exit()
 
 settings = Settings(config_file)
+
+# More meaningful process title
+try:
+    import setproctitle
+    process_name = settings.name.encode("ascii", "ignore").decode("ascii")
+    setproctitle.setproctitle(f'overwatch: {process_name}')
+except ModuleNotFoundError:
+    print('Cannot set process title since module "setproctitle" not found')
 
 HAVE_SCREEN = settings.have_screen
 HAVE_SENSOR = settings.have_sensor
@@ -141,12 +155,6 @@ if len(pin_map.keys()) > 0:
         print(e)
         print("ERROR: GPIO monitoring requirements not met, features disabled")
         pin_map.clear()
-
-# Imports and settings should be OK now, let the console know we are starting
-print("Starting OverWatch")
-
-# Start by re-nicing to reduce blocking of other processes
-os.nice(10)
 
 # Logging
 settings.log_file = Path(f'{settings.log_file_dir}/{settings.log_file_name}').resolve()
