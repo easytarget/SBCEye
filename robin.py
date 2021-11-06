@@ -65,6 +65,7 @@ class Robin:
         # Backup settings
         self.backup_count = s.rrd_backup_count
         self.backup_age = s.rrd_backup_age
+        self.backup_time = s.rrd_backup_time
 
         # File paths
         db_path = Path(f'{s.rrd_dir}').resolve()
@@ -141,7 +142,7 @@ class Robin:
     def start_backups(self):
         # Start the backup schedule
         if self.backup_count > 0:
-            schedule.every().day.at("23:45").do(self._backup)
+            schedule.every().day.at(self.backup_time).do(self._backup)
 
     def _backup(self):
         if self.backup_count > 0:

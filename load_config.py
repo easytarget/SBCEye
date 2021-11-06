@@ -66,6 +66,7 @@ class Settings:
         self.rrd_cache_age = abs(rrd.getint("cache_age"))
         self.rrd_backup_count = rrd.getint("backup_count")
         self.rrd_backup_age = int(abs(rrd.getfloat("backup_age")) * 86400)
+        self.rrd_backup_time = rrd.get("backup_time")
 
         display = config["display"]
         self.display_rotate = display.getboolean("rotate")
