@@ -140,7 +140,7 @@ class Robin:
         logging.info(f'RRD database is: {str(self.db_file)}')
 
 
-    def _run_threaded(job_func):
+    def _run_threaded(self, job_func):
         job_thread = Thread(target=job_func)
         job_thread.start()
 
