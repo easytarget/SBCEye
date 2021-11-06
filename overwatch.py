@@ -31,10 +31,11 @@ import textwrap
 import argparse
 from argparse import RawTextHelpFormatter
 from pathlib import Path
-import atexit
+from atexit import register
 import schedule
-import subprocess
-import signal
+from subprocess import check_output
+from threading import Thread
+from signal import signal, SIGTERM, SIGINT
 import psutil
 
 # Local classes
@@ -42,7 +43,7 @@ from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
 
-my_version = subprocess.check_output(["git", "describe", "--tags",
+my_version = check_output(["git", "describe", "--tags",
         "--always", "--dirty"], cwd=sys.path[0]).decode('ascii').strip()
 
 # Re-nice to reduce blocking of other processes
@@ -335,6 +336,10 @@ def hourly():
     timestamp = time.strftime(settings.time_format)
     print(f'{myself} :: {timestamp}')
 
+def run_threaded(job_func):
+    job_thread = Thread(target=job_func)
+    job_thread.start()
+
 def signal_bye(*_):
     # Calling sys.exit() will invoke the good_bye() exit handler
     sys.exit()
@@ -400,18 +405,20 @@ if __name__ == '__main__':
     # Start the web server, it will fork into a seperate thread and run continually
     serve_http(settings, rrd, data, (button_control, update_data, update_pins))
 
-    # Exit handler (needed for rrd data-safe shutdown)
-    signal.signal(signal.SIGTERM, signal_bye)
-    signal.signal(signal.SIGINT, signal_bye)
-    atexit.register(good_bye)
+    # Exit handlers (needed for rrd data-safe shutdown)
+    signal(SIGTERM, signal_bye)
+    signal(SIGINT, signal_bye)
+    register(good_bye)
 
     # Schedule pin monitoring, database updates and logging events
+    # Use seperate threads for the different updaters.
+    # The display (started in the animate class) runs in the main thread.
     schedule.every().hour.at(":00").do(hourly)
-    schedule.every(settings.rrd_interval).seconds.do(update_db)
+    schedule.every(settings.rrd_interval).seconds.do(run_threaded, update_db)
     if len(pin_map.keys()) > 0:
-        schedule.every(settings.pin_interval).seconds.do(update_pins)
+        schedule.every(settings.pin_interval).seconds.do(run_threaded, update_pins)
     if settings.log_interval > 0:
-        schedule.every(settings.log_interval).seconds.do(log_data)
+        schedule.every(settings.log_interval).seconds.do(run_threaded, log_data)
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedules and entering service loop")
@@ -420,7 +427,7 @@ if __name__ == '__main__':
     schedule.run_all()
 
     # Start the backup schedule after the run_all()
-    rrd.start_backups()
+    run_threaded(rrd.start_backups())
 
     # Main loop now runs forever while servicing the scheduler
     while True:
