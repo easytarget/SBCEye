@@ -9,7 +9,7 @@ import re
 # HTTP server
 import http.server
 from urllib.parse import urlparse, parse_qs
-from threading import Thread, current_thread
+from threading import Thread
 
 # Logging
 import logging
@@ -17,26 +17,26 @@ import logging
 # RRD data
 from robin import Robin
 
-def get_period(start, end):
-    if end == '':
-        period = f'last {start.lstrip("-")}'
-        start = f'end{start}'
-        end = 'now'
-    else:
-        period = f'{start} >> {end}'
-    return period
+#def get_period(start, end):
+#    if end == '':
+#        period = f'last {start.lstrip("-")}'
+#        start = f'end{start}'
+#        end = 'now'
+#    else:
+#        period = f'{start} >> {end}'
+#    return period
 
 
 def serve_http(s, rrd, data, helpers):
     # Spawns a http.server.HTTPServer in a separate thread on the given port.
     handler = _BaseRequestHandler
-    httpd = http.server.HTTPServer((s.web_host, s.web_port), handler, False)
+    httpd = http.server.ThreadingHTTPServer((s.web_host, s.web_port), handler, False)
     # Block only for 0.5 seconds max
     httpd.timeout = 0.5
     # HTTPServer sets this as well (left here to make obvious).
     httpd.allow_reuse_address = True
     if s.web_allow_dump and rrd.dumpable:
-        _threadlog(f"RRD database is dumpable via web")
+        logging.info(f"RRD database is dumpable via web")
         http.db_dumpable = True
     else:
         http.db_dumpable = False
@@ -49,25 +49,20 @@ def serve_http(s, rrd, data, helpers):
     http.update_data = helpers[1]
     http.update_pins = helpers[2]
     # Start the server
-    _threadlog(f"HTTP server will bind to port {str(s.web_port)} on host {s.web_host}")
+    logging.info(f"HTTP server will bind to port {str(s.web_port)} on host {s.web_host}")
     httpd.server_bind()
     address = f"http://{httpd.server_name}:{httpd.server_port}"
-    _threadlog(f"Access via: {address}")
-    print(f"Webserver started on : {address}")
+    print(f"Webserver starting on : {address}")
     httpd.server_activate()
     def serve_forever(httpd):
         with httpd:  # to make sure httpd.server_close is called
-            _threadlog("Http Server start")
+            logging.info("Http Server starting")
             httpd.serve_forever()
-            _threadlog("Http Server closing down")
+            logging.info("Http Server closing down")
     thread = Thread(target=serve_forever, args=(httpd, ))
-    thread.setDaemon(True)
+    thread.setDaemon(True )
     thread.start()
-    return httpd, address
 
-def _threadlog(logline):
-    # A wrapper function around logging.info() that prepends the current thread name
-    logging.info(f"[{current_thread().name}] : {logline}")
 
 class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _set_headers(self):
@@ -276,9 +271,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 Generating the dump imposes a high load on the overwatch process and
                 can potentially impact other software running on the system.
                 <br>
-                It can take several minutes to complete (depending on the
-                host machine/data complexity), and will block other overwatch
-                operations while it runs. <em>Use with care!</em>
+                It can take several minutes to complete; depending on the
+                host machine and db size+complexity. <em>Use with care!</em>
                 <hr>
                 If you are sure you wish to proceed:<br>
                 <a href="./dump_gz" title = "Direct download link">Download</a>
@@ -391,12 +385,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         elif (urlparse(self.path).path == '/dump_gz') and http.db_dumpable:
             # Raw dump download
             start = time.time()
-            _threadlog(f"RRD database dump requested by {self.client_address[0]}")
+            logging.info(f"RRD database dump requested by {self.client_address[0]}")
             response = http.rrd.dump()
             self._set_download_headers(len(response),
                     f'{http.s.name}-rrd-{time.strftime("%Y%m%d-%H%M%S")}.xml.gz')
             self.wfile.write(response)
-            _threadlog(f"Dump completed in {(time.time() - start):.2f}s")
+            logging.info(f"Dump completed in {(time.time() - start):.2f}s")
         elif (urlparse(self.path).path == '/dump') and http.db_dumpable:
             # Dump warning and link page
             self._set_headers()
