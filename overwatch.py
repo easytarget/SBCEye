@@ -427,7 +427,7 @@ if __name__ == '__main__':
     schedule.run_all()
 
     # Start the backup schedule after the run_all()
-    run_threaded(rrd.start_backups())
+    rrd.start_backups()
 
     # Main loop now runs forever while servicing the scheduler
     while True:
