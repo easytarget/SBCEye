@@ -9,7 +9,7 @@ import re
 # HTTP server
 import http.server
 from urllib.parse import urlparse, parse_qs
-from threading import Thread
+from threading import Thread, local
 
 # Logging
 import logging
@@ -31,6 +31,7 @@ def serve_http(s, rrd, data, helpers):
     # Spawns a http.server.HTTPServer in a separate thread on the given port.
     handler = _BaseRequestHandler
     httpd = http.server.ThreadingHTTPServer((s.web_host, s.web_port), handler, False)
+    #httpd = http.server.HTTPServer((s.web_host, s.web_port), handler, False)
     # Block only for 0.5 seconds max
     httpd.timeout = 0.5
     # HTTPServer sets this as well (left here to make obvious).
@@ -48,6 +49,9 @@ def serve_http(s, rrd, data, helpers):
     http.button_control = helpers[0]
     http.update_data = helpers[1]
     http.update_pins = helpers[2]
+    http.fi_file = 'favicon.ico'
+    if not os.path.exists(http.fi_file):
+        http.fi_file = f'{sys.path[0]}/{http.fi_file}'
     # Start the server
     logging.info(f"HTTP server will bind to port {str(s.web_port)} on host {s.web_host}")
     httpd.server_bind()
@@ -65,6 +69,9 @@ def serve_http(s, rrd, data, helpers):
 
 
 class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
+    ret = local()
+
+
     def _set_headers(self):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
@@ -284,6 +291,14 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         response = re.sub(r'^\s*','', html, flags=re.MULTILINE)
         self.wfile.write(bytes(response, 'utf-8'))
 
+    parsed_graph = local()
+    parsed_start = local()
+    parsed_end = local()
+    start = local()
+    end = local()
+    stamp = local()
+    graph = local()
+    parsed = local()
 
     def do_GET(self):
         # Process requests and parse their options
@@ -337,15 +352,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._write_dedented(response)
         elif urlparse(self.path).path == '/favicon.ico':
             # Favicon
-            fi_file = 'favicon.ico'
-            if not os.path.exists(fi_file):
-                fi_file = f'{sys.path[0]}/{fi_file}'
-            if not os.path.exists(fi_file):
+            if not os.path.exists(http.fi_file):
                 self.send_error(404, 'unavailable',
-                        f'{fi_file} not found.')
+                        f'{http.fi_file} not found.')
             else:
                 self._set_icon_headers()
-                with open(fi_file,'rb') as fi:
+                with open(http.fi_file,'rb') as fi:
                     self.wfile.write(fi.read())
         elif ((urlparse(self.path).path == '/' + http.s.button_url)
                 and (len(http.s.button_url) > 0)
