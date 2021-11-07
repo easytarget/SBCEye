@@ -7,7 +7,7 @@ import subprocess
 import os
 from shutil import which
 import schedule
-from threading import Thread, current_thread
+from threading import Thread
 import rrdtool
 
 
@@ -146,7 +146,6 @@ class Robin:
         job_thread.start()
 
     def _backup(self):
-        print(f'Backup: {current_thread().name}')
         if self.backup_count > 0:
             # Copy to a timestamped file
             self.write_updates()
@@ -184,7 +183,6 @@ class Robin:
             schedule.every().day.at(self.backup_time).do(self._run_threaded, self._backup)
 
     def dump(self):
-        print(f'Dump: {current_thread().name}')
         # provide a gzipped dump of database
         if self.dumpable:
             self.write_updates()
@@ -200,7 +198,6 @@ class Robin:
         return zipped
 
     def update(self, data):
-        print(f'Update: {current_thread().name}')
         # Update the database with the latest readings
         dataline = str(int(time.time()))
         for source in self.sources:
@@ -211,7 +208,6 @@ class Robin:
             self.write_updates()
 
     def write_updates(self):
-        print(f'Write updates: {current_thread().name}')
         # write any cached updates to the database
         if len(self.cache) > 0:
             rrdtool.update(
@@ -222,7 +218,6 @@ class Robin:
         self.last_write = time.time()
 
     def draw_graph(self, start, end, duration, graph):
-        print(f'Draw_graph: {current_thread().name}')
         # RRD graph generation
         # Returns the generated file for sending as the http response
         if (graph in self.sources) and (graph in self.graph_map.keys()):
