@@ -7,8 +7,12 @@ import subprocess
 import os
 from shutil import which
 import schedule
-from threading import Thread
+from threading import Thread, current_thread, Lock, local
 import rrdtool
+
+# Thread locking and local
+db_lock = Lock()
+response = local()
 
 
 class Robin:
@@ -183,6 +187,9 @@ class Robin:
             schedule.every().day.at(self.backup_time).do(self._run_threaded, self._backup)
 
     def dump(self):
+        if not db_lock.acquire(blocking=True, timeout=20):
+            print(f'Error: Dumping failed, could not acquire graph generation lock')
+            return
         # provide a gzipped dump of database
         if self.dumpable:
             self.write_updates()
@@ -190,40 +197,55 @@ class Robin:
             start = time.time()
             dump = subprocess.check_output(["rrdtool", 'dump', str(self.db_file)])
             print(f'Dump is: {len(dump)} bytes raw, ', end='')
+            db_lock.release()
             zipped = gzip.compress(dump, compresslevel=6)
             print(f'{len(zipped)} bytes compressed and took {(time.time() - start):.2f}s')
         else:
             print('Dump requested but denied because commandline "rrdtool" unavailable')
             zipped = bytearray()
+            db_lock.release()
         return zipped
 
     def update(self, data):
         # Update the database with the latest readings
+        if not db_lock.acquire(blocking=True, timeout=20):
+            print(f'Error: Update failed, could not acquire graph generation lock')
+            return
         dataline = str(int(time.time()))
         for source in self.sources:
             dataline += f':{data[source]}'
         if dataline:
             self.cache.append(dataline)
+        db_lock.release()
+        print(f'Added: {dataline}')
         if time.time() > (self.last_write + self.cache_age):
             self.write_updates()
 
     def write_updates(self):
         # write any cached updates to the database
         if len(self.cache) > 0:
+            if not db_lock.acquire(blocking=True, timeout=20):
+                print(f'Error: Data Write failed, could not acquire graph generation lock')
+                return
             rrdtool.update(
                     str(self.db_file),
                     "--template", self.template,
                     *self.cache)
             self.cache = []
+            db_lock.release()
         self.last_write = time.time()
 
     def draw_graph(self, start, end, duration, graph):
+        response = bytearray()
+        if not db_lock.acquire(blocking=True, timeout=20):
+            print(f'Error: png file generation failed for : {graph} : {start}>>{end}'\
+                    ', could not acquire graph generation lock')
+            return response
         # RRD graph generation
         # Returns the generated file for sending as the http response
         if (graph in self.sources) and (graph in self.graph_map.keys()):
             self.write_updates()
             params = self.graph_map[graph]
-            response = bytearray()
             with tempfile.NamedTemporaryFile(mode='rb', dir='/tmp',
                     prefix='overwatch_graph') as temp_file:
                 timestamp = time.strftime(self.graph_args['time_format'])
@@ -257,4 +279,5 @@ class Robin:
                     print(f'Error: png file generation failed for : {graph} : {start}>>{end}')
         else:
             print(f'Error: No graph available for type: {graph}')
+        db_lock.release()
         return response
