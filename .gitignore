@@ -1,6 +1,6 @@
 **/*.log*
 **/*.rrd
-**/backup/*.rrd.*
+**/*.rrd.*
 **/__pycache__
 config.ini
 env

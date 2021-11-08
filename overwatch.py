@@ -34,8 +34,7 @@ from pathlib import Path
 from atexit import register
 import schedule
 from subprocess import check_output
-from threading import Thread
-from signal import signal, SIGTERM, SIGINT
+from signal import signal, SIGTERM, SIGINT, SIGHUP
 import psutil
 
 # Local classes
@@ -336,17 +335,26 @@ def hourly():
     timestamp = time.strftime(settings.time_format)
     print(f'{myself} :: {timestamp}')
 
-def run_threaded(job_func):
-    job_thread = Thread(target=job_func)
-    job_thread.start()
+def handle_signal(sig, *_):
+    # Calling sys.exit() will invoke the safe handle_exit()
+    if sig == SIGHUP:
+        handle_restart()
+    elif sig == SIGINT and settings.debug:
+        handle_restart()
+    else:
+        # calling sys.exit() will also call handle_exit()
+        sys.exit()
 
-def signal_bye(*_):
-    # Calling sys.exit() will invoke the good_bye() exit handler
-    sys.exit()
-
-def good_bye():
-    logging.info('Exiting')
+def handle_restart():
+    # In-Place safe restart (re-reads config)
+    logging.info('Safe Restarting')
+    print('Restart\n')
     rrd.write_updates()
+    os.execv(sys.executable, ['python'] + sys.argv)
+
+def handle_exit():
+    rrd.write_updates()
+    logging.info('Exiting')
     print('Graceful Exit\n')
 
 
@@ -364,7 +372,7 @@ if __name__ == '__main__':
     # The animator class will start the screen display and saver
     # as scheduled jobs to run forever
     if HAVE_SCREEN:
-        screen = Animator(settings, disp, data)
+        Animator(settings, disp, data)
     else:
         if settings.have_screen:
             logging.warning('Display configured but did not initialise properly: '\
@@ -406,19 +414,20 @@ if __name__ == '__main__':
     serve_http(settings, rrd, data, (button_control, update_data, update_pins))
 
     # Exit handlers (needed for rrd data-safe shutdown)
-    signal(SIGTERM, signal_bye)
-    signal(SIGINT, signal_bye)
-    register(good_bye)
+    signal(SIGTERM, handle_signal)
+    signal(SIGINT, handle_signal)
+    signal(SIGHUP, handle_signal)
+    register(handle_exit)
 
     # Schedule pin monitoring, database updates and logging events
     # Use seperate threads for the different updaters.
     # The display (started in the animate class) runs in the main thread.
     schedule.every().hour.at(":00").do(hourly)
-    schedule.every(settings.rrd_interval).seconds.do(run_threaded, update_db)
+    schedule.every(settings.rrd_interval).seconds.do(update_db)
     if len(pin_map.keys()) > 0:
-        schedule.every(settings.pin_interval).seconds.do(run_threaded, update_pins)
+        schedule.every(settings.pin_interval).seconds.do(update_pins)
     if settings.log_interval > 0:
-        schedule.every(settings.log_interval).seconds.do(run_threaded, log_data)
+        schedule.every(settings.log_interval).seconds.do(log_data)
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedules and entering service loop")

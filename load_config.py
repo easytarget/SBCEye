@@ -83,4 +83,9 @@ class Settings:
         self.animate_passes = animate.getint("passes")
         self.animate_speed = animate.getint("speed")
 
+        if "debug" in config:
+            self.debug = True
+        else:
+            self.debug = False
+
         print("Settings loaded from configuration file successfully")

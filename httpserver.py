@@ -71,7 +71,6 @@ def serve_http(s, rrd, data, helpers):
 class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     ret = local()
 
-
     def _set_headers(self):
         self.send_response(200)
         self.send_header("Content-type", "text/html")

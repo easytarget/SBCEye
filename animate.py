@@ -3,6 +3,7 @@ import time
 import logging
 import schedule
 from PIL import Image, ImageDraw, ImageFont
+from threading import Thread, current_thread
 
 # Local classes
 import __main__ as main
@@ -49,7 +50,7 @@ class Animator:
         self.passes = settings.animate_passes
         self.current_pass = -3
         self.current_screen = 0
-        schedule.every(settings.animate_passtime).seconds.do(self.frame)
+        schedule.every(settings.animate_passtime).seconds.do(self._run_threaded, self.frame)
         schedule.every().hour.at(":00").do(self._hourly)
         logging.info('Display configured and enabled')
         print('Display configured and enabled')
@@ -57,10 +58,11 @@ class Animator:
         # Start saver
         self.screensaver = Saver(settings, disp)
 
-        # Splash!
-        # Will be run automagicallly by the scheduled hourly job
-        # when the main loop force-runs all schedules during initialisation
 
+    def _run_threaded(self, job_func):
+        job_thread = Thread(target=job_func, name=f'Frame{time.strftime("-%H%M%S")}')
+        job_thread.start()
+        job_thread.join()
 
     # Draw a black filled box to clear the canvas.
     def _clean(self):
@@ -110,6 +112,9 @@ class Animator:
                 self.draw.text((xpos, ypos), line, font=self.font, fill=255)
 
     def _splash(self):
+        # Run hourly by the scheduler
+        # Will be run automagicallly at startup when the main loop
+        #  force-runs all schedules during initialisation
         def _text(xpos):
             self.draw.text((8 + xpos, 0), 'Over-',  font=self.splash_font, fill=255)
             self.draw.text((8 + xpos, 30), 'Watch',  font=self.splash_font, fill=255)
@@ -128,18 +133,27 @@ class Animator:
         self._splash()
 
     def frame(self):
+        print(f'Frame: [{current_thread().name}]')
         # Run from the scheduler, animates each step of the cycle in sequence
         self.current_pass += 1
-        if self.current_pass >= self.passes:
+        if self.current_pass > self.passes:
             self.current_pass = 0
             self.current_screen += 1
             self.current_screen %= len(self.screen_list)
             getattr(self,self.screen_list[self.current_screen])(self.width + self.margin)
             self._slideout()
-        elif self.current_pass >= 0:
+        elif self.current_pass > 0:
             self._clean()
             getattr(self,self.screen_list[self.current_screen])()
             self._show()
-        elif self.current_pass == -1:
+        elif self.current_pass == 0:
             getattr(self,self.screen_list[self.current_screen])(self.width + self.margin)
             self._slideout()
+        # else:
+        #     current_pass is less than 0, leave display as-is, used to display Splash, alarms, etc.
+
+
+if __name__ == '__main__':
+    Animate(a,b,c)
+    while true:
+        pass
