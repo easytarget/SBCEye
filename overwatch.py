@@ -35,6 +35,7 @@ from atexit import register
 import schedule
 from subprocess import check_output
 from signal import signal, SIGTERM, SIGINT, SIGHUP
+from multiprocessing import Process, Queue
 import psutil
 
 # Local classes
@@ -99,13 +100,36 @@ else:
 
 settings = Settings(config_file)
 
+# Logging
+settings.log_file = Path(f'{settings.log_file_dir}/{settings.log_file_name}').resolve()
+print(f"Logging to: {settings.log_file}")
+handler = RotatingFileHandler(settings.log_file, maxBytes=settings.log_file_size,
+            backupCount=settings.log_file_count)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s',
+            datefmt=settings.log_date_format, handlers=[handler])
+
+# Older scheduler versions can log debug to 'INFO' not 'DEBUG', ignore it.
+schedule_logger = logging.getLogger('schedule')
+schedule_logger.setLevel(level=logging.WARN)
+
+# Now we have logging, notify we are starting up
+logging.info('')
+logging.info(f'Starting overwatch service for: {settings.name}')
+logging.info(f'Version: {my_version}')
+if default_config:
+    logging.warning('Running from default Configuration!')
+    logging.warning('- copy "default.ini" to "config.ini" to customise')
+
 # More meaningful process title
 try:
     import setproctitle
     process_name = settings.name.encode("ascii", "ignore").decode("ascii")
     setproctitle.setproctitle(f'overwatch: {process_name}')
 except ModuleNotFoundError:
-    print('Cannot set process title since module "setproctitle" not found')
+    pass
+
+#
+# Import hardware drivers
 
 HAVE_SCREEN = settings.have_screen
 HAVE_SENSOR = settings.have_sensor
@@ -131,7 +155,7 @@ if HAVE_SCREEN:
 
 if HAVE_SCREEN:
     try:
-        from animate import Animator
+        from animator import animate
     except Exception as e:
         print(e)
         print("ERROR: Screen animator requirements not met")
@@ -146,8 +170,7 @@ if HAVE_SENSOR:
         print("ERROR: BME280 environment sensor requirements not met")
         HAVE_SENSOR = False
 
-# GPIO light control
-pin_map = settings.pin_map.copy()
+pin_map = settings.pin_map
 if len(pin_map.keys()) > 0:
     try:
         from RPi import GPIO
@@ -156,27 +179,9 @@ if len(pin_map.keys()) > 0:
         print("ERROR: GPIO monitoring requirements not met, features disabled")
         pin_map.clear()
 
-# Logging
-settings.log_file = Path(f'{settings.log_file_dir}/{settings.log_file_name}').resolve()
-print(f"Logging to: {settings.log_file}")
-handler = RotatingFileHandler(settings.log_file, maxBytes=settings.log_file_size,
-            backupCount=settings.log_file_count)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s',
-            datefmt=settings.log_date_format, handlers=[handler])
+#
+# Initialise the hardware
 
-# Older scheduler versions can log debug to 'INFO' not 'DEBUG', ignore it.
-schedule_logger = logging.getLogger('schedule')
-schedule_logger.setLevel(level=logging.WARN)
-
-# Now we have logging, notify we are starting up
-logging.info('')
-logging.info(f'Starting overwatch service for: {settings.name}')
-logging.info(f'Version: {my_version}')
-if default_config:
-    logging.warning('Running from default Configuration!')
-    logging.warning('- copy "default.ini" to "config.ini" to customise')
-
-# Initialise the bus, display and sensor
 if HAVE_SCREEN or HAVE_SENSOR:
     try:
         # Create the I2C interface object
@@ -193,7 +198,7 @@ if HAVE_SCREEN:
         disp = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
         disp.contrast(settings.display_contrast)
         disp.invert(settings.display_invert)
-        disp.fill(0)  # Blank as fast in case it is showing garbage
+        disp.fill(0)  # Blank immediately in case it is showing garbage
         disp.show()
         print("We have a ssd1306 display at address " + hex(disp.addr))
     except Exception as e:
@@ -218,28 +223,46 @@ if HAVE_SENSOR:
             print("We do not have an environmental sensor")
             HAVE_SENSOR = False
 
-# Set the time of last data update so that a new update is forced
-data_updated = time.time() - settings.data_interval
+#
+# Local Classes, Globals
+
+# Override the main data class so it will dump changes to a queue if it exists
+# This is used to share data with the seperate display process
+queue = None
+class TheData(dict):
+    def __setitem__(self, item, value):
+        if queue:
+            queue.put([item, value])
+        super(TheData, self).__setitem__(item, value)
+    # we will want to support deleting items for alerts
+    #def __delitem__(self, item, value):
+    #    if queue:
+    #        queue.put([item], None)
+    #    super(TheData, self).__delitem__(item)
 
 # Use a dictionary to store current readings
-# start with the standard system readings
-data = {
+# initialise with standard system data
+data = TheData({
     'sys-temp': 0,
     'sys-load': 0,
     'sys-mem': 0,
-}
+})
 # add sensor data if present
 if HAVE_SENSOR:
     data["env-temp"] = 0
     data["env-humi"] = 0
     data["env-pres"] = 0
-# add pins
+# add pins as needed
 for name,_ in pin_map.items():
     data[f"pin-{name}"] = 0
+
+# time of last data update
+data_updated = 0
 
 # Unicode degrees character
 DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
+#
 # Local functions
 
 def button_control(action="toggle"):
@@ -336,13 +359,16 @@ def hourly():
     print(f'{myself} :: {timestamp}')
 
 def handle_signal(sig, *_):
-    # Calling sys.exit() will invoke the safe handle_exit()
+    # handle common signals
+    if screen:
+        # clean up the screen process
+        screen.join()
     if sig == SIGHUP:
         handle_restart()
     elif sig == SIGINT and settings.debug:
         handle_restart()
     else:
-        # calling sys.exit() will also call handle_exit()
+        # calling sys.exit() will invoke handle_exit()
         sys.exit()
 
 def handle_restart():
@@ -371,8 +397,12 @@ if __name__ == '__main__':
     # Display animation setup
     # The animator class will start the screen display and saver
     # as scheduled jobs to run forever
+    screen = None
     if HAVE_SCREEN:
-        Animator(settings, disp, data)
+        queue = Queue()
+        screen = Process(target=animate, args=(settings, disp, queue),
+                name='animator')
+        screen.start()
     else:
         if settings.have_screen:
             logging.warning('Display configured but did not initialise properly: '\
