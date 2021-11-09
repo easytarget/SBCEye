@@ -17,15 +17,6 @@ import logging
 # RRD data
 from robin import Robin
 
-#def get_period(start, end):
-#    if end == '':
-#        period = f'last {start.lstrip("-")}'
-#        start = f'end{start}'
-#        end = 'now'
-#    else:
-#        period = f'{start} >> {end}'
-#    return period
-
 
 def serve_http(s, rrd, data, helpers):
     # Spawns a http.server.HTTPServer in a separate thread on the given port.

@@ -300,8 +300,6 @@ def button_interrupt(*_):
     if GPIO.input(settings.button_pin):
         logging.info('Button pressed')
         button_control()
-    #else:
-    #    logging.info('Button glitch')
 
 def update_data():
     # Get current environmental and system data, called on demand
