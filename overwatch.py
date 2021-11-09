@@ -432,7 +432,7 @@ if __name__ == '__main__':
             GPIO.setup(settings.button_pin, GPIO.IN)
             # Set up the button pin interrupt
             GPIO.add_event_detect(settings.button_pin,
-                    GPIO.RISING, button_interrupt, bouncetime = 100)
+                    GPIO.RISING, button_interrupt, bouncetime = settings.button_hold)
             logging.info('Button enabled')
         if len(settings.button_url) > 0:
             logging.info(f'Web Button enabled on: /{settings.button_url}')
