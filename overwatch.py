@@ -27,13 +27,8 @@ import sys
 import logging
 from logging.handlers import RotatingFileHandler
 import random
-import textwrap
-import argparse
-from argparse import RawTextHelpFormatter
-from pathlib import Path
 from atexit import register
 import schedule
-from subprocess import check_output
 from signal import signal, SIGTERM, SIGINT, SIGHUP
 from multiprocessing import Process, Queue
 import psutil
@@ -44,66 +39,19 @@ from robin import Robin
 from httpserver import serve_http
 from pinreader import get_pin
 
-my_version = check_output(["git", "describe", "--tags",
-        "--always", "--dirty"], cwd=sys.path[0]).decode('ascii').strip()
-
 # Re-nice to reduce blocking of other processes
 os.nice(10)
 
+# The setting class will also process the arguments
+settings = Settings()
+
 # Let the console know we are starting
 print("Starting OverWatch")
-
-# Parse the arguments
-parser = argparse.ArgumentParser(
-    formatter_class=RawTextHelpFormatter,
-    description=textwrap.dedent('''
-        All hail the python Overwatch!
-        See 'default_settings.py' for more info on how to configure'''),
-    epilog=textwrap.dedent('''
-        Homepage: https://github.com/easytarget/pi-overwatch
-        '''))
-parser.add_argument("--config", "-c", type=str,
-        help="Config file name, default = config.ini")
-parser.add_argument("--version", "-v", action='store_true',
-        help="Return Overwatch version string and exit")
-args = parser.parse_args()
-
-if args.version:
-    # Dump version and quit
-    print(f'{sys.argv[0]} {my_version}')
-    sys.exit()
-
 print(f"Working directory: {os.getcwd()}")
-print(f'Running: {sys.argv[0]}  @ {my_version}')
-
-
-default_config = False
-if args.config:
-    config_file = Path(args.config).resolve()
-    if config_file.is_file():
-        print(f'Using user configuration from {config_file}')
-    else:
-        print(f"ERROR: Specified configuration file '{config_file}' not found, Exiting.")
-        sys.exit()
-else:
-    config_file = Path('config.ini').resolve()
-    if config_file.is_file():
-        print(f'Using configuration from {config_file}')
-    else:
-        config_file = Path(f'{sys.path[0]}/defaults.ini').resolve()
-        if config_file.is_file():
-            print(f'Using default configuration from {config_file}')
-            print(f'\nWARNING: Copy "defaults.ini" to "config.ini" for customisation\n')
-            default_config = True
-        else:
-            print('\nERROR: Cannot find a configuration file, exiting')
-            sys.exit()
-
-settings = Settings(config_file)
+print(f'Running: {sys.argv[0]}  @ {settings.my_version}')
+print(f"Logging to: {settings.log_file}")
 
 # Logging
-settings.log_file = Path(
-        f'{settings.log_file_dir}/{settings.log_file_name}').resolve()
 handler = RotatingFileHandler(settings.log_file,
         maxBytes=settings.log_file_size,
         backupCount=settings.log_file_count)
@@ -111,7 +59,6 @@ logging.basicConfig(level=logging.INFO,
         format='%(asctime)s %(levelname)s: %(message)s',
         datefmt=settings.log_date_format,
         handlers=[handler])
-print(f"Logging to: {settings.log_file}")
 
 # Older scheduler versions can log debug to 'INFO' not 'DEBUG', ignore it.
 schedule_logger = logging.getLogger('schedule')
@@ -120,8 +67,8 @@ schedule_logger.setLevel(level=logging.WARN)
 # Now we have logging, notify we are starting up
 logging.info('')
 logging.info(f'Starting overwatch service for: {settings.name}')
-logging.info(f'Version: {my_version}')
-if default_config:
+logging.info(f'Version: {settings.my_version}')
+if settings.default_config:
     logging.warning('Running from default Configuration!')
     logging.warning('- copy "default.ini" to "config.ini" to customise')
 
@@ -271,7 +218,7 @@ DEGREE_SIGN= u'\N{DEGREE SIGN}'
 # Local functions
 
 def button_control(action="toggle"):
-    # Set the first pin in pin_map to a specified state
+    # Set the controlled pin to a specified state
     if settings.button_out > 0:
         ret = f'{settings.button_name} '
         pin = settings.button_out
@@ -325,7 +272,7 @@ def update_pins():
     for name, pin in pin_map.items():
         this_pin_state =  get_pin(pin)
         if this_pin_state != data[f"pin-{name}"]:
-            # Pin has changed state, remember new state and log
+            # Pin has changed state, store new state and log
             data[f'pin-{name}'] = this_pin_state
             logging.info(f'{name}: {settings.web_pin_states[this_pin_state]}')
 
@@ -350,8 +297,8 @@ def log_data():
     for sense,(name,fmt,suffix) in loglist.items():
         if sense in data.keys():
             log_line += f'{name}: {data[sense]:{fmt}}{suffix}, '
-    print(log_line[:-2])
     logging.info(log_line[:-2])
+    print(log_line[:-2])
 
 def hourly():
     # Remind everybody we are alive

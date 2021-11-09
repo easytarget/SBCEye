@@ -2,11 +2,65 @@
 # Application defaults (sensible)
 #
 #
+import sys
+import textwrap
+from pathlib import Path
+import argparse
+from argparse import RawTextHelpFormatter
+from subprocess import check_output
+
 import configparser
 
 class Settings:
 
-    def __init__(self, config_file):
+    def __init__(self):
+
+        self.my_version = check_output(["git", "describe", "--tags",
+        "--always", "--dirty"], cwd=sys.path[0]).decode('ascii').strip()
+
+        # Parse the arguments
+        parser = argparse.ArgumentParser(
+            formatter_class=RawTextHelpFormatter,
+            description=textwrap.dedent('''
+                All hail the python Overwatch!
+                See 'default_settings.py' for more info on how to configure'''),
+            epilog=textwrap.dedent('''
+                Homepage: https://github.com/easytarget/pi-overwatch
+                '''))
+        parser.add_argument("--config", "-c", type=str,
+                help="Config file name, default = config.ini")
+        parser.add_argument("--version", "-v", action='store_true',
+                help="Return Overwatch version string and exit")
+        args = parser.parse_args()
+
+        if args.version:
+            # Dump version and quit
+            print(f'{sys.argv[0]} {self.my_version}')
+            sys.exit()
+
+        self.default_config = False
+        if args.config:
+            config_file = Path(args.config).resolve()
+            if config_file.is_file():
+                print(f'Using user configuration from {config_file}')
+            else:
+                print(f"ERROR: Specified configuration file '{config_file}' not found, Exiting.")
+                sys.exit()
+        else:
+            config_file = Path('config.ini').resolve()
+            if config_file.is_file():
+                print(f'Using configuration from {config_file}')
+            else:
+                config_file = Path(f'{sys.path[0]}/defaults.ini').resolve()
+                if config_file.is_file():
+                    print(f'Using default configuration from {config_file}')
+                    print(f'\nWARNING: Copy "defaults.ini" to "config.ini" for customisation\n')
+                    self.default_config = True
+                else:
+                    print('\nERROR: Cannot find a configuration file, exiting')
+                    sys.exit()
+
+
         config = configparser.RawConfigParser()
         config.optionxform = str
         config.read(config_file)
@@ -46,7 +100,7 @@ class Settings:
         self.button_out = button.getint("out")
         self.button_pin = button.getint("pin")
         self.button_url = button.get("url")
-        self.button_hold = button.getfloat("hold")
+        self.button_hold = int(button.getfloat("hold") * 1000)
         if self.button_out == 0:
             self.button_name = 'Undefined'
         else:
@@ -96,8 +150,7 @@ class Settings:
         else:
             self.debug = False
 
-        #import sys
-        #print(sys.argv)
-        #print(my_version)
-
         print("Settings loaded from configuration file successfully")
+
+        self.log_file = Path(
+        f'{self.log_file_dir}/{self.log_file_name}').resolve()
