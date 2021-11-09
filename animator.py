@@ -2,17 +2,18 @@
 import time
 import logging
 import schedule
+from sys import exit
+from signal import signal, SIGTERM, SIGINT
 from PIL import Image, ImageDraw, ImageFont
-from threading import Thread, current_thread
 
 # Local classes
-import __main__ as main
 from saver import Saver
 
 # Unicode degrees character
 DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
 class Animator:
+
     def __init__(self, settings, disp, data):
         # Display setup
         self.disp = disp
@@ -40,36 +41,32 @@ class Animator:
         self.font = ImageFont.truetype('LiberationMono-Bold.ttf', 16)
         self.splash_font = ImageFont.truetype('LiberationMono-Bold.ttf', 36)
 
-        # Screen list
-        self.screen_list = []
-        if any(key.startswith("env-") for key in self.data):
-            self.screen_list.append('_bme_screen')
-        self.screen_list.append('_sys_screen')
+        # Initial screen list
+        #self.update_screen_list()
 
         # Start main animator
         self.passes = settings.animate_passes
-        self.current_pass = -3
+        self.current_pass = -2
         self.current_screen = 0
-        schedule.every(settings.animate_passtime).seconds.do(self._run_threaded, self.frame)
+        schedule.every(settings.animate_passtime).seconds.do(self._frame)
         schedule.every().hour.at(":00").do(self._hourly)
-        logging.info('Display configured and enabled')
-        print('Display configured and enabled')
 
         # Start saver
         self.screensaver = Saver(settings, disp)
 
+        # Notify logs etc
+        logging.info('Display configured and enabled')
+        print('Display configured and enabled')
+        self._splash()
 
-    def _run_threaded(self, job_func):
-        job_thread = Thread(target=job_func, name=f'Frame{time.strftime("-%H%M%S")}')
-        job_thread.start()
-        job_thread.join()
 
-    # Draw a black filled box to clear the canvas.
+
     def _clean(self):
+        # Draw a black filled box to clear the canvas.
         self.draw.rectangle((0,0,self.span-1,self.height-1), outline=0, fill=0)
 
-    # Put a specific area of the canvas onto display
     def _show(self, xpos=0):
+        # Put a specific area of the canvas onto display
         if self.display_rotate:
             self.disp.image(self.image.transform((self.width,self.height),
                        Image.EXTENT,(xpos,0,xpos+self.width,self.height))
@@ -90,26 +87,36 @@ class Animator:
     def _bme_screen(self, xpos=0):
         # Draw screen for environmental data
         items = {
-                "env-temp": (' Temp: ', '.1f', DEGREE_SIGN, 5),
-                "env-humi": (' Humi: ', '.0f', '%', 25),
-                "env-pres": (' Pres: ', '.0f', 'mb', 45),
+                "env-temp": ('Temp: ', '.1f', DEGREE_SIGN, 5),
+                "env-humi": ('Humi: ', '.0f', '%', 25),
+                "env-pres": ('Pres: ', '.0f', 'mb', 45),
                 }
         for sense,(name,fmt,suffix,ypos) in items.items():
             if sense in self.data.keys():
                 line = f'{name}{self.data[sense]:{fmt}}{suffix}'
-                self.draw.text((xpos, ypos), line, font=self.font, fill=255)
+                self.draw.text((xpos + 6, ypos), line, font=self.font, fill=255)
 
     def _sys_screen(self,xpos=0):
         # Draw screen for system data
         items = {
-                "sys-temp": (' CPU:  ', '.1f', DEGREE_SIGN, 5),
-                "sys-load": (' Load: ', '1.2f', '', 25),
-                "sys-mem":  (' Mem:  ', '.1f', '%', 45),
+                "sys-temp": ('CPU:  ', '.1f', DEGREE_SIGN, 5),
+                "sys-load": ('Load: ', '1.2f', '', 25),
+                "sys-mem":  ('Mem:  ', '.1f', '%', 45),
                 }
         for sense,(name,fmt,suffix,ypos) in items.items():
             if sense in self.data.keys():
                 line = f'{name}{self.data[sense]:{fmt}}{suffix}'
-                self.draw.text((xpos, ypos), line, font=self.font, fill=255)
+                self.draw.text((xpos + 6, ypos), line, font=self.font, fill=255)
+
+    def _no_data(self, reason='Initialising'):
+        def _text(xpos):
+            self.draw.text((5 + xpos, 5),
+                    'No Data:', font=self.font, fill=255)
+            self.draw.text((5 + xpos, 25),
+                    reason, font=self.font, fill=255)
+        self._clean()
+        _text(0)
+        self._show()
 
     def _splash(self):
         # Run hourly by the scheduler
@@ -118,7 +125,7 @@ class Animator:
         def _text(xpos):
             self.draw.text((8 + xpos, 0), 'Over-',  font=self.splash_font, fill=255)
             self.draw.text((8 + xpos, 30), 'Watch',  font=self.splash_font, fill=255)
-        self.current_pass = -3
+        self.current_pass = -1
         self.current_screen = 0
         self.draw.rectangle((self.width + self.margin,0,self.span-1,self.height-1),
                 outline=0, fill=0)
@@ -128,15 +135,27 @@ class Animator:
         _text(0)
         self._show()
 
+    def _get_screen_list(self):
+        # Generate the screen list
+        self.screen_list = []
+        for key in self.data.keys():
+            if (key[:4] == 'env-') and (not '_bme_screen' in self.screen_list):
+                self.screen_list.append('_bme_screen')
+            if (key[:4] == "sys-") and (not '_sys_screen' in self.screen_list):
+                self.screen_list.append('_sys_screen')
+
     def _hourly(self):
         # totally frivously do a spash screen once an hour.
         self._splash()
 
-    def frame(self):
-        print(f'Frame: [{current_thread().name}]')
+    def _frame(self):
         # Run from the scheduler, animates each step of the cycle in sequence
+        self._get_screen_list()
         self.current_pass += 1
-        if self.current_pass > self.passes:
+        if len(self.screen_list) == 0:
+            self._no_data()
+            return
+        elif self.current_pass > self.passes:
             self.current_pass = 0
             self.current_screen += 1
             self.current_screen %= len(self.screen_list)
@@ -153,7 +172,33 @@ class Animator:
         #     current_pass is less than 0, leave display as-is, used to display Splash, alarms, etc.
 
 
-if __name__ == '__main__':
-    Animate(a,b,c)
-    while true:
+def animate(settings, disp, queue):
+    data = {}
+    def die_with_dignity(*_):
+        # Exit without stack trace on a sigint/sigterm
+        exit()
+
+    signal(SIGTERM, die_with_dignity)
+    signal(SIGINT, die_with_dignity)
+
+    try:
+        # Set a user-friendly process name if possible
+        import setproctitle
+        process_name = settings.name.encode("ascii", "ignore").decode("ascii")
+        setproctitle.setproctitle(f'overwatch screen: {process_name}')
+    except ModuleNotFoundError:
         pass
+
+    # Start the animator
+    screen = Animator(settings, disp, data)
+
+    # Loop forever servicing scheduler and queue
+    while True:
+        schedule.run_pending()
+        while not queue.empty():
+            key, value = queue.get_nowait()
+            if value:
+                data.update({key: value})
+            else:
+                data.pop(key, None)
+        time.sleep(0.25)
