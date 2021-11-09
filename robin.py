@@ -68,9 +68,8 @@ class Robin:
             if source in data.keys():
                 self.sources.append(source)
                 self.template += f'{source}:'
-        print(f'Storable sources = {self.sources}')
         self.template = self.template.rstrip(':')
-        print(f'Template = {self.template}')
+        print(f'RRD Sources = {self.template}')
 
         # Backup settings
         self.backup_count = s.rrd_backup_count
