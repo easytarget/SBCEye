@@ -43,9 +43,17 @@ class Settings:
             self.pin_map[key] = config.getint("pins",key)
 
         button = config["button"]
+        self.button_out = button.getint("out")
         self.button_pin = button.getint("pin")
         self.button_url = button.get("url")
         self.button_hold = button.getfloat("hold")
+        if self.button_out == 0:
+            self.button_name = 'Undefined'
+        else:
+            self.button_name = f'gpio-{self.button_out}'
+            for name, pin in self.pin_map.items():
+                if pin == self.button_out:
+                    self.button_name = name
 
         interval = config["interval"]
         self.pin_interval = interval.getint("pin")
@@ -87,5 +95,9 @@ class Settings:
             self.debug = True
         else:
             self.debug = False
+
+        #import sys
+        #print(sys.argv)
+        #print(my_version)
 
         print("Settings loaded from configuration file successfully")

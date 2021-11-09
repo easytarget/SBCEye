@@ -207,10 +207,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <tr><td colspan="2" style="text-align: center;">
                 <a href="./?view=deco&view=log" title="Open the log in a new page" target="_blank">
                 Log</a>\n'''
-        if http.s.web_show_control and (len(http.s.pin_map.keys()) > 0):
-            name = next(iter(http.s.pin_map))
+        if http.s.web_show_control and (http.s.button_pin > 0):
             ret += f'&nbsp;&nbsp;<a href="./{http.s.button_url}" '\
-                    f'title="{name} status and control page">{name}</a>\n'
+                    f'title="{http.s.button_name} status and control page">'\
+                    f'{http.s.button_name}</a>\n'
         ret += '</td></tr>\n'
         return ret
 
@@ -351,7 +351,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                     self.wfile.write(fi.read())
         elif ((urlparse(self.path).path == '/' + http.s.button_url)
                 and (len(http.s.button_url) > 0)
-                and (len(http.s.pin_map.keys()) > 0)):
+                and (http.s.button_out > 0)):
             # Web button control
             http.update_pins()
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
@@ -363,17 +363,17 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 return
             else:
                 action = 'status'
-            status, state, name = http.button_control(action)
-            if not status == f'{name} : {http.s.web_pin_states[state]}':
+            status, state = http.button_control(action)
+            if not status == f'{http.s.button_name} : {http.s.web_pin_states[state]}':
                 logging.info(f'Web button triggered by: {self.client_address[0]}'\
                             f' with action: {action}')
             self._set_headers()
-            response = self._give_head(f" :: {name}")
+            response = self._give_head(f" :: {http.s.button_name}")
             response += f'<h2>{status}</h2>\n'
             invert_state = http.s.web_pin_states[not state]
             response += f'''<div>
                     <a href="./{http.s.button_url}?state={invert_state}"
-                    title = "Switch {name} {invert_state}">
+                    title = "Switch {http.s.button_name} {invert_state}">
                     Switch {invert_state}</a>
                     </div>\n'''
             response += '<div style="padding-top: 1em;">\n'\

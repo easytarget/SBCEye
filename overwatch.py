@@ -42,6 +42,7 @@ import psutil
 from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
+from pinreader import get_pin
 
 my_version = check_output(["git", "describe", "--tags",
         "--always", "--dirty"], cwd=sys.path[0]).decode('ascii').strip()
@@ -101,12 +102,16 @@ else:
 settings = Settings(config_file)
 
 # Logging
-settings.log_file = Path(f'{settings.log_file_dir}/{settings.log_file_name}').resolve()
+settings.log_file = Path(
+        f'{settings.log_file_dir}/{settings.log_file_name}').resolve()
+handler = RotatingFileHandler(settings.log_file,
+        maxBytes=settings.log_file_size,
+        backupCount=settings.log_file_count)
+logging.basicConfig(level=logging.INFO,
+        format='%(asctime)s %(levelname)s: %(message)s',
+        datefmt=settings.log_date_format,
+        handlers=[handler])
 print(f"Logging to: {settings.log_file}")
-handler = RotatingFileHandler(settings.log_file, maxBytes=settings.log_file_size,
-            backupCount=settings.log_file_count)
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s',
-            datefmt=settings.log_date_format, handlers=[handler])
 
 # Older scheduler versions can log debug to 'INFO' not 'DEBUG', ignore it.
 schedule_logger = logging.getLogger('schedule')
@@ -267,10 +272,9 @@ DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
 def button_control(action="toggle"):
     # Set the first pin in pin_map to a specified state
-    if len(pin_map.keys()) > 0:
-        name = next(iter(pin_map))
-        pin = pin_map[name]
-        ret = f'{name} '
+    if settings.button_out > 0:
+        ret = f'{settings.button_name} '
+        pin = settings.button_out
         if action.lower() in ['toggle','invert','button']:
             GPIO.output(pin, not GPIO.input(pin))
             ret += 'Toggled: '
@@ -288,10 +292,9 @@ def button_control(action="toggle"):
         state = GPIO.input(pin)
         ret += settings.web_pin_states[state]
     else:
-        name = ''
         state = False
-        ret = 'Not supported, no pin defined'
-    return (ret, state, name)
+        ret = 'Not supported, no pin number defined'
+    return (ret, state)
 
 def button_interrupt(*_):
     # give a short delay, then re-read input to provide a minimum hold-down time
@@ -320,7 +323,7 @@ def update_data():
 def update_pins():
     # Check if any pins have changed state, and log
     for name, pin in pin_map.items():
-        this_pin_state =  GPIO.input(pin)
+        this_pin_state =  get_pin(pin)
         if this_pin_state != data[f"pin-{name}"]:
             # Pin has changed state, remember new state and log
             data[f'pin-{name}'] = this_pin_state
@@ -409,31 +412,32 @@ if __name__ == '__main__':
     # Get an initial data reading for system and sensor values
     update_data()
 
-    # GPIO mode and arrays for the pin database path and current status
-    if len(pin_map.keys()) > 0:
-        GPIO.setmode(GPIO.BCM)  # Set all GPIO pins to BCM GPIO numbering
-        GPIO.setwarnings(False) # Dont warn if channels accessed outside this processes
-
-    # Set all gpio pins to 'output' and record their initial status
-    # We need to set them as outputs in our context in order to monitor their state.
-    # - So long as we do not try to write this will not affect their physical status,
-    #   nor will it prevent other processes (eg octoprint) reading and using them
     for name, pin in pin_map.items():
-        GPIO.setup(pin, GPIO.OUT)
-        data[f'pin-{name}'] = GPIO.input(pin)
+        data[f'pin-{name}'] = get_pin(pin)
         logging.info(f'{name}: {settings.web_pin_states[data[f"pin-{name}"]]}')
+
     if any(key.startswith('pin-') for key in data):
         logging.info('GPIO monitoring configured and logging enabled')
     elif len(settings.pin_map.keys()) > 0:
         logging.info('GPIO monitoring configured but pin setup failed: '\
                 'GPIO features disabled')
 
-    # Enable interrupt if we have a button and a pin to control
-    if (len(pin_map.keys()) > 0) and (settings.button_pin > 0):
-        # Set up the button pin interrupt, if defined
-        GPIO.setup(settings.button_pin, GPIO.IN)       # Set our button pin to be an input
-        GPIO.add_event_detect(settings.button_pin, GPIO.RISING, button_interrupt, bouncetime = 100)
-        logging.info('Button enabled')
+    # Set pin interrupt and output if we have a button and a pin to control
+    if settings.button_out > 0:
+        GPIO.setmode(GPIO.BCM)  # Use BCM GPIO numbering
+        GPIO.setwarnings(False) # Dont warn if channels accessed outside this processes
+        GPIO.setup(settings.button_out, GPIO.OUT)
+        logging.info(f'Controllable pin ({settings.button_name}) enabled')
+        if settings.button_pin > 0:
+            GPIO.setup(settings.button_pin, GPIO.IN)
+            # Set up the button pin interrupt
+            GPIO.add_event_detect(settings.button_pin,
+                    GPIO.RISING, button_interrupt, bouncetime = 100)
+            logging.info('Button enabled')
+        if len(settings.button_url) > 0:
+            logging.info(f'Web Button enabled on: /{settings.button_url}')
+        print(f'Controllable pin ({settings.button_name}) configured and enabled; '\
+                f'(pin={settings.button_pin}, url="{settings.button_url})"')
 
     # RRD init
     rrd = Robin(settings, data)
