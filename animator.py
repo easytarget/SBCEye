@@ -124,7 +124,7 @@ class Animator:
         #  force-runs all schedules during initialisation
         def _text(xpos):
             self.draw.text((8 + xpos, 0), 'Over-',  font=self.splash_font, fill=255)
-            self.draw.text((8 + xpos, 30), 'Watch',  font=self.splash_font, fill=255)
+            self.draw.text((8 + xpos, 28), 'Watch',  font=self.splash_font, fill=255)
         self.current_pass = -1
         self.current_screen = 0
         self.draw.rectangle((self.width + self.margin,0,self.span-1,self.height-1),
@@ -155,7 +155,7 @@ class Animator:
         if len(self.screen_list) == 0:
             self._no_data()
             return
-        elif self.current_pass > self.passes:
+        elif self.current_pass >= self.passes:
             self.current_pass = 0
             self.current_screen += 1
             self.current_screen %= len(self.screen_list)
