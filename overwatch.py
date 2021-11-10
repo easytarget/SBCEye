@@ -37,7 +37,6 @@ import psutil
 from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
-from animator import animate
 from pinreader import get_pin
 from bus_drivers import i2c_setup
 
@@ -258,10 +257,6 @@ def handle_exit():
 # The fun starts here:
 if __name__ == '__main__':
 
-    # Get an initial data reading
-    update_data()
-    update_pins()
-
     # Log sensor status
     if bme280:
         logging.info('Environmental sensor configured and enabled')
@@ -279,14 +274,14 @@ if __name__ == '__main__':
     # Set pin interrupt and output if we have a button and a pin to control
     if settings.button_out > 0:
         GPIO.setmode(GPIO.BCM)  # Use BCM GPIO numbering
-        GPIO.setwarnings(False) # Dont warn if channels accessed outside this processes
         GPIO.setup(settings.button_out, GPIO.OUT)
         logging.info(f'Controllable pin ({settings.button_name}) enabled')
         if settings.button_pin > 0:
             GPIO.setup(settings.button_pin, GPIO.IN)
             # Set up the button pin interrupt
             GPIO.add_event_detect(settings.button_pin,
-                    GPIO.RISING, button_interrupt, bouncetime = settings.button_hold)
+                    GPIO.RISING, button_interrupt,
+                    bouncetime = int(settings.button_hold * 2000))
             logging.info('Button enabled')
         if len(settings.button_url) > 0:
             logging.info(f'Web Button enabled on: /{settings.button_url}')
@@ -295,6 +290,7 @@ if __name__ == '__main__':
 
     # Display animation setup
     if disp:
+        from animator import animate
         queue = Queue()
         display = Process(target=animate, args=(settings, disp, queue),
                 name='overwatch_animator')
@@ -304,6 +300,10 @@ if __name__ == '__main__':
         if settings.have_screen:
             logging.warning('Display configured but did not initialise properly: '\
                     'Display features disabled')
+
+    # Get an initial data reading
+    update_data()
+    update_pins()
 
     # RRD init
     rrd = Robin(settings, data)

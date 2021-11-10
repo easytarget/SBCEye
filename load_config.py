@@ -100,7 +100,7 @@ class Settings:
         self.button_out = button.getint("out")
         self.button_pin = button.getint("pin")
         self.button_url = button.get("url")
-        self.button_hold = int(button.getfloat("hold") * 1000)
+        self.button_hold = button.getfloat("hold")
         if self.button_out == 0:
             self.button_name = 'Undefined'
         else:

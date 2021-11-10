@@ -59,6 +59,16 @@ def i2c_setup(screen, sensor):
             print(e)
             print("We do not have a display")
 
+        try:
+            # Additional modules needed for display
+            # Not actually used here in the main loop, but we test for them here
+            # so we do not get an ugly failure when the display animator loads.
+            from PIL import Image, ImageDraw, ImageFont
+        except Exception as e:
+            disp = None
+            print(e)
+            print("ERROR: PIL graphics module not found, disabling display")
+
     if sensor:
         try:
             # Create the I2C BME280 sensor object
