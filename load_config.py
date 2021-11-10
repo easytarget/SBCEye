@@ -121,6 +121,8 @@ class Settings:
         self.log_file_count = log.getint("file_count")
         self.log_file_size = log.getint("file_size") * 1024
         self.log_date_format = log.get("date_format")
+        self.log_file = Path(
+        f'{self.log_file_dir}/{self.log_file_name}').resolve()
 
         rrd = config["rrd"]
         self.rrd_dir = rrd.get("dir")
@@ -151,6 +153,3 @@ class Settings:
             self.debug = False
 
         print("Settings loaded from configuration file successfully")
-
-        self.log_file = Path(
-        f'{self.log_file_dir}/{self.log_file_name}').resolve()

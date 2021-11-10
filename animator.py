@@ -38,8 +38,13 @@ class Animator:
         # This font is located in: /usr/share/fonts/truetype/liberation/ on Raspian.
         # If you get an error that it is not present, install it with:
         #   sudo apt install fonts-liberation
-        self.font = ImageFont.truetype('LiberationMono-Bold.ttf', 16)
-        self.splash_font = ImageFont.truetype('LiberationMono-Bold.ttf', 36)
+        try:
+            self.font = ImageFont.truetype('LiberationMono-Bold.ttf', 16)
+            self.splash_font = ImageFont.truetype('LiberationMono-Bold.ttf', 36)
+        except OSError:
+            print('"LiberationMono" font not present, falling back to ugly default')
+            print('Install font with "$ sudo apt install fonts-liberation"')
+            self.font = self.splash_font =  ImageFont.load_default()
 
         # Initial screen list
         #self.update_screen_list()

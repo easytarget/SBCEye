@@ -13,7 +13,7 @@ def i2c_setup(screen, sensor):
         try:
             from board import SCL, SDA
             import busio
-        except Exception as e:
+        except ImportError as e:
             print(e)
             print("ERROR: I2C bus requirements not met")
             screen = sensor = False
@@ -22,7 +22,7 @@ def i2c_setup(screen, sensor):
         # I2C 128x64 OLED Display
         try:
             import adafruit_ssd1306
-        except Exception as e:
+        except ModuleNotFoundError as e:
             print(e)
             print("ERROR: ssd1306 display requirements not met")
             screen = False
@@ -31,7 +31,7 @@ def i2c_setup(screen, sensor):
         # BME280 I2C Tepmerature Pressure and Humidity sensor
         try:
             import adafruit_bme280
-        except Exception as e:
+        except ModuleNotFoundError as e:
             print(e)
             print("ERROR: BME280 environment sensor requirements not met")
             sensor = False
@@ -44,7 +44,7 @@ def i2c_setup(screen, sensor):
             # Create the I2C interface object
             i2c = busio.I2C(SCL, SDA)
             print('We have a I2C bus')
-        except Exception as e:
+        except ValueError as e:
             print(e)
             print("No I2C bus, display and sensor functions will be disabled")
             screen = sensor = False
@@ -64,7 +64,7 @@ def i2c_setup(screen, sensor):
             # Not actually used here in the main loop, but we test for them here
             # so we do not get an ugly failure when the display animator loads.
             from PIL import Image, ImageDraw, ImageFont
-        except Exception as e:
+        except ModuleNotFoundError as e:
             disp = None
             print(e)
             print("ERROR: PIL graphics module not found, disabling display")
