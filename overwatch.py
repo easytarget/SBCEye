@@ -70,7 +70,7 @@ logging.info('')
 logging.info(f'Starting overwatch service for: {settings.name}')
 logging.info(f'Version: {settings.my_version}')
 if settings.default_config:
-    logging.warning('Running from default Configuration!')
+    logging.warning('Running from default configuration')
     logging.warning('- copy "default.ini" to "config.ini" to customise')
 
 # More meaningful process title
