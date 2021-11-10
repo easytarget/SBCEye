@@ -4,7 +4,6 @@ import logging
 import schedule
 from sys import exit
 from signal import signal, SIGTERM, SIGINT
-from PIL import Image, ImageDraw, ImageFont
 
 # Local classes
 from saver import Saver
@@ -175,7 +174,8 @@ class Animator:
 def animate(settings, disp, queue):
     data = {}
     def die_with_dignity(*_):
-        # Exit without stack trace on a sigint/sigterm
+        # Exit cleanly (eg without stack trace) on a sigint/sigterm
+        print('Display animator process exiting')
         exit()
 
     signal(SIGTERM, die_with_dignity)
@@ -189,11 +189,19 @@ def animate(settings, disp, queue):
     except ModuleNotFoundError:
         pass
 
+    try:
+        # Additional modules needed for display
+        from PIL import Image, ImageDraw, ImageFont
+    except Exception as e:
+        print(e)
+        print("ERROR: Display animator requirements not met, disabling")
+        return
+
     # Start the animator
-    screen = Animator(settings, disp, data)
+    animation = Animator(settings, disp, data)
 
     # Loop forever servicing scheduler and queue
-    while True:
+    while animation:
         schedule.run_pending()
         while not queue.empty():
             key, value = queue.get_nowait()

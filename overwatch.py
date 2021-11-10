@@ -37,7 +37,9 @@ import psutil
 from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
+from animator import animate
 from pinreader import get_pin
+from bus_drivers import i2c_setup
 
 # Re-nice to reduce blocking of other processes
 os.nice(10)
@@ -81,131 +83,51 @@ except ModuleNotFoundError:
     pass
 
 #
-# Import hardware drivers
+# Import, setup and return hardware drivers, or 'None' if setup fails
 
-HAVE_SCREEN = settings.have_screen
-HAVE_SENSOR = settings.have_sensor
+disp, bme280 = i2c_setup(settings.have_screen, settings.have_sensor)
 
-if HAVE_SCREEN or HAVE_SENSOR:
-    # I2C Comms
-    try:
-        from board import SCL, SDA
-        import busio
-    except Exception as e:
-        print(e)
-        print("ERROR: I2C bus requirements not met")
-        HAVE_SCREEN = HAVE_SENSOR = False
+if disp:
+    disp.contrast(settings.display_contrast)
+    disp.invert(settings.display_invert)
+    disp.fill(0)  # Blank asap in case we are showing garbage
+    disp.show()
 
-if HAVE_SCREEN:
-    # I2C 128x64 OLED Display
-    try:
-        import adafruit_ssd1306
-    except Exception as e:
-        print(e)
-        print("ERROR: ssd1306 display requirements not met")
-        HAVE_SCREEN = False
-
-if HAVE_SCREEN:
-    try:
-        from animator import animate
-    except Exception as e:
-        print(e)
-        print("ERROR: Screen animator requirements not met")
-        HAVE_SCREEN = False
-
-if HAVE_SENSOR:
-    # BME280 I2C Tepmerature Pressure and Humidity sensor
-    try:
-        import adafruit_bme280
-    except Exception as e:
-        print(e)
-        print("ERROR: BME280 environment sensor requirements not met")
-        HAVE_SENSOR = False
-
-pin_map = settings.pin_map
-if len(pin_map.keys()) > 0:
+if settings.button_out > 0:
     try:
         from RPi import GPIO
     except Exception as e:
         print(e)
-        print("ERROR: GPIO monitoring requirements not met, features disabled")
-        pin_map.clear()
-
-#
-# Initialise the hardware
-
-if HAVE_SCREEN or HAVE_SENSOR:
-    try:
-        # Create the I2C interface object
-        i2c = busio.I2C(SCL, SDA)
-    except Exception as e:
-        print(e)
-        print("No I2C bus, display and sensor functions will be disabled")
-        HAVE_SCREEN = HAVE_SENSOR = False
-
-if HAVE_SCREEN:
-    try:
-        # Create the I2C SSD1306 OLED object
-        # The first two parameters are the pixel width and pixel height.
-        disp = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
-        disp.contrast(settings.display_contrast)
-        disp.invert(settings.display_invert)
-        disp.fill(0)  # Blank immediately in case it is showing garbage
-        disp.show()
-        print("We have a ssd1306 display at address " + hex(disp.addr))
-    except Exception as e:
-        print(e)
-        print("We do not have a display")
-        HAVE_SCREEN = False
-
-if HAVE_SENSOR:
-    try:
-        # Create the I2C BME280 sensor object
-        bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x76)
-        print("BME280 sensor found with address 0x76")
-        HAVE_SENSOR = True
-    except Exception as e:
-        try:
-            bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x77)
-            print("BME280 sensor found with address 0x77")
-            HAVE_SENSOR = True
-        except Exception as f:
-            print(e)
-            print(f)
-            print("We do not have an environmental sensor")
-            HAVE_SENSOR = False
+        print("ERROR: button & pin control requirements not met, features disabled")
+        settings.button_out = 0
 
 #
 # Local Classes, Globals
 
 # Override the main data class so it will dump changes to a queue if it exists
-# This is used to share data with the seperate display process
+# This is used to share data with the seperate display animator process
 queue = None
 class TheData(dict):
     def __setitem__(self, item, value):
         if queue:
             queue.put([item, value])
         super(TheData, self).__setitem__(item, value)
-    # we will want to support deleting items for alerts
+    # (untested) support deleting items for alerts
     #def __delitem__(self, item, value):
     #    if queue:
     #        queue.put([item], None)
     #    super(TheData, self).__delitem__(item)
 
-# Use a dictionary to store current readings
-# initialise with standard system data
-data = TheData({
-    'sys-temp': 0,
-    'sys-load': 0,
-    'sys-mem': 0,
-})
-# add sensor data if present
-if HAVE_SENSOR:
+# Use a (custom overridden) dictionary to store current readings
+data = TheData({})
+data["sys-temp"] = 0
+data["sys-load"] = 0
+data["sys-mem"] = 0
+if bme280:
     data["env-temp"] = 0
     data["env-humi"] = 0
     data["env-pres"] = 0
-# add pins as needed
-for name,_ in pin_map.items():
+for name,_ in settings.pin_map.items():
     data[f"pin-{name}"] = 0
 
 # time of last data update
@@ -240,7 +162,8 @@ def button_control(action="toggle"):
         ret += settings.web_pin_states[state]
     else:
         state = False
-        ret = 'Not supported, no pin number defined'
+        ret = 'Not supported, no controlled pin number defined'
+    update_pins()
     return (ret, state)
 
 def button_interrupt(*_):
@@ -255,7 +178,7 @@ def update_data():
     # Get current environmental and system data, called on demand
     global data_updated
     if (time.time() - data_updated) >= settings.data_interval:
-        if HAVE_SENSOR:
+        if bme280:
             data['env-temp'] = bme280.temperature
             data['env-humi'] = bme280.relative_humidity
             data['env-pres'] = bme280.pressure
@@ -269,7 +192,7 @@ def update_data():
 
 def update_pins():
     # Check if any pins have changed state, and log
-    for name, pin in pin_map.items():
+    for name, pin in settings.pin_map.items():
         this_pin_state =  get_pin(pin)
         if this_pin_state != data[f"pin-{name}"]:
             # Pin has changed state, store new state and log
@@ -308,9 +231,9 @@ def hourly():
 
 def handle_signal(sig, *_):
     # handle common signals
-    if screen:
+    if display:
         # clean up the screen process
-        screen.join()
+        display.join()
     if sig == SIGHUP:
         handle_restart()
     elif sig == SIGINT and settings.debug:
@@ -335,39 +258,23 @@ def handle_exit():
 # The fun starts here:
 if __name__ == '__main__':
 
+    # Get an initial data reading
+    update_data()
+    update_pins()
+
     # Log sensor status
-    if HAVE_SENSOR:
+    if bme280:
         logging.info('Environmental sensor configured and enabled')
     elif settings.have_sensor:
         logging.warning('Environmental data configured but no sensor detected: '\
                 'Environment status and logging disabled')
 
-    # Display animation setup
-    # The animator class will start the screen display and saver
-    # as scheduled jobs to run forever
-    screen = None
-    if HAVE_SCREEN:
-        queue = Queue()
-        screen = Process(target=animate, args=(settings, disp, queue),
-                name='animator')
-        screen.start()
-    else:
-        if settings.have_screen:
-            logging.warning('Display configured but did not initialise properly: '\
-                    'Display features disabled')
-
-    # Get an initial data reading for system and sensor values
-    update_data()
-
-    for name, pin in pin_map.items():
-        data[f'pin-{name}'] = get_pin(pin)
-        logging.info(f'{name}: {settings.web_pin_states[data[f"pin-{name}"]]}')
-
     if any(key.startswith('pin-') for key in data):
         logging.info('GPIO monitoring configured and logging enabled')
-    elif len(settings.pin_map.keys()) > 0:
-        logging.info('GPIO monitoring configured but pin setup failed: '\
-                'GPIO features disabled')
+
+    for name, pin in settings.pin_map.items():
+        data[f'pin-{name}'] = get_pin(pin)
+        logging.info(f'{name}: {settings.web_pin_states[data[f"pin-{name}"]]}')
 
     # Set pin interrupt and output if we have a button and a pin to control
     if settings.button_out > 0:
@@ -386,6 +293,18 @@ if __name__ == '__main__':
         print(f'Controllable pin ({settings.button_name}) configured and enabled; '\
                 f'(pin={settings.button_pin}, url="{settings.button_url})"')
 
+    # Display animation setup
+    if disp:
+        queue = Queue()
+        display = Process(target=animate, args=(settings, disp, queue),
+                name='overwatch_animator')
+        display.start()
+    else:
+        display = None
+        if settings.have_screen:
+            logging.warning('Display configured but did not initialise properly: '\
+                    'Display features disabled')
+
     # RRD init
     rrd = Robin(settings, data)
 
@@ -399,11 +318,9 @@ if __name__ == '__main__':
     register(handle_exit)
 
     # Schedule pin monitoring, database updates and logging events
-    # Use seperate threads for the different updaters.
-    # The display (started in the animate class) runs in the main thread.
     schedule.every().hour.at(":00").do(hourly)
     schedule.every(settings.rrd_interval).seconds.do(update_db)
-    if len(pin_map.keys()) > 0:
+    if len(settings.pin_map.keys()) > 0:
         schedule.every(settings.pin_interval).seconds.do(update_pins)
     if settings.log_interval > 0:
         schedule.every(settings.log_interval).seconds.do(log_data)
