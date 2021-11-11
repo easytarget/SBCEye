@@ -1,10 +1,27 @@
-'''Bus based hardware drivers
+'''Bus based hardware driver initialisation
+
+Imports and starts the optional Bus based devices.
+Gracefully fails and disables services as appropriate if anything goes wrong
+
+I'd probably do this differently if writing from scratch/refactoring, and
+make better use of Importlib in overwatch.py.
 '''
 
-# currently only for I2C bus devices, but leaves room for expansion/alternatives
+import importlib
+
 
 def i2c_setup(screen, sensor):
-    '''Import and start the I2C bus devices'''
+    '''Import and start the I2C bus devices
+
+    parameters:
+        screen: (bool) is screen enabled in config?
+        sensor: (bool) is environmental sensor (bme280) enabled in config?
+
+    returns:
+        disp:   Display driverr object or None if failed
+        bme280: Sensor module object, or None if failed
+    '''
+
     disp = None
     bme280 = None
 
@@ -58,14 +75,8 @@ def i2c_setup(screen, sensor):
             print(error)
             print("ERROR: SSD1306 i2c display failed to initialise, disabling")
 
-        try:
-            # Additional modules needed for display
-            # Not actually used here in the main loop, but we test for them here
-            # so we do not get an ugly failure when the display animator loads.
-            from PIL import Image, ImageDraw, ImageFont
-        except ImportError as error:
+        if not importlib.util.find_spec("PILd"):
             disp = None
-            print(error)
             print("ERROR: PIL graphics module not found, disabling display")
 
     if sensor:
