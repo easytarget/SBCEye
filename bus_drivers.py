@@ -75,7 +75,7 @@ def i2c_setup(screen, sensor):
             print(error)
             print("ERROR: SSD1306 i2c display failed to initialise, disabling")
 
-        if not importlib.util.find_spec("PILd"):
+        if not importlib.util.find_spec("PIL"):
             disp = None
             print("ERROR: PIL graphics module not found, disabling display")
 
