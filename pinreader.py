@@ -1,10 +1,16 @@
-# Directly read pins via the /sys/class/gpio tree
+'''Really simple and direct reading of BCM GPIO pins
 
-from os import path, open, close, read, write, O_WRONLY, O_RDONLY
+provides:
+    pinreader.get_pin(pin):
+    - pin (int) is the bcm pin number
+    - returns an integer, 0 or 1 corresponding to on/off
+'''
 
-gpio_root = '/sys/class/gpio'
-export_handle = f'{gpio_root}/export'
-unexport_handle = f'{gpio_root}/unexport'
+import os
+
+GPIO_ROOT = '/sys/class/gpio'
+export_handle = f'{GPIO_ROOT}/export'
+unexport_handle = f'{GPIO_ROOT}/unexport'
 
 def get_pin(pin):
     '''Read pin state, return an integer
@@ -15,17 +21,17 @@ def get_pin(pin):
     returns:
     pin_state: (int) 0=low, 1=high
     '''
-    gpio_handle = f'{gpio_root}/gpio{str(pin)}'
-    exported = path.isdir(gpio_handle)
+    gpio_handle = f'{GPIO_ROOT}/gpio{str(pin)}'
+    exported = os.path.isdir(gpio_handle)
     if not exported:
-        export = open(export_handle, O_WRONLY)
-        write(export, bytes(str(pin), 'ascii'))
-        close(export)
-    value = open(f'{gpio_handle}/value', O_RDONLY)
-    ret = int(read(value,1))
-    close(value)
+        export = os.open(export_handle, os.O_WRONLY)
+        os.write(export, bytes(str(pin), 'ascii'))
+        os.close(export)
+    value = os.open(f'{gpio_handle}/value', os.O_RDONLY)
+    ret = int(os.read(value,1))
+    os.close(value)
     if not exported:
-        unexport = open(unexport_handle, O_WRONLY)
-        write(unexport, bytes(str(pin), 'ascii'))
-        close(unexport)
+        unexport = os.open(unexport_handle, os.O_WRONLY)
+        os.write(unexport, bytes(str(pin), 'ascii'))
+        os.close(unexport)
     return int(ret)

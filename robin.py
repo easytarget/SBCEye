@@ -1,3 +1,6 @@
+'''Dedicated RRDB database handling for the pi overwatch
+'''
+
 import tempfile
 import time
 from pathlib import Path
@@ -6,8 +9,8 @@ import gzip
 import subprocess
 import os
 from shutil import which
+from threading import Thread, Lock, local
 import schedule
-from threading import Thread, current_thread, Lock, local
 import rrdtool
 
 # Dump and graph operations are run multithreaded by the httpServer, and backups
@@ -19,6 +22,9 @@ zipped = local()
 
 
 class Robin:
+    '''Helper class for RRDB database
+    '''
+
     def __init__(self, s, data):
         self.graph_args = {}
         self.graph_args['name'] = s.name
@@ -85,7 +91,7 @@ class Robin:
                 os.mkdir(f'{str(db_path)}/backup/')
             except FileExistsError:
                 pass
-            except:
+            except OSError:
                 logging.warning('Disabling database backups because the'\
                         'backup folder could not be created')
                 print(f'Database backup folder creation failed ({str(db_path)}/backup/)')
@@ -149,17 +155,14 @@ class Robin:
         logging.info(f'RRD database is: {str(self.db_file)}')
 
 
-    def _run_threaded(self, job_func):
-        job_thread = Thread(target=job_func)
-        job_thread.start()
-
     def _backup(self):
+        '''Backup and rotate old backups'''
         if self.backup_count > 0:
             # Copy to a timestamped file
             self.write_updates()
             suffix = time.strftime("%Y-%m-%d.%H:%M:%S.gz")
             if not db_lock.acquire(blocking=True, timeout=600):
-                print(f'Error: Backup failed, could not acquire db lock within 600s')
+                print('Error: Backup failed, could not acquire db lock within 600s')
                 return
             start = time.time()
             with open(f'{self.db_file}', 'rb') as dbfile:
@@ -192,19 +195,20 @@ class Robin:
                     print(f'Removed stale backup: {name}')
 
     def start_backups(self):
+        '''Add the backup schedule job'''
         # Start the backup schedule, using threads since it can run for some time
         if self.backup_count > 0:
-            schedule.every().day.at(self.backup_time).do(self._run_threaded, self._backup)
+            schedule.every().day.at(self.backup_time).do(run_threaded, self._backup)
 
     def dump(self):
-        # provide a gzipped dump of database
+        '''provide a gzipped dump of database'''
         zipped = bytearray()
         if self.dumpable:
             self.write_updates()
             print('Dump requested')
             if not db_lock.acquire(blocking=True, timeout=60):
-                print(f'Error: Dumping failed, could not acquire db lock within 60s')
-                return
+                print('Error: Dumping failed, could not acquire db lock within 60s')
+                return zipped
             start = time.time()
             dump = subprocess.check_output(["rrdtool", 'dump', str(self.db_file)])
             db_lock.release()
@@ -217,9 +221,9 @@ class Robin:
         return zipped
 
     def update(self, data):
-        # Update the database with the latest readings
+        '''Update the database with the latest readings'''
         if not db_lock.acquire(blocking=True, timeout=self.update_interval):
-            print(f'Error: Update failed, could not acquire graph '\
+            print('Error: Update failed, could not acquire graph '\
                     f'generation lock within update period ({self.update_interval}s)')
             return
         dataline = str(int(time.time()))
@@ -232,11 +236,11 @@ class Robin:
             self.write_updates()
 
     def write_updates(self):
-        # write any cached updates to the database
+        '''write any cached updates to the database'''
         if len(self.cache) > 0:
             if not db_lock.acquire(blocking=True, timeout=self.cache_age):
-                print(f'Error: Data Write failed, could not acquire graph '\
-                        'generation lock within write period ({self.cache_age}s)')
+                print('Error: Data Write failed, could not acquire graph '\
+                        f'generation lock within write period ({self.cache_age}s)')
                 return
             try:
                 rrdtool.update(
@@ -245,13 +249,14 @@ class Robin:
                         "--skip-past-updates",
                         *self.cache)
                 self.cache = []
-            except Exception as rrd_error:
+            except rrdtool.OperationalError as rrd_error:
                 print("RRDTool update error:")
                 print(rrd_error)
             db_lock.release()
         self.last_write = time.time()
 
     def draw_graph(self, start, end, duration, graph):
+        '''Generate a graph, returns a raw png image'''
         response = bytearray()
         if not graph_lock.acquire(blocking=True, timeout=120):
             print(f'Error: png file generation failed for : {graph} : {start}>>{end}'\
@@ -287,7 +292,7 @@ class Robin:
                     rrdtool.graph(
                             temp_file.name,
                             *rrd_args)
-                except Exception as rrd_error:
+                except rrdtool.OperationalError as rrd_error:
                     print("RRDTool graph error:")
                     print(rrd_error)
                 response = temp_file.read()
@@ -297,3 +302,9 @@ class Robin:
             print(f'Error: No graph available for type: {graph}')
         graph_lock.release()
         return response
+
+def run_threaded(job_func):
+    '''Start a job in a new thread
+    '''
+    job_thread = Thread(target=job_func)
+    job_thread.start()

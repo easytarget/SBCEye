@@ -14,10 +14,6 @@ from threading import Thread, local
 # Logging
 import logging
 
-# RRD data
-from robin import Robin
-
-
 def serve_http(s, rrd, data, helpers):
     # Spawns a http.server.HTTPServer in a separate thread on the given port.
     handler = _BaseRequestHandler
@@ -28,7 +24,7 @@ def serve_http(s, rrd, data, helpers):
     # HTTPServer sets this as well (left here to make obvious).
     httpd.allow_reuse_address = True
     if s.web_allow_dump and rrd.dumpable:
-        logging.info(f"RRD database is dumpable via web")
+        logging.info("RRD database is dumpable via web")
         http.db_dumpable = True
     else:
         http.db_dumpable = False
@@ -40,9 +36,9 @@ def serve_http(s, rrd, data, helpers):
     http.button_control = helpers[0]
     http.update_data = helpers[1]
     http.update_pins = helpers[2]
-    http.fi_file = 'favicon.ico'
-    if not os.path.exists(http.fi_file):
-        http.fi_file = f'{sys.path[0]}/{http.fi_file}'
+    http.icon_file = 'favicon.ico'
+    if not os.path.exists(http.icon_file):
+        http.icon_file = f'{sys.path[0]}/{http.icon_file}'
     # Start the server
     logging.info(f"HTTP server will bind to port {str(s.web_port)} on host {s.web_host}")
     httpd.server_bind()
@@ -342,13 +338,13 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._write_dedented(response)
         elif urlparse(self.path).path == '/favicon.ico':
             # Favicon
-            if not os.path.exists(http.fi_file):
+            if not os.path.exists(http.icon_file):
                 self.send_error(404, 'unavailable',
-                        f'{http.fi_file} not found.')
+                        f'{http.icon_file} not found.')
             else:
                 self._set_icon_headers()
-                with open(http.fi_file,'rb') as fi:
-                    self.wfile.write(fi.read())
+                with open(http.icon_file,'rb') as favicon:
+                    self.wfile.write(favicon.read())
         elif ((urlparse(self.path).path == '/' + http.s.button_url)
                 and (len(http.s.button_url) > 0)
                 and (http.s.button_out > 0)):

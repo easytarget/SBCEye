@@ -54,7 +54,7 @@ class Settings:
                 config_file = Path(f'{sys.path[0]}/defaults.ini').resolve()
                 if config_file.is_file():
                     print(f'Using default configuration from {config_file}')
-                    print(f'\nWARNING: Copy "defaults.ini" to "config.ini" for customisation\n')
+                    print('\nWARNING: Copy "defaults.ini" to "config.ini" for customisation\n')
                     self.default_config = True
                 else:
                     print('\nERROR: Cannot find a configuration file, exiting')
@@ -136,6 +136,7 @@ class Settings:
         self.display_rotate = display.getboolean("rotate")
         self.display_contrast = display.getint("contrast")
         self.display_invert = display.getboolean("invert")
+        self.display_screens = display.get("screens").split(',')
 
         saver = config["saver"]
         self.saver_mode = saver.get("mode")

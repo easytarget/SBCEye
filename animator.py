@@ -1,9 +1,9 @@
 # Some general functions we will use
 import time
 import logging
-import schedule
-from sys import exit
+from sys import exit as sys_exit
 from signal import signal, SIGTERM, SIGINT
+import schedule
 from PIL import Image, ImageDraw, ImageFont
 
 # Local classes
@@ -27,6 +27,7 @@ class Animator:
         self.display_rotate = settings.display_rotate
         self.animate_speed = settings.animate_speed
         self.time_format = settings.time_format
+        self.screens = settings.display_screens
 
         # Create image canvas (with mode '1' for 1-bit color)
         self.image = Image.new("1", (self.span, self.height))
@@ -46,8 +47,8 @@ class Animator:
             print('Install font with "$ sudo apt install fonts-liberation"')
             self.font = self.splash_font =  ImageFont.load_default()
 
-        # Initial screen list
-        #self.update_screen_list()
+        # Begin with empty screen list
+        self.screen_list = []
 
         # Start main animator
         self.passes = settings.animate_passes
@@ -57,13 +58,14 @@ class Animator:
         schedule.every().hour.at(":00").do(self._hourly)
 
         # Start saver
-        self.screensaver = Saver(settings, disp)
+        saver_settings = (settings.saver_mode, settings.saver_on,
+                settings.saver_off, settings.display_invert)
+        self.screensaver = Saver(disp, saver_settings)
 
         # Notify logs etc
         logging.info('Display configured and enabled')
         print('Display configured and enabled')
         self._splash()
-
 
 
     def _clean(self):
@@ -101,12 +103,23 @@ class Animator:
                 line = f'{name}{self.data[sense]:{fmt}}{suffix}'
                 self.draw.text((xpos + 6, ypos), line, font=self.font, fill=255)
 
-    def _sys_screen(self,xpos=0):
+    def _sys_screen1(self,xpos=0):
         # Draw screen for system data
         items = {
                 "sys-temp": ('CPU:  ', '.1f', DEGREE_SIGN, 5),
                 "sys-load": ('Load: ', '1.2f', '', 25),
                 "sys-mem":  ('Mem:  ', '.1f', '%', 45),
+                }
+        for sense,(name,fmt,suffix,ypos) in items.items():
+            if sense in self.data.keys():
+                line = f'{name}{self.data[sense]:{fmt}}{suffix}'
+                self.draw.text((xpos + 6, ypos), line, font=self.font, fill=255)
+
+    def _sys_screen2(self,xpos=0):
+        # Draw screen for additional system data
+        items = {
+                "sys-disk": ('disk:  ', '.f', 'MB', 5),
+                "sys-load": ('LOAD: ', '1.2f', '', 25),
                 }
         for sense,(name,fmt,suffix,ypos) in items.items():
             if sense in self.data.keys():
@@ -140,14 +153,21 @@ class Animator:
         _text(0)
         self._show()
 
-    def _get_screen_list(self):
+    def _update_screen_list(self):
         # Generate the screen list
-        self.screen_list = []
         for key in self.data.keys():
-            if (key[:4] == 'env-') and (not '_bme_screen' in self.screen_list):
+            if (key[:4] == 'env-')\
+                    and ('bme_screen' in self.screens)\
+                    and ('_bme_screen' not in self.screen_list):
                 self.screen_list.append('_bme_screen')
-            if (key[:4] == "sys-") and (not '_sys_screen' in self.screen_list):
-                self.screen_list.append('_sys_screen')
+            if (key[:4] == "sys-")\
+                    and ('sys_screen1' in self.screens)\
+                    and ('_sys_screen1' not in self.screen_list):
+                self.screen_list.append('_sys_screen1')
+            if (key[:4] == "sys-")\
+                    and ('sys_screen2' in self.screens)\
+                    and ('_sys_screen2' not in self.screen_list):
+                self.screen_list.append('_sys_screen2')
 
     def _hourly(self):
         # totally frivously do a spash screen once an hour.
@@ -155,11 +175,10 @@ class Animator:
 
     def _frame(self):
         # Run from the scheduler, animates each step of the cycle in sequence
-        self._get_screen_list()
+        self._update_screen_list()
         self.current_pass += 1
         if len(self.screen_list) == 0:
             self._no_data()
-            return
         elif self.current_pass >= self.passes:
             self.current_pass = 0
             self.current_screen += 1
@@ -181,7 +200,7 @@ def animate(settings, disp, queue):
     def die_with_dignity(*_):
         # Exit cleanly (eg without stack trace) on a sigint/sigterm
         print('Display animator process exiting')
-        exit()
+        sys_exit()
 
     signal(SIGTERM, die_with_dignity)
     signal(SIGINT, die_with_dignity)

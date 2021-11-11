@@ -28,9 +28,9 @@ import logging
 from logging.handlers import RotatingFileHandler
 import random
 from atexit import register
-import schedule
 from signal import signal, SIGTERM, SIGINT, SIGHUP
 from multiprocessing import Process, Queue
+import schedule
 import psutil
 
 # Local classes
@@ -78,7 +78,7 @@ try:
     import setproctitle
     process_name = settings.name.encode("ascii", "ignore").decode("ascii")
     setproctitle.setproctitle(f'overwatch: {process_name}')
-except ModuleNotFoundError:
+except ImportError:
     pass
 
 #
@@ -230,9 +230,9 @@ def hourly():
 
 def handle_signal(sig, *_):
     # handle common signals
-    if display:
+    if DISPLAY:
         # clean up the screen process
-        display.join()
+        DISPLAY.join()
     if sig == SIGHUP:
         handle_restart()
     elif sig == SIGINT and settings.debug:
@@ -292,11 +292,11 @@ if __name__ == '__main__':
     if disp:
         from animator import animate
         queue = Queue()
-        display = Process(target=animate, args=(settings, disp, queue),
+        DISPLAY = Process(target=animate, args=(settings, disp, queue),
                 name='overwatch_animator')
-        display.start()
+        DISPLAY.start()
     else:
-        display = None
+        DISPLAY = None
         if settings.have_screen:
             logging.warning('Display configured but did not initialise properly: '\
                     'Display features disabled')
