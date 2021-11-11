@@ -77,7 +77,7 @@ Now we install/upgrade the requirements
 (env) pi@pi:~/HAT/pi-overwatch $ pip install image
 ```
 
-Copy the `default-overwatch-settings.py` file to `overwatch-settings.py` and edit as required.
+Copy the `defaults.ini` file to `config.ini` and edit as required.
 - See the comments in the file
 - The default configuration is sufficient for testing, but screens, sensors and GPIO settings need to be enabled in the settings
 - Some other parameters for the web server, logging and display can be set there too
@@ -105,7 +105,7 @@ Note; If you want to leave the virtualenv at any time you can do so with `$ deac
 Once you have everything installed, configured and tested by running on the console you should start running this as a system service. The OverWatch will then run automatically at boot and operate in the background like other services.
 
 ```console
-pi@pi:~/HAT/pi-overwatch $ sudo cp OverWatch.service /etc/systemd/system/
+pi@pi:~/HAT/pi-overwatch $ sudo ln -s /home/pi/HAT/pi-overwatch/OverWatch.service /etc/systemd/system/
 pi@pi:~/HAT/pi-overwatch $ sudo systemctl daemon-reload
 pi@pi:~/HAT/pi-overwatch $ sudo systemctl enable OverWatch.service
 pi@pi:~/HAT/pi-overwatch $ sudo systemctl start OverWatch.service
@@ -125,7 +125,8 @@ Oct 13 19:37:49 pi.easytarget.org systemd[1]: Started OverWatch script for PI Ha
 ## Upgrading
 Quick notes; to be expanded later as required, assumes you use git.
 - go to the pi-overwatch repo
-- `git pull`
+- git pull
+- merge any changes from defaults.ini to config.ini
 - stop the service
 - start the service
 
