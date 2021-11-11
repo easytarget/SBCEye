@@ -63,6 +63,7 @@ Now we install/upgrade the requirements
 (env) pi@pi:~/HAT/pi-overwatch $ pip install psutil
 (env) pi@pi:~/HAT/pi-overwatch $ pip install RPi.GPIO
 (env) pi@pi:~/HAT/pi-overwatch $ pip install schedule
+(env) pi@pi:~/HAT/pi-overwatch $ pip install setproctitle
 
 (env) pi@pi:~/HAT/pi-overwatch $ sudo apt install librrd-dev
 (env) pi@pi:~/HAT/pi-overwatch $ pip install rrdtool
