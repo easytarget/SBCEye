@@ -1,7 +1,10 @@
-#
-# Application defaults (sensible)
-#
-#
+'''Process arguments and load configuration
+
+User can override the standard .ini file on the commandline
+Otherwise we use the local config.ini if it exists
+If not we use default.ini, which has sensible defaults
+'''
+
 import sys
 import textwrap
 from pathlib import Path
@@ -12,6 +15,13 @@ from subprocess import check_output
 import configparser
 
 class Settings:
+    '''Provide the settings as a class
+
+    No Methods
+    Attributes:
+        Basically, look at the class and config.ini file, I'm not going
+        to list and describe everything a second time here ;-)
+    '''
 
     def __init__(self):
 

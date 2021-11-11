@@ -25,7 +25,7 @@ def i2c_setup(screen, sensor):
     disp = None
     bme280 = None
 
-    # Start by determining if we can load the correct modules
+    # Start by trying to load the correct modules
     if screen or sensor:
         # I2C Comms
         try:

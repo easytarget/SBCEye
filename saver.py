@@ -44,7 +44,7 @@ class Saver:
                     or start not in range(0,23)\
                     or end not in range(0,23):
                 print('start/end times identical or out of range; disabling')
-                self.mode = 'end'
+                self.mode = 'off'
             elif start < end:
                 self.saver_map = [False]*24
                 for i in range(start, end):

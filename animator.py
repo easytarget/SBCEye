@@ -1,5 +1,9 @@
+'''Display Animator class and start function
+part of the OverWatch Project
+'''
+
 # Some general functions we will use
-import time
+from time import sleep
 import logging
 from sys import exit as sys_exit
 from signal import signal, SIGTERM, SIGINT
@@ -13,9 +17,16 @@ from saver import Saver
 DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
 class Animator:
+    '''Animates the I2C OLED display
+
+    Handles starting the display and then displays the desired information
+    screens according to user-defined 'frame' rate.
+    Screens are 'slid' into place to provide a pleasing animation effect
+    A screensaver can be invoked to blank or invert the display as the user wishes
+    '''
 
     def __init__(self, settings, disp, data):
-        # Display setup
+        '''Display setup'''
         self.disp = disp
         self.data = data
 
@@ -26,7 +37,6 @@ class Animator:
 
         self.display_rotate = settings.display_rotate
         self.animate_speed = settings.animate_speed
-        self.time_format = settings.time_format
         self.screens = settings.display_screens
 
         # Create image canvas (with mode '1' for 1-bit color)
@@ -69,11 +79,11 @@ class Animator:
 
 
     def _clean(self):
-        # Draw a black filled box to clear the canvas.
+        '''Draw a black filled box to clear the canvas'''
         self.draw.rectangle((0,0,self.span-1,self.height-1), outline=0, fill=0)
 
     def _show(self, xpos=0):
-        # Put a specific area of the canvas onto display
+        '''Put a specific area of the canvas onto display'''
         if self.display_rotate:
             self.disp.image(self.image.transform((self.width,self.height),
                        Image.EXTENT,(xpos,0,xpos+self.width,self.height))
@@ -84,7 +94,7 @@ class Animator:
         self.disp.show()
 
     def _slideout(self):
-        # Slide the display view across the canvas to animate between screens
+        '''Slide the display view across the canvas to animate between screens'''
         x_pos = 0
         while x_pos < self.width + self.margin:
             self._show(x_pos)
@@ -92,7 +102,7 @@ class Animator:
         self._show(self.width + self.margin)
 
     def _bme_screen(self, xpos=0):
-        # Draw screen for environmental data
+        '''Draw screen for environmental data'''
         items = {
                 "env-temp": ('Temp: ', '.1f', DEGREE_SIGN, 5),
                 "env-humi": ('Humi: ', '.0f', '%', 25),
@@ -104,7 +114,7 @@ class Animator:
                 self.draw.text((xpos + 6, ypos), line, font=self.font, fill=255)
 
     def _sys_screen1(self,xpos=0):
-        # Draw screen for system data
+        '''Draw screen for system data'''
         items = {
                 "sys-temp": ('CPU:  ', '.1f', DEGREE_SIGN, 5),
                 "sys-load": ('Load: ', '1.2f', '', 25),
@@ -116,7 +126,7 @@ class Animator:
                 self.draw.text((xpos + 6, ypos), line, font=self.font, fill=255)
 
     def _sys_screen2(self,xpos=0):
-        # Draw screen for additional system data
+        '''Draw screen for additional system data'''
         items = {
                 "sys-disk": ('disk:  ', '.f', 'MB', 5),
                 "sys-load": ('LOAD: ', '1.2f', '', 25),
@@ -127,6 +137,7 @@ class Animator:
                 self.draw.text((xpos + 6, ypos), line, font=self.font, fill=255)
 
     def _no_data(self, reason='Initialising'):
+        '''Cover screen for when the data structure is empty'''
         def _text(xpos):
             self.draw.text((5 + xpos, 5),
                     'No Data:', font=self.font, fill=255)
@@ -137,9 +148,9 @@ class Animator:
         self._show()
 
     def _splash(self):
-        # Run hourly by the scheduler
-        # Will be run automagicallly at startup when the main loop
-        #  force-runs all schedules during initialisation
+        ''' Run hourly by the scheduler
+        Will be run automagicallly at startup when the main loop
+        force-runs all schedules during initialisation'''
         def _text(xpos):
             self.draw.text((8 + xpos, 0), 'Over-',  font=self.splash_font, fill=255)
             self.draw.text((8 + xpos, 28), 'Watch',  font=self.splash_font, fill=255)
@@ -154,7 +165,7 @@ class Animator:
         self._show()
 
     def _update_screen_list(self):
-        # Generate the screen list
+        '''Generate the screen list'''
         for key in self.data.keys():
             if (key[:4] == 'env-')\
                     and ('bme_screen' in self.screens)\
@@ -170,11 +181,11 @@ class Animator:
                 self.screen_list.append('_sys_screen2')
 
     def _hourly(self):
-        # totally frivously do a spash screen once an hour.
+        '''totally frivously do a spash screen once an hour'''
         self._splash()
 
     def _frame(self):
-        # Run from the scheduler, animates each step of the cycle in sequence
+        '''Run from the scheduler, animates each step of the cycle in sequence'''
         self._update_screen_list()
         self.current_pass += 1
         if len(self.screen_list) == 0:
@@ -247,4 +258,4 @@ def animate(settings, disp, queue):
             else:
                 data.pop(key, None)
         schedule.run_pending()
-        time.sleep(0.25)
+        sleep(0.25)

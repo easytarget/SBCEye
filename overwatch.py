@@ -1,21 +1,31 @@
 #!/usr/bin/python
+'''
+Pi Overwatch:
+Animate the OLED display attached to my OctoPrint server with bme280 and system data
+Show, log and graph the environmental, system and gpio data via a web interface
+Give me a on/off button + url to control the bench lights via a GPIO pin
 
-# Pi Overwatch:
-# Animate the SSD1306 display attached to my OctoPrint server with bme280 and system data
-# Show, log and graph the environmental, system and gpio data via a web interface
-# Give me a on/off button + url to control the bench lights via a GPIO pin
+I2C BME280 Sensor and SSD1306 Display:
 
-# I2C BME280 Sensor and SSD1306 Display:
-#
-# Note: the sensor and display are optional, if not found their functionality will be disabled and this will be logged at startup.
-#
-# Make sure I2C is enabled in 'boot/config.txt' (reboot after editing that file)
-# Uncomment: "dtparam=i2c_arm=on", which is the same as you get if enabling I2C via the 'Interface Options' in `sudo raspi-config`
-# I prefer 'dtparam=i2c_arm=on,i2c_arm_baudrate=400000', to draw the display faster, but is more prone to errors from long wires etc.. ymmv.
+Note: the sensor and display are optional, if not found their functionality will be
+disabled and this will be logged at startup.
 
-# To list all I2C addresses visible on the system run: `i2cdetect -y 1` (`sudo apt install i2c-tools`)
-# bme280 I2C address should be 0x76 or 0x77 (this is selectable via a jumper) and we will search for it there
-# The SSD1306 I2C address should be automagically found; the driver will bind to the first matching display
+Make sure I2C is enabled in 'boot/config.txt' (reboot after editing that file)
+
+- Uncomment: "dtparam=i2c_arm=on", which is the same as you get if enabling I2C
+  via the 'Interface Options' in `sudo raspi-config`
+
+- I prefer 'dtparam=i2c_arm=on,i2c_arm_baudrate=400000', to draw the display faster,
+  but is more prone to errors from long wires etc.. ymmv
+
+To list all I2C addresses visible on the system run:
+$ sudo apt install i2c-tools
+$ i2cdetect -y 1`
+
+bme280 I2C address should be 0x76 or 0x77; it will be searched for on these addresses
+The SSD1306 I2C address should be automagically found; the driver will bind to the
+first matching display
+'''
 
 # Default settings are in the file 'default_config.ini'
 # Copy this to 'config.ini' and edit as appropriate
@@ -103,10 +113,9 @@ if settings.button_out > 0:
 #
 # Local Classes, Globals
 
-# Override the main data class so it will dump changes to a queue if it exists
-# This is used to share data with the seperate display animator process
 data_queue = None
 class TheData(dict):
+    '''Override the dictionary class to also send data to the queue for the display'''
     def __setitem__(self, item, value):
         if data_queue:
             data_queue.put([item, value])
@@ -126,8 +135,8 @@ if bme280:
     data["env-temp"] = 0
     data["env-humi"] = 0
     data["env-pres"] = 0
-for name,_ in settings.pin_map.items():
-    data[f"pin-{name}"] = 0
+for pin_name,_ in settings.pin_map.items():
+    data[f"pin-{pin_name}"] = 0
 
 # time of last data update
 data_updated = 0
@@ -139,7 +148,7 @@ DEGREE_SIGN= u'\N{DEGREE SIGN}'
 # Local functions
 
 def button_control(action="toggle"):
-    # Set the controlled pin to a specified state
+    '''Set the controlled pin to a specified state'''
     if settings.button_out > 0:
         ret = f'{settings.button_name} '
         pin = settings.button_out
@@ -166,15 +175,15 @@ def button_control(action="toggle"):
     return (ret, state)
 
 def button_interrupt(*_):
-    # give a short delay, then re-read input to provide a minimum hold-down time
-    # and suppress false triggers from other gpio operations
+    '''give a short delay, then re-read input to provide a minimum hold-down time
+    and suppress false triggers from other gpio operations'''
     time.sleep(settings.button_hold)
     if GPIO.input(settings.button_pin):
         logging.info('Button pressed')
         button_control()
 
 def update_data():
-    # Get current environmental and system data, called on demand
+    '''Get current environmental and system data, called on demand'''
     global data_updated
     if (time.time() - data_updated) >= settings.data_interval:
         if bme280:
@@ -190,7 +199,7 @@ def update_data():
         data_updated = time.time()
 
 def update_pins():
-    # Check if any pins have changed state, and log
+    '''Check if any pins have changed state, and log'''
     for name, pin in settings.pin_map.items():
         this_pin_state =  get_pin(pin)
         if this_pin_state != data[f"pin-{name}"]:
@@ -199,13 +208,13 @@ def update_pins():
             logging.info(f'{name}: {settings.web_pin_states[this_pin_state]}')
 
 def update_db():
-    # Runs on a scedule, refresh readings and update RRD
+    '''Runs on a scedule, refresh readings and update RRD'''
     update_data()
     rrd.update(data)
 
 def log_data():
-    # Runs on a user defined schedule to dump a line of sensor data in the log
-    # Dictionary with tuples specifying name, format and suffix
+    '''Runs on a user defined schedule to dump a line of sensor data in the log
+    Dictionary with tuples specifying name, format and suffix'''
     loglist = {
             "env-temp": ('Temp', '.1f', DEGREE_SIGN),
             "env-humi": ('Humi', '.0f', '%'),
@@ -223,13 +232,13 @@ def log_data():
     print(log_line[:-2])
 
 def hourly():
-    # Remind everybody we are alive
+    '''Remind everybody we are alive'''
     myself = os.path.basename(__file__)
     timestamp = time.strftime(settings.time_format)
     print(f'{myself} :: {timestamp}')
 
 def handle_signal(sig, *_):
-    # handle common signals
+    '''Handle common signals'''
     if DISPLAY:
         # clean up the screen process
         DISPLAY.join()
@@ -242,13 +251,14 @@ def handle_signal(sig, *_):
         sys.exit()
 
 def handle_restart():
-    # In-Place safe restart (re-reads config)
+    '''In-Place safe restart (re-reads config)'''
     logging.info('Safe Restarting')
     print('Restart\n')
     rrd.write_updates()
     os.execv(sys.executable, ['python'] + sys.argv)
 
 def handle_exit():
+    '''Ensure we write ipending data to the RRD database as we exit'''
     rrd.write_updates()
     logging.info('Exiting')
     print('Graceful Exit\n')
@@ -267,9 +277,9 @@ if __name__ == '__main__':
     if any(key.startswith('pin-') for key in data):
         logging.info('GPIO monitoring configured and logging enabled')
 
-    for name, pin in settings.pin_map.items():
-        data[f'pin-{name}'] = get_pin(pin)
-        logging.info(f'{name}: {settings.web_pin_states[data[f"pin-{name}"]]}')
+    for pin_name, pin_number in settings.pin_map.items():
+        data[f'pin-{pin_name}'] = get_pin(pin_number)
+        logging.info(f'{pin_name}: {settings.web_pin_states[data[f"pin-{pin_name}"]]}')
 
     # Set pin interrupt and output if we have a button and a pin to control
     if settings.button_out > 0:

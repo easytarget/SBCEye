@@ -1,4 +1,5 @@
-# Provides the http handler and request server for the Pi OverWatch
+'''Provides the ithreaded http handler for the Pi OverWatch
+'''
 
 import sys
 import os.path
@@ -15,7 +16,7 @@ from threading import Thread, local
 import logging
 
 def serve_http(s, rrd, data, helpers):
-    # Spawns a http.server.HTTPServer in a separate thread on the given port.
+    '''Spawns a http.server.HTTPServer in a separate thread on the given port'''
     handler = _BaseRequestHandler
     httpd = http.server.ThreadingHTTPServer((s.web_host, s.web_port), handler, False)
     #httpd = http.server.HTTPServer((s.web_host, s.web_port), handler, False)
@@ -56,6 +57,7 @@ def serve_http(s, rrd, data, helpers):
 
 
 class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
+    '''Handles each individual request in a new thread'''
     ret = local()
 
     def _set_headers(self):
@@ -287,7 +289,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     parsed = local()
 
     def do_GET(self):
-        # Process requests and parse their options
+        '''Process requests and parse their options'''
         if urlparse(self.path).path == '/graph':
             # Individual Graph
             parsed_graph = parse_qs(urlparse(self.path).query).get('graph', None)
@@ -428,4 +430,5 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(404, 'No Such Page', 'This site serves pages at "/" and "/graphs"')
 
     def do_HEAD(self):
+        '''returns headers'''
         self._set_headers()
