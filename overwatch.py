@@ -105,16 +105,16 @@ if settings.button_out > 0:
 
 # Override the main data class so it will dump changes to a queue if it exists
 # This is used to share data with the seperate display animator process
-queue = None
+data_queue = None
 class TheData(dict):
     def __setitem__(self, item, value):
-        if queue:
-            queue.put([item, value])
+        if data_queue:
+            data_queue.put([item, value])
         super(TheData, self).__setitem__(item, value)
-    # (untested) support deleting items for alerts
+    # (untested) deleting items
     #def __delitem__(self, item, value):
-    #    if queue:
-    #        queue.put([item], None)
+    #    if data_queue:
+    #        data_queue.put([item], None)
     #    super(TheData, self).__delitem__(item)
 
 # Use a (custom overridden) dictionary to store current readings
@@ -291,8 +291,8 @@ if __name__ == '__main__':
     # Display animation setup
     if disp:
         from animator import animate
-        queue = Queue()
-        DISPLAY = Process(target=animate, args=(settings, disp, queue),
+        data_queue = Queue()
+        DISPLAY = Process(target=animate, args=(settings, disp, data_queue),
                 name='overwatch_animator')
         DISPLAY.start()
     else:

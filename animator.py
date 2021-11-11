@@ -193,12 +193,33 @@ class Animator:
             getattr(self,self.screen_list[self.current_screen])(self.width + self.margin)
             self._slideout()
         # else:
-        #     current_pass is less than 0, leave display as-is, used to display Splash, alarms, etc.
+        #     current_pass is less than 0
+        #     leave display as-is, used to display Splash, alarms, etc.
 
 
 def animate(settings, disp, queue):
+    '''Runs in a subprocess, animate the display using data recieved on the queue
+
+    This function is called as a subprocess and is not expected to return.
+    It starts the main Animator class, which animates the display and is driven
+    by the scheduler to provide animation 'passes'.
+    The screensaver is driven by another schedule as needed
+
+    Having started the Animator class this function enters an infinite loop
+    servicing the schedule(s) once per second. It listens on a queue
+    for incoming data pairs, and updates the values it displays.
+
+    parameters:
+        settings: main overwatch settings class
+        disp:     display module object
+        queue:    multiprocess queue, used to recieve data updates
+
+    returns:
+        Nothing, enters a loop and is not expected to return
+    '''
+
     def die_with_dignity(*_):
-        # Exit cleanly (eg without stack trace) on a sigint/sigterm
+        '''Exit cleanly (eg without stack trace) on a sigint/sigterm'''
         print('Display animator process exiting')
         sys_exit()
 
@@ -219,11 +240,11 @@ def animate(settings, disp, queue):
 
     # Loop forever servicing scheduler and queue
     while animation:
-        schedule.run_pending()
         while not queue.empty():
             key, value = queue.get_nowait()
             if value:
                 data.update({key: value})
             else:
                 data.pop(key, None)
+        schedule.run_pending()
         time.sleep(0.25)
