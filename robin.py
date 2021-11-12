@@ -1,5 +1,7 @@
-'''Dedicated RRDB database handling for the pi overwatch
+'''Data-Driven RRDB database handling for the pi overwatch
 '''
+
+# pragma pylint: disable=logging-fstring-interpolation
 
 import tempfile
 import time
@@ -14,12 +16,11 @@ import schedule
 import rrdtool
 
 # Dump and graph operations are run multithreaded by the httpServer, and backups
-#  are also threaded. We need some mutex locks and thread local storage
+#  are also threaded. We need some mutex locks for them
 db_lock = Lock()
 graph_lock = Lock()
-response = local()
-zipped = local()
-
+dump_local = local()
+graph_local = local()
 
 class Robin:
     '''Helper class for RRDB database
@@ -202,29 +203,31 @@ class Robin:
 
     def dump(self):
         '''provide a gzipped dump of database'''
-        zipped = bytearray()
+        dump_local.zipped = bytearray()
         if self.dumpable:
             self.write_updates()
             print('Dump requested')
             if not db_lock.acquire(blocking=True, timeout=60):
                 print('Error: Dumping failed, could not acquire db lock within 60s')
-                return zipped
-            start = time.time()
+                return dump_local.zipped
+            dump_local.start = time.time()
             dump = subprocess.check_output(["rrdtool", 'dump', str(self.db_file)])
             db_lock.release()
-            print(f'Dump is: {len(dump)} bytes raw and took {(time.time() - start):.2f}s')
-            start = time.time()
-            zipped = gzip.compress(dump, compresslevel=6)
-            print(f'Dump compressed to {len(zipped)} bytes in {(time.time() - start):.2f}s')
+            print(f'Dump is: {len(dump)} bytes raw and '\
+                    f'took {(time.time() - dump_local.start):.2f}s')
+            dump_local.start = time.time()
+            dump_local.zipped = gzip.compress(dump, compresslevel=6)
+            print(f'Dump compressed to {len(dump_local.zipped)} bytes '\
+                    f'in {(time.time() - dump_local.start):.2f}s')
         else:
             print('Dump requested but denied because commandline "rrdtool" unavailable')
-        return zipped
+        return dump_local.zipped
 
     def update(self, data):
         '''Update the database with the latest readings'''
         if not db_lock.acquire(blocking=True, timeout=self.update_interval):
-            print('Error: Update failed, could not acquire graph '\
-                    f'generation lock within update period ({self.update_interval}s)')
+            print('Error: Update failed, could not acquire database '\
+                    f'lock within update period ({self.update_interval}s)')
             return
         dataline = str(int(time.time()))
         for source in self.sources:
@@ -239,8 +242,8 @@ class Robin:
         '''write any cached updates to the database'''
         if len(self.cache) > 0:
             if not db_lock.acquire(blocking=True, timeout=self.cache_age):
-                print('Error: Data Write failed, could not acquire graph '\
-                        f'generation lock within write period ({self.cache_age}s)')
+                print('Error: Data Write failed, could not acquire database '\
+                        f'lock within write period ({self.cache_age}s)')
                 return
             try:
                 rrdtool.update(
@@ -257,11 +260,11 @@ class Robin:
 
     def draw_graph(self, start, end, duration, graph):
         '''Generate a graph, returns a raw png image'''
-        response = bytearray()
+        graph_local.response = bytearray()
         if not graph_lock.acquire(blocking=True, timeout=120):
             print(f'Error: png file generation failed for : {graph} : {start}>>{end}'\
                     ', could not acquire graph generation lock within 120s')
-            return response
+            return graph_local.response
         # RRD graph generation
         # Returns the generated file for sending as the http response
         if (graph in self.sources) and (graph in self.graph_map.keys()):
@@ -295,13 +298,13 @@ class Robin:
                 except rrdtool.OperationalError as rrd_error:
                     print("RRDTool graph error:")
                     print(rrd_error)
-                response = temp_file.read()
-                if len(response) == 0:
+                graph_local.response = temp_file.read()
+                if len(graph_local.response) == 0:
                     print(f'Error: png file generation failed for : {graph} : {start}>>{end}')
         else:
             print(f'Error: No graph available for type: {graph}')
         graph_lock.release()
-        return response
+        return graph_local.response
 
 def run_threaded(job_func):
     '''Start a job in a new thread

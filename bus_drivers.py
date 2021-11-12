@@ -6,6 +6,7 @@ Gracefully fails and disables services as appropriate if anything goes wrong
 I'd probably do this differently if writing from scratch/refactoring, and
 make better use of Importlib in overwatch.py.
 '''
+# pragma pylint: disable=import-outside-toplevel
 
 import importlib
 

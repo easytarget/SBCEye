@@ -65,7 +65,7 @@ Now we install/upgrade the requirements
 (env) pi@pi:~/HAT/pi-overwatch $ pip install schedule
 (env) pi@pi:~/HAT/pi-overwatch $ pip install setproctitle
 
-(env) pi@pi:~/HAT/pi-overwatch $ sudo apt install librrd-dev
+(env) pi@pi:~/HAT/pi-overwatch $ sudo apt install rrdtool librrd-dev
 (env) pi@pi:~/HAT/pi-overwatch $ pip install rrdtool
 
 ; Only if you plan to use a BME280 Temperature/Humidity/Pressure sensor:

@@ -2,6 +2,8 @@
 part of the OverWatch Project
 '''
 
+# pragma pylint: disable=logging-fstring-interpolation
+
 # Some general functions we will use
 from time import sleep
 import logging

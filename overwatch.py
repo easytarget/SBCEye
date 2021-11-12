@@ -27,6 +27,8 @@ The SSD1306 I2C address should be automagically found; the driver will bind to t
 first matching display
 '''
 
+# pragma pylint: disable=logging-fstring-interpolation
+
 # Default settings are in the file 'default_config.ini'
 # Copy this to 'config.ini' and edit as appropriate
 
@@ -75,6 +77,19 @@ logging.basicConfig(level=logging.INFO,
 schedule_logger = logging.getLogger('schedule')
 schedule_logger.setLevel(level=logging.WARN)
 
+# Unicode degrees character
+DEGREE_SIGN= u'\N{DEGREE SIGN}'
+
+# Items to appear in the log data set
+LOG_LIST = {
+        "env-temp": ('Temp', '.1f', DEGREE_SIGN),
+        "env-humi": ('Humi', '.0f', '%'),
+        "env-pres": ('Pres', '.0f', 'mb'),
+        "sys-temp": ('CPU', '.1f', DEGREE_SIGN),
+        "sys-load": ('Load', '1.2f', ''),
+        "sys-mem": ('Mem', '.1f', '%'),
+        }
+
 # Now we have logging, notify we are starting up
 logging.info('')
 logging.info(f'Starting overwatch service for: {settings.name}')
@@ -105,7 +120,7 @@ if disp:
 if settings.button_out > 0:
     try:
         from RPi import GPIO
-    except Exception as e:
+    except ImportError as e:
         print(e)
         print("ERROR: button & pin control requirements not met, features disabled")
         settings.button_out = 0
@@ -119,7 +134,8 @@ class TheData(dict):
     def __setitem__(self, item, value):
         if data_queue:
             data_queue.put([item, value])
-        super(TheData, self).__setitem__(item, value)
+        super().__setitem__(item, value)
+        #super(TheData, self).__setitem__(item, value)
     # (untested) deleting items
     #def __delitem__(self, item, value):
     #    if data_queue:
@@ -140,9 +156,6 @@ for pin_name,_ in settings.pin_map.items():
 
 # time of last data update
 data_updated = 0
-
-# Unicode degrees character
-DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
 #
 # Local functions
@@ -215,17 +228,9 @@ def update_db():
 def log_data():
     '''Runs on a user defined schedule to dump a line of sensor data in the log
     Dictionary with tuples specifying name, format and suffix'''
-    loglist = {
-            "env-temp": ('Temp', '.1f', DEGREE_SIGN),
-            "env-humi": ('Humi', '.0f', '%'),
-            "env-pres": ('Pres', '.0f', 'mb'),
-            "sys-temp": ('CPU', '.1f', DEGREE_SIGN),
-            "sys-load": ('Load', '1.2f', ''),
-            "sys-mem": ('Mem', '.1f', '%'),
-            }
     log_line = ''
     update_data()
-    for sense,(name,fmt,suffix) in loglist.items():
+    for sense,(name,fmt,suffix) in LOG_LIST.items():
         if sense in data.keys():
             log_line += f'{name}: {data[sense]:{fmt}}{suffix}, '
     logging.info(log_line[:-2])

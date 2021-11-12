@@ -1,5 +1,7 @@
-'''Provides the ithreaded http handler for the Pi OverWatch
+'''Provides the threaded http handler for the Pi OverWatch
 '''
+
+# pragma pylint: disable=logging-fstring-interpolation,no-self-use
 
 import sys
 import os.path
@@ -109,7 +111,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <body>'''
 
     def _give_foot(self, refresh = 0, scroll = False):
-        # DEBUG: f'<pre style="color:#888888">GET: {self.path} from: {self.client_address[0]}</pre>\n'
         ret = '''</body>\n
                 <script>\n'''
         if refresh > 0:
@@ -394,7 +395,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         elif (urlparse(self.path).path == '/dump') and http.db_dumpable:
             # Dump warning and link page
             self._set_headers()
-            response = self._give_head(f" :: RRD Dump")
+            response = self._give_head(" :: RRD Dump")
             response += self._give_dump_portal()
             response += self._give_foot()
             self._write_dedented(response)
