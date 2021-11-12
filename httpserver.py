@@ -17,23 +17,23 @@ from threading import Thread, local
 # Logging
 import logging
 
-def serve_http(s, rrd, data, helpers):
+def serve_http(settings, rrd, data, helpers):
     '''Spawns a http.server.HTTPServer in a separate thread on the given port'''
     handler = _BaseRequestHandler
-    httpd = http.server.ThreadingHTTPServer((s.web_host, s.web_port), handler, False)
-    #httpd = http.server.HTTPServer((s.web_host, s.web_port), handler, False)
+    httpd = http.server.ThreadingHTTPServer((settings.web_host, settings.web_port), handler, False)
+    #httpd = http.server.HTTPServer((settings.web_host, settings.web_port), handler, False)
     # Block only for 0.5 seconds max
     httpd.timeout = 0.5
     # HTTPServer sets this as well (left here to make obvious).
     httpd.allow_reuse_address = True
-    if s.web_allow_dump and rrd.dumpable:
+    if settings.web_allow_dump and rrd.dumpable:
         logging.info("RRD database is dumpable via web")
         http.db_dumpable = True
     else:
         http.db_dumpable = False
     # I'm just passing objects blindly into the http class itself, quick and dirty but it works
     # there is probably a better way to do this, eg using a meta-class and inheritance
-    http.s = s
+    http.settings = settings
     http.rrd = rrd
     http.data = data
     http.button_control = helpers[0]
@@ -43,7 +43,8 @@ def serve_http(s, rrd, data, helpers):
     if not os.path.exists(http.icon_file):
         http.icon_file = f'{sys.path[0]}/{http.icon_file}'
     # Start the server
-    logging.info(f"HTTP server will bind to port {str(s.web_port)} on host {s.web_host}")
+    logging.info(f'HTTP server will bind to port {str(settings.web_port)} '\
+            f'on host {settings.web_host}')
     httpd.server_bind()
     address = f"http://{httpd.server_name}:{httpd.server_port}"
     print(f"Webserver starting on : {address}")
@@ -89,9 +90,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def _give_head(self, title_extra=""):
-        title = http.s.name
+        title = http.settings.name
         if len(title_extra) > 0:
-            title = f"{http.s.name}{title_extra}"
+            title = f"{http.settings.name}{title_extra}"
         return f'''
                 <!DOCTYPE html>
                 <html>
@@ -127,7 +128,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         return ret
 
     def _give_timestamp(self):
-        timestamp = time.strftime(http.s.time_format)
+        timestamp = time.strftime(http.settings.time_format)
         return  f'''<div style="color:#555555;
                 font-size: 94%; padding-top: 0.5em;">{timestamp}</div>
                 <div style="color:#888888;
@@ -145,7 +146,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 }
         ret = ''
         if len(http.data.keys() & sensorlist.keys()) > 0:
-            ret += f'<tr><th>{http.s.web_sensor_name}</th></tr>\n'
+            ret += f'<tr><th>{http.settings.web_sensor_name}</th></tr>\n'
             for sense,(name,fmt,suffix) in sensorlist.items():
                 if sense in http.data.keys():
                     ret += f'<tr><td>{name}: </td><td>{http.data[sense]:{fmt}}{suffix}</td></tr>\n'
@@ -177,18 +178,18 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             ret += '<tr><th>GPIO</th></tr>\n'
             for sense,name in pinlist.items():
                 ret += f'<tr><td>{name}:</td><td>'\
-                       f'{http.s.web_pin_states[bool(http.data[sense])]}</td></tr>\n'
+                       f'{http.settings.web_pin_states[bool(http.data[sense])]}</td></tr>\n'
         return ret
 
     def _give_graphlinks(self, skip=""):
         # A list of available graph pages
         ret = ''
         skip = skip.lstrip('-')
-        if len(http.s.graph_durations) > 0:
+        if len(http.settings.graph_durations) > 0:
             if len(skip) == 0:
                 ret += '<tr><th>Graphs</th></tr>\n'
             ret += '<tr><td colspan="2" style="text-align: center;">\n'
-            for duration in http.s.graph_durations:
+            for duration in http.settings.graph_durations:
                 if duration != skip:
                     ret += f'&nbsp;<a href="./graphs?start=end-{duration}" '\
                            f'title="Graphs covering the last {duration} in time">'\
@@ -204,12 +205,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # Link to the log and pin contol pages
         ret = f'''{self._give_graphlinks()}
                 <tr><td colspan="2" style="text-align: center;">
-                <a href="./?view=deco&view=log" title="Open the log in a new page" target="_blank">
+                <a href="./?view=deco&view=log" title="Open log in a new page" target="_blank">
                 Log</a>\n'''
-        if http.s.web_show_control and (http.s.button_pin > 0):
-            ret += f'&nbsp;&nbsp;<a href="./{http.s.button_url}" '\
-                    f'title="{http.s.button_name} status and control page">'\
-                    f'{http.s.button_name}</a>\n'
+        if http.settings.web_show_control and (http.settings.button_pin > 0):
+            ret += f'&nbsp;&nbsp;<a href="./{http.settings.button_url}" '\
+                    f'title="{http.settings.button_name} status and control page">'\
+                    f'{http.settings.button_name}</a>\n'
         ret += '</td></tr>\n'
         return ret
 
@@ -227,7 +228,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         lines = max(1, min(lines, 250000))
         # Use a shell one-liner used to extract the last {lines} of data from the logs
         # There is doubtless a more 'python' way to do this, but it is fast, cheap and works..
-        log_command = f"for a in `ls -tr {http.s.log_file}*`;do cat $a ; done | tail -{lines}"
+        log_command = \
+                f"for a in `ls -tr {http.settings.log_file}*`;do cat $a ; done | tail -{lines}"
         log = subprocess.check_output(log_command, shell=True).decode('utf-8')
         ret = f'''
                 <div style="overflow-x: auto; width: 100%;">\n
@@ -334,7 +336,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 stamp = f'{start} >> {end}'
             self._set_headers()
             response = self._give_head(f" :: graphs {stamp}")
-            response += f'<h2>{http.s.name}</h2>'
+            response += f'<h2>{http.settings.name}</h2>'
             response += self._give_graphs(start, end, stamp)
             response += self._give_timestamp()
             response += self._give_foot(refresh=300)
@@ -348,9 +350,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 self._set_icon_headers()
                 with open(http.icon_file,'rb') as favicon:
                     self.wfile.write(favicon.read())
-        elif ((urlparse(self.path).path == '/' + http.s.button_url)
-                and (len(http.s.button_url) > 0)
-                and (http.s.button_out > 0)):
+        elif ((urlparse(self.path).path == '/' + http.settings.button_url)
+                and (len(http.settings.button_url) > 0)
+                and (http.settings.button_out > 0)):
             # Web button control
             http.update_pins()
             parsed = parse_qs(urlparse(self.path).query).get('state', None)
@@ -363,16 +365,16 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             else:
                 action = 'status'
             status, state = http.button_control(action)
-            if not status == f'{http.s.button_name} : {http.s.web_pin_states[state]}':
+            if not status == f'{http.settings.button_name} : {http.settings.web_pin_states[state]}':
                 logging.info(f'Web button triggered by: {self.client_address[0]}'\
                             f' with action: {action}')
             self._set_headers()
-            response = self._give_head(f" :: {http.s.button_name}")
+            response = self._give_head(f" :: {http.settings.button_name}")
             response += f'<h2>{status}</h2>\n'
-            invert_state = http.s.web_pin_states[not state]
+            invert_state = http.settings.web_pin_states[not state]
             response += f'''<div>
-                    <a href="./{http.s.button_url}?state={invert_state}"
-                    title = "Switch {http.s.button_name} {invert_state}">
+                    <a href="./{http.settings.button_url}?state={invert_state}"
+                    title = "Switch {http.settings.button_name} {invert_state}">
                     Switch {invert_state}</a>
                     </div>\n'''
             response += '<div style="padding-top: 1em;">\n'\
@@ -389,7 +391,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             logging.info(f"RRD database dump requested by {self.client_address[0]}")
             response = http.rrd.dump()
             self._set_download_headers(len(response),
-                    f'{http.s.name}-rrd-{time.strftime("%Y%m%d-%H%M%S")}.xml.gz')
+                    f'{http.settings.name}-rrd-{time.strftime("%Y%m%d-%H%M%S")}.xml.gz')
             self.wfile.write(response)
             logging.info(f"Dump completed in {(time.time() - start):.2f}s")
         elif (urlparse(self.path).path == '/dump') and http.db_dumpable:
@@ -409,7 +411,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response = self._give_head()
             scroll_page = False
             if "deco" in view:
-                response += f'<h2>{http.s.name}</h2>\n'
+                response += f'<h2>{http.settings.name}</h2>\n'
             response += '<table>\n'
             if "env" in view:
                 response += self._give_env()
