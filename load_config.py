@@ -146,7 +146,6 @@ class Settings:
         self.display_rotate = display.getboolean("rotate")
         self.display_contrast = display.getint("contrast")
         self.display_invert = display.getboolean("invert")
-        self.display_screens = display.get("screens").split(',')
 
         saver = config["saver"]
         self.saver_mode = saver.get("mode")

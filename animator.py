@@ -14,7 +14,25 @@ from PIL import Image, ImageDraw, ImageFont
 from saver import Saver
 
 # Unicode degrees character
-DEGREE_SIGN= u'\N{DEGREE SIGN}'
+DEGREE_SIGN = u'\N{DEGREE SIGN}'
+
+FRAME_MAP = {
+        "bme-screen": {
+            "env-temp": ('Temp: ', '.1f', DEGREE_SIGN, 5),
+            "env-humi": ('Humi: ', '.0f', '%', 25),
+            "env-pres": ('Pres: ', '.0f', 'mb', 45),
+            },
+        "sys-screen1": {
+            "sys-temp": ('CPU:  ', '.1f', DEGREE_SIGN, 5),
+            "sys-load": ('Load: ', '1.2f', '', 25),
+            "sys-mem":  ('Mem:  ', '.1f', '%', 45),
+            },
+        "sys-screen2": {
+            "sys-disk": ('disk: ', '.f', 'MB', 5),
+            "sys-load": ('LOAD: ', '1.2f', '', 25),
+            "sys-io":  ('IO: ', '.1f', '%', 45),
+            },
+        }
 
 class Animator:
     '''Animates the I2C OLED display
@@ -37,7 +55,6 @@ class Animator:
 
         self.display_rotate = settings.display_rotate
         self.animate_speed = settings.animate_speed
-        self.screens = settings.display_screens
 
         # Create image canvas (with mode '1' for 1-bit color)
         self.image = Image.new("1", (self.span, self.height))
@@ -63,7 +80,7 @@ class Animator:
         # Start main animator
         self.passes = settings.animate_passes
         self.current_pass = -2
-        self.current_screen = 0
+        self.current_frame = 0
         schedule.every(settings.animate_passtime).seconds.do(self._frame)
         schedule.every().hour.at(":00").do(self._hourly)
 
@@ -71,6 +88,8 @@ class Animator:
         saver_settings = (settings.saver_mode, settings.saver_on,
                 settings.saver_off, settings.display_invert)
         self.screensaver = Saver(disp, saver_settings)
+        self.screensaver.check()
+        schedule.every().hour.at(":00").do(self.screensaver.check)
 
         # Notify logs etc
         logging.info('Display configured and enabled')
@@ -101,40 +120,21 @@ class Animator:
             x_pos = x_pos + self.animate_speed
         self._show(self.width + self.margin)
 
-    def _bme_screen(self, xpos=0):
-        '''Draw screen for environmental data'''
-        items = {
-                "env-temp": ('Temp: ', '.1f', DEGREE_SIGN, 5),
-                "env-humi": ('Humi: ', '.0f', '%', 25),
-                "env-pres": ('Pres: ', '.0f', 'mb', 45),
-                }
-        for sense,(name,fmt,suffix,ypos) in items.items():
-            if sense in self.data.keys():
-                line = f'{name}{self.data[sense]:{fmt}}{suffix}'
-                self.draw.text((xpos + 6, ypos), line, font=self.font, fill=255)
+    def _draw_row(self, key, template, xpos):
+        '''Draw the supplied row with offset "xpos" using template data
+        if the supplied key name does not exist in data, show "N/A"
+        '''
+        if key in self.data.keys():
+            row = f'{template[0]}{self.data[key]:{template[1]}}{template[2]}'
+        else:
+            row = f'{template[0]}N/A'
+        self.draw.text((xpos + 6, template[3]), row, font=self.font, fill=255)
 
-    def _sys_screen1(self,xpos=0):
-        '''Draw screen for system data'''
-        items = {
-                "sys-temp": ('CPU:  ', '.1f', DEGREE_SIGN, 5),
-                "sys-load": ('Load: ', '1.2f', '', 25),
-                "sys-mem":  ('Mem:  ', '.1f', '%', 45),
-                }
-        for sense,(name,fmt,suffix,ypos) in items.items():
-            if sense in self.data.keys():
-                line = f'{name}{self.data[sense]:{fmt}}{suffix}'
-                self.draw.text((xpos + 6, ypos), line, font=self.font, fill=255)
-
-    def _sys_screen2(self,xpos=0):
-        '''Draw screen for additional system data'''
-        items = {
-                "sys-disk": ('disk:  ', '.f', 'MB', 5),
-                "sys-load": ('LOAD: ', '1.2f', '', 25),
-                }
-        for sense,(name,fmt,suffix,ypos) in items.items():
-            if sense in self.data.keys():
-                line = f'{name}{self.data[sense]:{fmt}}{suffix}'
-                self.draw.text((xpos + 6, ypos), line, font=self.font, fill=255)
+    def _draw_frame(self, frame_data, xpos=0):
+        '''Draw the supplied frame with offset "xpos"
+        '''
+        for key,template in frame_data.items():
+            self._draw_row(key, template, xpos)
 
     def _no_data(self, reason='Initialising'):
         '''Cover screen for when the data structure is empty'''
@@ -155,7 +155,7 @@ class Animator:
             self.draw.text((8 + xpos, 0), 'Over-',  font=self.splash_font, fill=255)
             self.draw.text((8 + xpos, 28), 'Watch',  font=self.splash_font, fill=255)
         self.current_pass = -1
-        self.current_screen = 0
+        self.current_frame = 0
         self.draw.rectangle((self.width + self.margin,0,self.span-1,self.height-1),
                 outline=0, fill=0)
         _text(self.width + self.margin)
@@ -165,24 +165,10 @@ class Animator:
         self._show()
 
     def _update_screen_list(self):
-        '''Generate the screen list'''
-        for key in self.data.keys():
-            if (key[:4] == 'env-')\
-                    and ('bme_screen' in self.screens)\
-                    and ('_bme_screen' not in self.screen_list):
-                self.screen_list.append('_bme_screen')
-            if (key[:4] == "sys-")\
-                    and ('sys_screen1' in self.screens)\
-                    and ('_sys_screen1' not in self.screen_list):
-                self.screen_list.append('_sys_screen1')
-            if (key[:4] == "sys-")\
-                    and ('sys_screen2' in self.screens)\
-                    and ('_sys_screen2' not in self.screen_list):
-                self.screen_list.append('_sys_screen2')
-
-    def _hourly(self):
-        '''totally frivously do a spash screen once an hour'''
-        self._splash()
+        '''add screens to the list when data for them is available'''
+        for screen,rows in FRAME_MAP.items():
+            if (rows.keys() & self.data.keys()) and (screen not in self.screen_list):
+                self.screen_list.append(screen)
 
     def _frame(self):
         '''Run from the scheduler, animates each step of the cycle in sequence'''
@@ -191,21 +177,31 @@ class Animator:
         if len(self.screen_list) == 0:
             self._no_data()
         elif self.current_pass >= self.passes:
+            # move to next frame
             self.current_pass = 0
-            self.current_screen += 1
-            self.current_screen %= len(self.screen_list)
-            getattr(self,self.screen_list[self.current_screen])(self.width + self.margin)
+            self.current_frame += 1
+            self.current_frame %= len(self.screen_list)
+            self._draw_frame(FRAME_MAP[self.screen_list[self.current_frame]],
+                    self.width + self.margin)
             self._slideout()
         elif self.current_pass > 0:
+            # Update current frame
             self._clean()
-            getattr(self,self.screen_list[self.current_screen])()
+            self._draw_frame(FRAME_MAP[self.screen_list[self.current_frame]])
             self._show()
         elif self.current_pass == 0:
-            getattr(self,self.screen_list[self.current_screen])(self.width + self.margin)
+            # We are transitioning from a splash/alarm screen, slide
+            self._draw_frame(FRAME_MAP[self.screen_list[self.current_frame]],
+                    self.width + self.margin)
             self._slideout()
         # else:
         #     current_pass is less than 0
-        #     leave display as-is, used to display Splash, alarms, etc.
+        #     leave display as-is, used to display splash, alarms, etc.
+
+    def _hourly(self):
+        '''check screensaver and totally frivously do a spash screen once an hour'''
+        self.screensaver.check()
+        self._splash()
 
 
 def animate(settings, disp, queue):

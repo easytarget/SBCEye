@@ -1,12 +1,7 @@
 '''Implements a screen saver/inverter for the pi overwatch
-
-Requires the python schedule module:
-    https://schedule.readthedocs.io/en/stable/
-    $ pip install schedule
 '''
 
 import time
-import schedule
 
 class Saver:
     '''Saver class:
@@ -53,7 +48,6 @@ class Saver:
                 self.saver_map = [True]*24
                 for i in range(end, start):
                     self.saver_map[i] = False
-            schedule.every().hour.at(":00").do(self.check)
             self.check()
 
 
@@ -76,7 +70,7 @@ class Saver:
 
     def check(self):
         '''Check the current state vs the time, and apply changes as
-        needed. Called on the hour by the scheduler'''
+        needed.'''
         if self.mode != 'off':
             hour = time.localtime()[3]
             if self.active != self.saver_map[hour]:
