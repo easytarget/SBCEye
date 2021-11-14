@@ -26,11 +26,6 @@ def serve_http(settings, rrd, data, helpers):
     httpd.timeout = 0.5
     # HTTPServer sets this as well (left here to make obvious).
     httpd.allow_reuse_address = True
-    if settings.web_allow_dump and rrd.rrdtool:
-        logging.info("RRD database is dumpable via web")
-        http.db_dumpable = True
-    else:
-        http.db_dumpable = False
     # I'm just passing objects blindly into the http class itself, quick and dirty but it works
     # there is probably a better way to do this, eg using a meta-class and inheritance
     http.settings = settings
@@ -42,6 +37,19 @@ def serve_http(settings, rrd, data, helpers):
     http.icon_file = 'favicon.ico'
     if not os.path.exists(http.icon_file):
         http.icon_file = f'{sys.path[0]}/{http.icon_file}'
+    if rrd.rrdtool:
+        http.db_graphable = True
+        if settings.web_allow_dump:
+            logging.info("RRD database is dumpable via web")
+            http.db_dumpable = True
+        else:
+            http.db_dumpable = False
+    else:
+        logging.warning('Commandline rrdtool not found, '\
+                'graphing and dumping functions are unavailable')
+        http.db_dumpable = False
+        http.db_graphable = False
+
     # Start the server
     logging.info(f'HTTP server will bind to port {str(settings.web_port)} '\
             f'on host {settings.web_host}')
@@ -49,11 +57,13 @@ def serve_http(settings, rrd, data, helpers):
     address = f"http://{httpd.server_name}:{httpd.server_port}"
     print(f"Webserver starting on : {address}")
     httpd.server_activate()
+
     def serve_forever(httpd):
         with httpd:  # to make sure httpd.server_close is called
             logging.info("Http Server starting")
             httpd.serve_forever()
             logging.info("Http Server closing down")
+
     thread = Thread(target=serve_forever, args=(httpd, ))
     thread.setDaemon(True )
     thread.start()
@@ -187,7 +197,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # A list of available graph pages
         ret = ''
         skip = skip.lstrip('-')
-        if len(http.settings.graph_durations) > 0:
+        if (len(http.settings.graph_durations) > 0) and http.db_graphable:
             if len(skip) == 0:
                 ret += '<tr><th>Graphs</th></tr>\n'
             ret += '<tr><td colspan="2" style="text-align: center;">\n'
@@ -286,7 +296,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         '''Process requests and parse their options'''
-        if urlparse(self.path).path == '/graph':
+        if (urlparse(self.path).path == '/graph') and http.db_graphable:
             # Individual Graph
             parsed_graph = parse_qs(urlparse(self.path).query).get('graph', None)
             parsed_start = parse_qs(urlparse(self.path).query).get('start', None)
@@ -313,7 +323,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 return
             self._set_png_headers()
             self.wfile.write(body)
-        elif urlparse(self.path).path == '/graphs':
+        elif (urlparse(self.path).path == '/graphs') and http.db_graphable:
             # Graph Index Page
             parsed_start = parse_qs(urlparse(self.path).query).get('start', None)
             parsed_end = parse_qs(urlparse(self.path).query).get('end', None)

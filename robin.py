@@ -151,7 +151,10 @@ class Robin:
 
         # Disable dumping if rrdtool not in path
         self.rrdtool = which("rrdtool")
-        print(f'RRDTOOL: {self.rrdtool}')
+        if self.rrdtool:
+            print(f'Commandline rrdtool: {self.rrdtool}')
+        else:
+            print('No commandline rrdtool available, ' + 'graphing and dumping disabled')
 
         # Use a home-brew local cache
         self.cache = []
