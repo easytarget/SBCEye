@@ -161,7 +161,7 @@ for pin_name,_ in settings.pin_map.items():
     data[f"pin-{pin_name}"] = 0
 
 # time of last data update
-data_updated = 0
+data["update-time"] = 0
 
 #
 # Local functions
@@ -202,9 +202,9 @@ def button_interrupt(*_):
         button_control()
 
 def update_data():
-    '''Get current environmental and system data, called on demand'''
-    global data_updated
-    if (time.time() - data_updated) >= settings.data_interval:
+    '''Get current environmental and system data, called on demand
+    enforces a minimum update interval to avoid spamming the sensors'''
+    if (time.time() - data["update-time"]) >= settings.data_interval:
         if bme280:
             data['env-temp'] = bme280.temperature
             data['env-humi'] = bme280.relative_humidity
@@ -218,7 +218,7 @@ def update_data():
         data['sys-mem'] = psutil.virtual_memory().percent
         data["sys-disk"] = psutil.disk_usage('/')[3]
         data["sys-proc"] = len(psutil.pids())
-        data_updated = time.time()
+        data["update-time"] = time.time()
 
 def update_pins():
     '''Check if any pins have changed state, and log'''

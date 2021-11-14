@@ -5,7 +5,7 @@ part of the OverWatch Project
 # pragma pylint: disable=logging-fstring-interpolation
 
 # Some general functions we will use
-from time import sleep
+from time import sleep, time
 import logging
 from sys import exit as sys_exit
 from signal import signal, SIGTERM, SIGINT
@@ -174,6 +174,7 @@ class Animator:
 
     def _frame(self):
         '''Run from the scheduler, animates each step of the cycle in sequence'''
+        print(f'FRAME: data-age = {time() - self.data["update-time"]:.1f}')
         self._update_screen_list()
         self.current_pass += 1
         if len(self.screen_list) == 0:

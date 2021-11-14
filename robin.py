@@ -150,10 +150,8 @@ class Robin:
                     f"DS:{source}:GAUGE:60:{mini}:{maxi}")
 
         # Disable dumping if rrdtool not in path
-        if which("rrdtool"):
-            self.dumpable = True
-        else:
-            self.dumpable = False
+        self.rrdtool = which("rrdtool")
+        print(f'RRDTOOL: {self.rrdtool}')
 
         # Use a home-brew local cache
         self.cache = []
@@ -214,14 +212,14 @@ class Robin:
     def dump(self):
         '''provide a gzipped dump of database'''
         dump_local.zipped = bytearray()
-        if self.dumpable:
+        if self.rrdtool:
             self.write_updates()
             print('Dump requested')
             if not db_lock.acquire(blocking=True, timeout=60):
                 print('Error: Dumping failed, could not acquire db lock within 60s')
                 return dump_local.zipped
             dump_local.start = time.time()
-            dump = subprocess.check_output(["rrdtool", 'dump', str(self.db_file)])
+            dump = subprocess.check_output([self.rrdtool, 'dump', str(self.db_file)])
             db_lock.release()
             print(f'Dump is: {len(dump)} bytes raw and '\
                     f'took {(time.time() - dump_local.start):.2f}s')

@@ -26,7 +26,7 @@ def serve_http(settings, rrd, data, helpers):
     httpd.timeout = 0.5
     # HTTPServer sets this as well (left here to make obvious).
     httpd.allow_reuse_address = True
-    if settings.web_allow_dump and rrd.dumpable:
+    if settings.web_allow_dump and rrd.rrdtool:
         logging.info("RRD database is dumpable via web")
         http.db_dumpable = True
     else:
@@ -61,7 +61,6 @@ def serve_http(settings, rrd, data, helpers):
 
 class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     '''Handles each individual request in a new thread'''
-    ret = local()
 
     def _set_headers(self):
         self.send_response(200)
@@ -285,15 +284,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         response = re.sub(r'^\s*','', html, flags=re.MULTILINE)
         self.wfile.write(bytes(response, 'utf-8'))
 
-    parsed_graph = local()
-    parsed_start = local()
-    parsed_end = local()
-    start = local()
-    end = local()
-    stamp = local()
-    graph = local()
-    parsed = local()
-
     def do_GET(self):
         '''Process requests and parse their options'''
         if urlparse(self.path).path == '/graph':
@@ -406,7 +396,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._write_dedented(response)
         elif urlparse(self.path).path == '/':
             # Main Page
-            http.update_data()
             view = parse_qs(urlparse(self.path).query).get('view', None)
             if not view:
                 view = ["deco", "env", "sys", "gpio", "links"]
@@ -433,7 +422,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_foot(refresh= 60, scroll= scroll_page)
             self._write_dedented(response)
         else:
-            self.send_error(404, 'No Such Page', 'This site serves pages at "/" and "/graphs"')
+            self.send_error(404, 'No Such Page', 'Nothing matches the given URL on this OverWatch server')
 
     def do_HEAD(self):
         '''returns headers'''
