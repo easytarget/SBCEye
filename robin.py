@@ -47,8 +47,11 @@ class Robin:
                 'env-humi': ('0','100'),
                 'env-pres': ('300','1100'),
                 'sys-temp': ('-10','110'),
-                'sys-load': ('0','10'),
+                'sys-load': ('0','100'),
+                'sys-freq': ('500','6000'),
                 'sys-mem': ('0','100'),
+                'sys-disk': ('0','100'),
+                'sys-proc': ('0','512'),
             }
 
         # Graphs and parameters
@@ -60,7 +63,10 @@ class Robin:
                     '--alt-autoscale', '--units-exponent','0', '--y-grid','25:1'),
                 'sys-temp': ('CPU Temperature','80','40','%3.1lf\u00B0C'),
                 'sys-load': ('CPU Load Average','2','0','%2.3lf','--alt-autoscale-max'),
+                'sys-freq': ('CPU frequency','1500','500','%4.0lfMHz'),
                 'sys-mem':  ('System Memory Use','100','0','%3.0lf%%'),
+                'sys-disk': ('System Disk use','100','0','%3.0lf%%'),
+                'sys-proc': ('System Process count','220','60','%4.0lf'),
                 }
         # pins
         for name in s.pin_map.keys():

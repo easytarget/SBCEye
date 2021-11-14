@@ -157,7 +157,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         sensorlist = {
                 'sys-temp': ('CPU Temperature','.1f','&deg;'),
                 'sys-load': ('CPU Load','1.2f',''),
+                'sys-freq': ('Frequency','.0f','MHz'),
                 'sys-mem': ('Memory used','.1f','%'),
+                'sys-disk': ('Disk used','.1f','%'),
+                'sys-proc': ('Processes','.0f',''),
                 }
         ret = ''
         if len(http.data.keys() & sensorlist.keys()) > 0:

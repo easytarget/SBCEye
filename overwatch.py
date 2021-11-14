@@ -83,11 +83,14 @@ DEGREE_SIGN= u'\N{DEGREE SIGN}'
 # Items to appear in the log data set
 LOG_LIST = {
         "env-temp": ('Temp', '.1f', DEGREE_SIGN),
-        "env-humi": ('Humi', '.0f', '%'),
+        "env-humi": ('Humi', '.1f', '%'),
         "env-pres": ('Pres', '.0f', 'mb'),
         "sys-temp": ('CPU', '.1f', DEGREE_SIGN),
         "sys-load": ('Load', '1.2f', ''),
-        "sys-mem": ('Mem', '.1f', '%'),
+        "sys-freq": ('Freq', '.0f', 'MHz'),
+        "sys-mem":  ('Mem', '.1f', '%'),
+        "sys-disk": ('Disk', '.1f', '%'),
+        "sys-proc": ('Proc', '.0f', ''),
         }
 
 # Now we have logging, notify we are starting up
@@ -146,7 +149,10 @@ class TheData(dict):
 data = TheData({})
 data["sys-temp"] = 0
 data["sys-load"] = 0
+data["sys-freq"] = 0
 data["sys-mem"] = 0
+data["sys-disk"] = 0
+data["sys-proc"] = 0
 if bme280:
     data["env-temp"] = 0
     data["env-humi"] = 0
@@ -208,7 +214,10 @@ def update_data():
                 data['env-pres'] = 'U'
         data['sys-temp'] = psutil.sensors_temperatures()["cpu_thermal"][0].current
         data['sys-load'] = psutil.getloadavg()[0]
+        data["sys-freq"] = psutil.cpu_freq()[0]
         data['sys-mem'] = psutil.virtual_memory().percent
+        data["sys-disk"] = psutil.disk_usage('/')[3]
+        data["sys-proc"] = len(psutil.pids())
         data_updated = time.time()
 
 def update_pins():

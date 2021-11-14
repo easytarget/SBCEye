@@ -27,12 +27,12 @@ FRAME_MAP = {
         "sys-screen1": {
             "sys-temp": ('CPU:  ', '.1f', DEGREE_SIGN, 5),
             "sys-load": ('Load: ', '1.2f', '', 25),
-            "sys-mem":  ('Mem:  ', '.1f', '%', 45),
+            "sys-freq": ('Freq: ', '.0f', 'MHz', 45),
             },
         "sys-screen2": {
-            "sys-disk": ('disk: ', '.f', 'MB', 5),
-            "sys-load": ('LOAD: ', '1.2f', '', 25),
-            "sys-io":  ('IO: ', '.1f', '%', 45),
+            "sys-mem":  ('Mem:  ', '.1f', '%', 5),
+            "sys-disk": ('Disk: ', '.1f', '%', 25),
+            "sys-proc": ('Proc: ', '.0f', '', 45),
             },
         }
 
