@@ -18,7 +18,6 @@ import rrdtool
 # Dump and graph operations are run multithreaded by the httpServer, and backups
 #  are also threaded. We need some mutex locks for them
 db_lock = Lock()
-graph_lock = Lock()
 dump_local = local()
 graph_local = local()
 
@@ -33,6 +32,11 @@ class Robin:
         self.graph_args['wide'] = s.graph_wide
         self.graph_args['high'] = s.graph_high
         self.graph_args['style'] = [s.graph_line]
+        self.graph_args['style'].append(f'GPRINT:data:MIN:Min\:%8.2lf')
+        self.graph_args['style'].append(f'GPRINT:data:AVERAGE:Average\:%8.2lf')
+        self.graph_args['style'].append(f'GPRINT:data:MAX:Max\:%8.2lf')
+        self.graph_args['style'].append(f'GPRINT:data:LAST:Last\:%8.2lf')
+        self.graph_args['style'].append(f'GPRINT:data:LAST:%c:strftime')
         if s.graph_area:
             self.graph_args['style'].insert(0, s.graph_area)
         if s.graph_comment_l:
@@ -70,7 +74,7 @@ class Robin:
                     '--units-exponent','0'),
                 'sys-mem':  ('System Memory Use','100','0','%3.0lf%%'),
                 'sys-disk': ('System Disk use','100','0','%3.0lf%%'),
-                'sys-proc': ('System Process count','220','60','%4.0lf'),
+                'sys-proc': ('System Process count','200','100','%4.0lf'),
                 }
         # pins
         for name in s.pin_map.keys():
@@ -272,49 +276,42 @@ class Robin:
     def draw_graph(self, start, end, duration, graph):
         '''Generate a graph, returns a raw png image'''
         graph_local.response = bytearray()
-        if not graph_lock.acquire(blocking=True, timeout=120):
-            print(f'Error: png file generation failed for : {graph} : {start}>>{end}'\
-                    ', could not acquire graph generation lock within 120s')
-            return graph_local.response
-        # RRD graph generation
-        # Returns the generated file for sending as the http response
         if (graph in self.sources) and (graph in self.graph_map.keys()):
             self.write_updates()
             params = self.graph_map[graph]
-            with tempfile.NamedTemporaryFile(mode='rb', dir='/tmp',
-                    prefix='overwatch_graph') as temp_file:
-                timestamp = time.strftime(self.graph_args['time_format'])
-                rrd_args = ["--full-size-mode",
-                            "--start", start,
-                            "--end", end,
-                            "--watermark", f'{self.graph_args["name"]} :: {timestamp}',
-                            "--width", str(self.graph_args["wide"])
-                            ]
-                if graph[:4] == 'pin-':
-                    rrd_args.extend(["--height", str(self.graph_args["high"]/2)])
-                else:
-                    rrd_args.extend(["--height", str(self.graph_args["high"])])
-                rrd_args.extend(["--title", f'{params[0]}: {duration}',
-                                 "--upper-limit", params[1],
-                                 "--lower-limit", params[2],
-                                 "--left-axis-format", params[3]])
-                if len(params) > 4:
-                    rrd_args.extend(params[4:])
-                rrd_args.extend([f'DEF:data={str(self.db_file)}:{graph}:AVERAGE',
-                                 *self.graph_args["style"]])
-                try:
-                    rrdtool.graph(
-                            temp_file.name,
-                            *rrd_args)
-                except rrdtool.OperationalError as rrd_error:
-                    print("RRDTool graph error:")
-                    print(rrd_error)
-                graph_local.response = temp_file.read()
-                if len(graph_local.response) == 0:
-                    print(f'Error: png file generation failed for : {graph} : {start}>>{end}')
+            timestamp = time.strftime(self.graph_args['time_format'])
+            rrd_args = ["--full-size-mode",
+                        "--start", start,
+                        "--end", end,
+                        "--watermark", f'{self.graph_args["name"]} :: {timestamp}',
+                        "--width", str(self.graph_args["wide"])
+                        ]
+            if graph[:4] == 'pin-':
+                rrd_args.extend(["--height", str(self.graph_args["high"]/2)])
+            else:
+                rrd_args.extend(["--height", str(self.graph_args["high"])])
+            rrd_args.extend(["--title", f'{params[0]}: {duration}',
+                             "--upper-limit", params[1],
+                             "--lower-limit", params[2],
+                             "--left-axis-format", params[3]])
+            if len(params) > 4:
+                rrd_args.extend(params[4:])
+            rrd_args.extend([f'DEF:data={str(self.db_file)}:{graph}:AVERAGE',
+                             *self.graph_args["style"]])
+
+            try:
+                graph_local.response = subprocess.check_output(
+                        [self.rrdtool, 'graph', '-', *rrd_args])
+            except subprocess.CalledProcessError as graph_error:
+                print(f'Graph generation failed:\n{graph_error}')
+                print(f'cmd: {graph_error.cmd}')
+                print(f'output: {graph_error.output}')
+                print(f'stdout: {graph_error.stderr}')
+
+            if len(graph_local.response) == 0:
+                print(f'Error: png file generation failed for : {graph} : {start}>>{end}')
         else:
             print(f'Error: No graph available for type: {graph}')
-        graph_lock.release()
         return graph_local.response
 
 def run_threaded(job_func):
