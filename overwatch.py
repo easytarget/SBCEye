@@ -181,7 +181,7 @@ def net_data():
     for line in subprocess.check_output(['iwconfig', 'wlan0']).decode('utf-8').split('\n'):
         for block in line.strip().split('  '):
             if block.strip()[:13] == 'Signal level=':
-                return int(b.strip()[13:].split(' ')[0])
+                return int(block.strip()[13:].split(' ')[0])
     return None
 
 def button_control(action="toggle"):
