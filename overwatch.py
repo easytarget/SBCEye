@@ -42,6 +42,7 @@ import random
 from atexit import register
 from signal import signal, SIGTERM, SIGINT, SIGHUP
 from multiprocessing import Process, Queue
+import subprocess
 import schedule
 import psutil
 
@@ -153,18 +154,35 @@ data["sys-freq"] = 0
 data["sys-mem"] = 0
 data["sys-disk"] = 0
 data["sys-proc"] = 0
+data["sys-net-io"] = 0
+data["sys-disk-io"] = 0
+data["sys-cpu-int"] = 0
 if bme280:
     data["env-temp"] = 0
     data["env-humi"] = 0
     data["env-pres"] = 0
 for pin_name,_ in settings.pin_map.items():
     data[f"pin-{pin_name}"] = 0
+data["update-time"] = 0   # time of last data update
 
-# time of last data update
-data["update-time"] = 0
+# Counters - used for incremental data, need pre-populating
+counter = {}
+counter["sys-net-io"] = psutil.net_io_counters().bytes_sent \
+        + psutil.net_io_counters().bytes_recv
+counter["sys-disk-io"] = psutil.disk_io_counters().read_bytes\
+        + psutil.disk_io_counters().write_bytes
+counter["sys-cpu-int"] = psutil.cpu_stats().soft_interrupts
 
 #
 # Local functions
+
+
+def net_data():
+    for line in subprocess.check_output(['iwconfig', 'wlan0']).decode('utf-8').split('\n'):
+        for block in line.strip().split('  '):
+            if block.strip()[:13] == 'Signal level=':
+                return int(b.strip()[13:].split(' ')[0])
+    return None
 
 def button_control(action="toggle"):
     '''Set the controlled pin to a specified state'''
@@ -204,7 +222,8 @@ def button_interrupt(*_):
 def update_data():
     '''Get current environmental and system data, called on demand
     enforces a minimum update interval to avoid spamming the sensors'''
-    if (time.time() - data["update-time"]) >= settings.data_interval:
+    time_period = time.time() - data["update-time"]
+    if time_period >= settings.data_interval:
         if bme280:
             data['env-temp'] = bme280.temperature
             data['env-humi'] = bme280.relative_humidity
@@ -218,6 +237,18 @@ def update_data():
         data['sys-mem'] = psutil.virtual_memory().percent
         data["sys-disk"] = psutil.disk_usage('/').percent
         data["sys-proc"] = len(psutil.pids())
+        net_count = psutil.net_io_counters().bytes_sent \
+                + psutil.net_io_counters().bytes_recv
+        disk_count = psutil.disk_io_counters().read_bytes\
+                + psutil.disk_io_counters().write_bytes
+        int_count = psutil.cpu_stats().soft_interrupts
+        data["sys-net-io"] = (net_count - counter["sys-net-io"]) / time_period / 1024
+        data["sys-disk-io"] = (disk_count - counter["sys-disk-io"]) / time_period / 1024
+        data["sys-cpu-int"] = (int_count - counter["sys-cpu-int"]) / time_period
+        counter["sys-net-io"] = net_count
+        counter["sys-disk-io"] = disk_count
+        counter["sys-cpu-int"] = int_count
+
         data["update-time"] = time.time()
 
 def update_pins():
@@ -347,6 +378,8 @@ if __name__ == '__main__':
         schedule.every(settings.pin_interval).seconds.do(update_pins)
     if settings.log_interval > 0:
         schedule.every(settings.log_interval).seconds.do(log_data)
+
+    schedule.every(5).seconds.do(print,f'RSSI: {net_data()}')
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedules and entering service loop")

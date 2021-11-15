@@ -55,7 +55,10 @@ class Robin:
                 'sys-freq': ('500','6000'),
                 'sys-mem': ('0','100'),
                 'sys-disk': ('0','100'),
-                'sys-proc': ('0','512'),
+                'sys-proc': ('0','U'),
+                'sys-net-io': ('0','U'),
+                'sys-disk-io': ('0','U'),
+                'sys-cpu-int': ('0','U'),
             }
 
         # Graphs and parameters
@@ -75,6 +78,9 @@ class Robin:
                 'sys-mem':  ('System Memory Use','100','0','%3.0lf%%'),
                 'sys-disk': ('System Disk use','100','0','%3.0lf%%'),
                 'sys-proc': ('System Process count','200','100','%4.0lf'),
+                'sys-net-io': ('System network IO','0','500','%5.0lf', '--alt-autoscale'),
+                'sys-disk-io': ('System disk IO','0','1000','%5.0lf', '--alt-autoscale'),
+                'sys-cpu-int': ('Interrupts','0','2000','%5.0lf', '--alt-autoscale'),
                 }
         # pins
         for name in s.pin_map.keys():

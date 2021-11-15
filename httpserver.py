@@ -167,10 +167,13 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         sensorlist = {
                 'sys-temp': ('CPU Temperature','.1f','&deg;'),
                 'sys-load': ('CPU Load','1.2f',''),
-                'sys-freq': ('Frequency','.0f','<span style="font-size: 75%;"> MHz</style>'),
-                'sys-mem': ('Memory used','.1f','<span style="font-size: 75%;">%'),
-                'sys-disk': ('Disk used','.1f','<span style="font-size: 75%;">%'),
+                'sys-freq': ('Frequency','.0f','<span style="font-size: 75%;"> MHz</span>'),
+                'sys-mem': ('Memory used','.1f','<span style="font-size: 75%;">%</span>'),
+                'sys-disk': ('Disk used','.1f','<span style="font-size: 75%;">%</span>'),
                 'sys-proc': ('Processes','.0f',''),
+                'sys-net-io': ('Network IO','.1f','<span style="font-size: 75%;"> KB/s</span>'),
+                'sys-disk-io': ('Disk IO','.1f','<span style="font-size: 75%;"> KB/s</span>'),
+                'sys-cpu-int': ('Interrupts','.0f','<span style="font-size: 75%;"> /s</span>'),
                 }
         ret = ''
         if len(http.data.keys() & sensorlist.keys()) > 0:
