@@ -238,7 +238,6 @@ def log_data():
     '''Runs on a user defined schedule to dump a line of sensor data in the log
     Dictionary with tuples specifying name, format and suffix'''
     log_line = ''
-    update_data()
     for sense,(name,fmt,suffix) in LOG_LIST.items():
         if sense in data.keys():
             log_line += f'{name}: {data[sense]:{fmt}}{suffix}, '
