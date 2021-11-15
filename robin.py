@@ -240,17 +240,13 @@ class Robin:
 
     def update(self, data):
         '''Update the database with the latest readings'''
-        if not db_lock.acquire(blocking=True, timeout=self.update_interval):
-            print('Error: Update failed, could not acquire database '\
-                    f'lock within update period ({self.update_interval}s)')
-            return
         dataline = str(int(time.time()))
         for source in self.sources:
             dataline += f':{data[source]}'
         if dataline:
             self.cache.append(dataline)
-        db_lock.release()
-        if time.time() > (self.last_write + self.cache_age):
+        if time.time() > (self.last_write + self.cache_age)\
+                and not db_lock.locked():
             self.write_updates()
 
     def write_updates(self):
