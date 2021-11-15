@@ -28,7 +28,7 @@ class Robin:
     def __init__(self, s, data):
         self.graph_args = {}
         self.graph_args['name'] = s.name
-        self.graph_args['time_format'] = s.time_format
+        self.graph_args['time_format'] = s.long_format
         self.graph_args['wide'] = s.graph_wide
         self.graph_args['high'] = s.graph_high
         self.graph_args['style'] = [s.graph_line]

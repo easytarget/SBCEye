@@ -137,7 +137,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         return ret
 
     def _give_timestamp(self):
-        timestamp = time.strftime(http.settings.time_format)
+        timestamp = time.strftime(http.settings.long_format)
         return  f'''<div style="color:#555555;
                 font-size: 94%; padding-top: 0.5em;">{timestamp}</div>
                 <div style="color:#888888;

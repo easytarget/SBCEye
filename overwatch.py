@@ -70,7 +70,7 @@ handler = RotatingFileHandler(settings.log_file,
         backupCount=settings.log_file_count)
 logging.basicConfig(level=logging.INFO,
         format='%(asctime)s %(levelname)s: %(message)s',
-        datefmt=settings.log_date_format,
+        datefmt=settings.short_format,
         handlers=[handler])
 
 # Older scheduler versions can log debug to 'INFO' not 'DEBUG', ignore it.
@@ -247,7 +247,7 @@ def log_data():
 def hourly():
     '''Remind everybody we are alive'''
     myself = os.path.basename(__file__)
-    timestamp = time.strftime(settings.time_format)
+    timestamp = time.strftime(settings.long_format)
     print(f'{myself} :: {timestamp}')
 
 def handle_signal(sig, *_):

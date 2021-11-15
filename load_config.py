@@ -79,7 +79,8 @@ class Settings:
 
         general = config["general"]
         self.name = general.get("name")
-        self.time_format = general.get("time_format")
+        self.long_format = general.get("long_format")
+        self.short_format = general.get("short_format")
         self.have_sensor = general.getboolean("sensor")
         self.have_screen = general.getboolean("screen")
 
@@ -130,7 +131,6 @@ class Settings:
         self.log_file_name = log.get("file_name")
         self.log_file_count = log.getint("file_count")
         self.log_file_size = log.getint("file_size") * 1024
-        self.log_date_format = log.get("date_format")
         self.log_file = Path(
         f'{self.log_file_dir}/{self.log_file_name}').resolve()
 
