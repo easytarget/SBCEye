@@ -252,20 +252,23 @@ class Robin:
     def write_updates(self):
         '''write any cached updates to the database'''
         if len(self.cache) > 0:
+            print(f'DB WRITE:len={len(self.cache)}\n{self.cache}')
             if not db_lock.acquire(blocking=True, timeout=self.cache_age):
                 print('Error: Data Write failed, could not acquire database '\
                         f'lock within write period ({self.cache_age}s)')
                 return
-            try:
-                rrdtool.update(
-                        str(self.db_file),
-                        "--template", self.template,
-                        "--skip-past-updates",
-                        *self.cache)
-                self.cache = []
-            except rrdtool.OperationalError as rrd_error:
-                print("RRDTool update error:")
-                print(rrd_error)
+            # check if cache was emptied in another thread while waiting for lock
+            if len(self.cache) > 0:
+                try:
+                    rrdtool.update(
+                            str(self.db_file),
+                            "--template", self.template,
+                            "--skip-past-updates",
+                            *self.cache)
+                    self.cache = []
+                except rrdtool.OperationalError as rrd_error:
+                    print("RRDTool update error:")
+                    print(rrd_error)
             db_lock.release()
         self.last_write = time.time()
 
