@@ -214,9 +214,9 @@ def update_data():
                 data['env-pres'] = 'U'
         data['sys-temp'] = psutil.sensors_temperatures()["cpu_thermal"][0].current
         data['sys-load'] = psutil.getloadavg()[0]
-        data["sys-freq"] = psutil.cpu_freq()[0]
+        data["sys-freq"] = psutil.cpu_freq().current
         data['sys-mem'] = psutil.virtual_memory().percent
-        data["sys-disk"] = psutil.disk_usage('/')[3]
+        data["sys-disk"] = psutil.disk_usage('/').percent
         data["sys-proc"] = len(psutil.pids())
         data["update-time"] = time.time()
 
@@ -332,7 +332,7 @@ if __name__ == '__main__':
     rrd = Robin(settings, data)
 
     # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(settings, rrd, data, (button_control, update_data, update_pins))
+    serve_http(settings, rrd, data, (button_control, update_pins))
 
     # Exit handlers (needed for rrd data-safe shutdown)
     signal(SIGTERM, handle_signal)

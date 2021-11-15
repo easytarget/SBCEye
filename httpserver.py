@@ -32,8 +32,7 @@ def serve_http(settings, rrd, data, helpers):
     http.rrd = rrd
     http.data = data
     http.button_control = helpers[0]
-    http.update_data = helpers[1]
-    http.update_pins = helpers[2]
+    http.update_pins = helpers[1]
     http.icon_file = 'favicon.ico'
     if not os.path.exists(http.icon_file):
         http.icon_file = f'{sys.path[0]}/{http.icon_file}'
@@ -137,8 +136,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         return ret
 
     def _give_timestamp(self):
-        timestamp = time.strftime(http.settings.long_format)
-        return  f'''<div style="color:#555555;
+        timestamp = time.strftime(http.settings.long_format,
+                time.localtime(http.data["update-time"]))
+        return  f'''<div title="Time of latest data readings"
+                style="color:#555555;
                 font-size: 94%; padding-top: 0.5em;">{timestamp}</div>
                 <div style="color:#888888;
                 font-size: 66%; font-weight: lighter; padding-top:0.5em">
