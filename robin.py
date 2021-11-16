@@ -137,7 +137,7 @@ class Robin:
             args.append(["--start", "now-10s",
                     "--step", "10s",
                     "RRA:AVERAGE:0.5:1:181440",    # 3 weeks per 10s
-                    "RRA:AVERAGE:0.5:6:786240",    # 3 months per minute
+                    "RRA:AVERAGE:0.5:6:133920",    # 3 months per minute
                     "RRA:AVERAGE:0.5:360:158112"]) # 3 years per hour
             rrdtool.create(*args,*ds_list)
         else:
@@ -258,13 +258,13 @@ class Robin:
     def write_updates(self):
         '''write any cached updates to the database'''
         if len(self.cache) > 0:
-            print(f'DB WRITE:len={len(self.cache)}\n{self.cache}')
             if not db_lock.acquire(blocking=True, timeout=self.cache_age):
                 print('Error: Data Write failed, could not acquire database '\
                         f'lock within write period ({self.cache_age}s)')
                 return
             # check if cache was emptied in another thread while waiting for lock
             if len(self.cache) > 0:
+                print(f'DB WRITE:len={len(self.cache)}')
                 try:
                     rrdtool.update(
                             str(self.db_file),
