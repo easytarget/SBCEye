@@ -176,14 +176,6 @@ counter["sys-cpu-int"] = psutil.cpu_stats().soft_interrupts
 #
 # Local functions
 
-
-def net_data():
-    for line in subprocess.check_output(['iwconfig', 'wlan0']).decode('utf-8').split('\n'):
-        for block in line.strip().split('  '):
-            if block.strip()[:13] == 'Signal level=':
-                return int(block.strip()[13:].split(' ')[0])
-    return None
-
 def button_control(action="toggle"):
     '''Set the controlled pin to a specified state'''
     if settings.button_out > 0:
@@ -378,8 +370,6 @@ if __name__ == '__main__':
         schedule.every(settings.pin_interval).seconds.do(update_pins)
     if settings.log_interval > 0:
         schedule.every(settings.log_interval).seconds.do(log_data)
-
-    schedule.every(5).seconds.do(print,f'RSSI: {net_data()}')
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedules and entering service loop")
