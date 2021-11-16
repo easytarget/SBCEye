@@ -63,30 +63,38 @@ class Robin:
 
         # Graphs and parameters
         self.graph_map = {
-                'env-temp': (f'{s.web_sensor_name} Temperature','40','10',
-                    '%3.1lf\u00B0C', '--alt-autoscale'),
-                'env-humi': (f'{s.web_sensor_name} Humidity','100','0',
-                    '%3.0lf%%'),
-                'env-pres': (f'{s.web_sensor_name} Pressure','1100','900',
-                    '%4.0lfmb', '--alt-autoscale', '--units-exponent','0',
+                'env-temp': (f'{s.web_sensor_name} Temperature, \u00B0Centigrade',
+                    None, None, '%3.0lf\u00B0'),
+                'env-humi': (f'{s.web_sensor_name} Humidity, % percent',
+                    None, None, '%3.0lf'),
+                'env-pres': (f'{s.web_sensor_name} Pressure, millibars',
+                    None, None, '%4.0lf', '--units-exponent','0',
                     '--y-grid','25:1'),
-                'sys-temp': ('CPU Temperature','80','40','%3.1lf\u00B0C'),
-                'sys-load': ('CPU Load Average','2','0','%2.3lf',
-                    '--alt-autoscale-max'),
-                'sys-freq': ('CPU frequency','1500','600','%4.0lfMHz',
-                    '--units-exponent','0'),
-                'sys-mem':  ('System Memory Use','100','0','%3.0lf%%'),
-                'sys-disk': ('System Disk use','100','0','%3.0lf%%'),
-                'sys-proc': ('System Process count','200','100','%4.0lf'),
-                'sys-net-io': ('System network IO','0','500','%5.0lf', '--alt-autoscale'),
-                'sys-disk-io': ('System disk IO','0','1000','%5.0lf', '--alt-autoscale'),
-                'sys-cpu-int': ('Interrupts','0','2000','%5.0lf', '--alt-autoscale'),
+                'sys-temp': ('CPU Temperature, \u00B0Centigrade',
+                    None, None,'%3.0lf\u00B0'),
+                'sys-load': ('CPU Load Average',
+                    None, '0','%2.2lf', '--alt-autoscale-max'),
+                'sys-freq': ('CPU frequency, MHz',
+                    None, None,'%4.0lf', '--units-exponent','0'),
+                'sys-mem':  ('System Memory Use, % percent',
+                    '100', '0', '%3.0lf'),
+                'sys-disk': ('System Disk use, % percent',
+                    '100', '0', '%3.0lf'),
+                'sys-proc': ('System Process count',
+                    None, None, '%4.0lf'),
+                'sys-net-io': ('System network IO, KB/s',
+                    None, None,'%5.0lf', '--units-exponent','0'),
+                'sys-disk-io': ('System disk IO, KB/s',
+                    None, None,'%5.0lf', '--units-exponent','0'),
+                'sys-cpu-int': ('Soft interrupts, per second',
+                    None, None, '%5.0lf', '--units-exponent','0'),
                 }
         # pins
         for name in s.pin_map.keys():
             self.data_sources[f'pin-{name}'] = ('0','1')
-            self.graph_map[f'pin-{name}'] = (f'{name} Pin State','1','-0.01','%3.1lf',
-                    '--alt-autoscale')
+            self.graph_map[f'pin-{name}'] = (f'{name} Pin State, '\
+                    f'0={s.web_pin_states[0]}, 1={s.web_pin_states[1]}',
+                    '1', '0' ,'%3.1lf', '--alt-autoscale', '--units-exponent','0')
 
         # set the list of active and storable sources
         self.template= ''
@@ -295,10 +303,12 @@ class Robin:
                 rrd_args.extend(["--height", str(self.graph_args["high"]/2)])
             else:
                 rrd_args.extend(["--height", str(self.graph_args["high"])])
-            rrd_args.extend(["--title", f'{params[0]}: {duration}',
-                             "--upper-limit", params[1],
-                             "--lower-limit", params[2],
-                             "--left-axis-format", params[3]])
+            rrd_args.extend(["--title", f'{params[0]}: {duration}'])
+            if params[1]:
+                 rrd_args.extend(["--upper-limit", params[1]])
+            if params[2]:
+                 rrd_args.extend(["--lower-limit", params[2]])
+            rrd_args.extend(["--left-axis-format", params[3]])
             if len(params) > 4:
                 rrd_args.extend(params[4:])
             rrd_args.extend([f'DEF:data={str(self.db_file)}:{graph}:AVERAGE',
