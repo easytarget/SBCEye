@@ -159,7 +159,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             ret += f'<tr><th>{http.settings.web_sensor_name}</th></tr>\n'
             for sense,(name,fmt,suffix) in sensorlist.items():
                 if sense in http.data.keys():
-                    ret += f'<tr><td>{name}: </td><td>{http.data[sense]:{fmt}}{suffix}</td></tr>\n'
+                    ret += f'<tr><td>{name}: </td><td style="text-align: right;">'\
+                            f'{http.data[sense]:{fmt}}{suffix}</td></tr>\n'
         return ret
 
     def _give_sys(self):
@@ -167,20 +168,21 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         sensorlist = {
                 'sys-temp': ('CPU Temperature','.1f','&deg;'),
                 'sys-load': ('CPU Load','1.2f',''),
-                'sys-freq': ('Frequency','.0f','<span style="font-size: 75%;"> MHz</span>'),
+                'sys-freq': ('CPU Frequency','.0f','<span style="font-size: 75%;"> MHz</span>'),
                 'sys-mem': ('Memory used','.1f','<span style="font-size: 75%;">%</span>'),
                 'sys-disk': ('Disk used','.1f','<span style="font-size: 75%;">%</span>'),
                 'sys-proc': ('Processes','.0f',''),
                 'sys-net-io': ('Network IO','.1f','<span style="font-size: 75%;"> k/s</span>'),
                 'sys-disk-io': ('Disk IO','.1f','<span style="font-size: 75%;"> k/s</span>'),
-                'sys-cpu-int': ('Interrupts','.0f','<span style="font-size: 75%;"> /s</span>'),
+                'sys-cpu-int': ('Soft Interrupts','.0f','<span style="font-size: 75%;"> /s</span>'),
                 }
         ret = ''
         if len(http.data.keys() & sensorlist.keys()) > 0:
             ret = '<tr><th>Server</th></tr>\n'
             for sense,(name,fmt,suffix) in sensorlist.items():
                 if sense in http.data.keys():
-                    ret += f'<tr><td>{name}: </td><td>{http.data[sense]:{fmt}}{suffix}</td></tr>\n'
+                    ret += f'<tr><td>{name}: </td><td style="text-align: right;">'\
+                            f'{http.data[sense]:{fmt}}{suffix}</td></tr>\n'
         return ret
 
     def _give_pins(self):
@@ -193,7 +195,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         if len(http.data.keys() & pinlist.keys()) > 0:
             ret += '<tr><th>GPIO</th></tr>\n'
             for sense,name in pinlist.items():
-                ret += f'<tr><td>{name}:</td><td>'\
+                ret += f'<tr><td>{name}:</td><td style="text-align: right;">'\
                        f'{http.settings.web_pin_states[bool(http.data[sense])]}</td></tr>\n'
         return ret
 
