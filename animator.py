@@ -179,9 +179,11 @@ class Animator:
 
     def _frame(self):
         '''Run from the scheduler, animates each step of the cycle in sequence'''
-        print(f'FRAME: data-age = {time() - self.data["update-time"]:.1f}')
         self._update_screen_list()
         self.current_pass += 1
+        if (time() - self.data["update-time"]) > 60:
+            self._no_data('Timeout')
+            self.current_pass = -1
         if len(self.screen_list) == 0:
             self._no_data()
         elif self.current_pass >= self.passes:

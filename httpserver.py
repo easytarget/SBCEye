@@ -160,7 +160,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             for sense,(name,fmt,suffix) in sensorlist.items():
                 if sense in http.data.keys():
                     ret += f'<tr><td>{name}: </td><td style="text-align: right;">'\
-                            f'{http.data[sense]:{fmt}}{suffix}</td></tr>\n'
+                            f'{http.data[sense]:{fmt}}</td>'\
+                            f'<td style="padding-left: 0;">{suffix}</td></tr>\n'
         return ret
 
     def _give_sys(self):
@@ -182,7 +183,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             for sense,(name,fmt,suffix) in sensorlist.items():
                 if sense in http.data.keys():
                     ret += f'<tr><td>{name}: </td><td style="text-align: right;">'\
-                            f'{http.data[sense]:{fmt}}{suffix}</td></tr>\n'
+                            f'{http.data[sense]:{fmt}}</td>'\
+                            f'<td style="padding-left: 0;">{suffix}</td></tr>\n'
         return ret
 
     def _give_pins(self):

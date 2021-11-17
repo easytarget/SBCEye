@@ -143,11 +143,10 @@ class TheData(dict):
             data_queue.put([item, value])
         super().__setitem__(item, value)
         #super(TheData, self).__setitem__(item, value)
-    # (untested) deleting items
-    #def __delitem__(self, item, value):
-    #    if data_queue:
-    #        data_queue.put([item], None)
-    #    super(TheData, self).__delitem__(item)
+    def __delitem__(self, item):
+        if data_queue:
+            data_queue.put([item], None)
+        super().__delitem__(item)
 
 # Use a (custom overridden) dictionary to store current readings
 data = TheData({})
