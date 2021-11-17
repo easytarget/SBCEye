@@ -27,22 +27,15 @@ class Robin:
 
     def __init__(self, s, data):
         self.graph_args = {}
-        self.graph_args['name'] = s.name
-        self.graph_args['time_format'] = s.long_format
-        self.graph_args['wide'] = s.graph_wide
-        self.graph_args['high'] = s.graph_high
-        self.graph_args['style'] = [s.graph_line]
-        self.graph_args['style'].append(f'GPRINT:data:MIN:Min\:%8.2lf')
-        self.graph_args['style'].append(f'GPRINT:data:AVERAGE:Average\:%8.2lf')
-        self.graph_args['style'].append(f'GPRINT:data:MAX:Max\:%8.2lf')
-        self.graph_args['style'].append(f'GPRINT:data:LAST:Last\:%8.2lf')
-        self.graph_args['style'].append(f'GPRINT:data:LAST:%c:strftime')
-        if s.graph_area:
-            self.graph_args['style'].insert(0, s.graph_area)
-        if s.graph_comment_l:
-            self.graph_args['style'].append(f'COMMENT: {s.graph_comment_l}')
-        if s.graph_comment_r:
-            self.graph_args['style'].append(f'COMMENT: {s.graph_comment_r}')
+        self.graph_args["name"] = s.name
+        self.graph_args["time_format"] = s.long_format
+        self.graph_args["time_stamp"] = s.short_format
+        self.graph_args["wide"] = s.graph_wide
+        self.graph_args["high"] = s.graph_high
+        self.graph_args["line_color"] = s.graph_line_color
+        self.graph_args["line_width"] = s.graph_line_width
+        self.graph_args["area_color"] = s.graph_area_color
+        self.graph_args["area_depth"] = s.graph_area_depth
 
 
         # Sensor and system sources with limits (min,max)
@@ -64,37 +57,37 @@ class Robin:
         # Graphs and parameters
         self.graph_map = {
                 'env-temp': (f'{s.web_sensor_name} Temperature, \u00B0Centigrade',
-                    None, None, '%3.0lf\u00B0'),
+                    None, None, '%3.0lf\u00B0', '%3.1lf\u00B0C'),
                 'env-humi': (f'{s.web_sensor_name} Humidity, % percent',
-                    None, None, '%3.0lf'),
+                    None, None, '%3.0lf', '%3.0lf%%'),
                 'env-pres': (f'{s.web_sensor_name} Pressure, millibars',
-                    None, None, '%4.0lf', '--units-exponent','0',
+                    None, None, '%4.0lf', '%4.0lf mb', '--units-exponent','0',
                     '--y-grid','25:1'),
                 'sys-temp': ('CPU Temperature, \u00B0Centigrade',
-                    None, None,'%3.0lf\u00B0'),
+                    None, None, '%3.0lf\u00B0', '%3.1lf\u00B0C'),
                 'sys-load': ('CPU Load Average',
-                    None, '0','%2.2lf', '--alt-autoscale-max'),
+                    None, '0','%2.2lf', '%2.2lf', '--alt-autoscale-max'),
                 'sys-freq': ('CPU frequency, MHz',
-                    None, None,'%4.0lf', '--units-exponent','0'),
+                    None, None, '%4.0lf', '%4.0lf MHz', '--units-exponent','0'),
                 'sys-mem':  ('System Memory Use, % percent',
-                    '100', '0', '%3.0lf'),
+                    '100', '0', '%3.0lf', '%3.0lf%%'),
                 'sys-disk': ('System Disk use, % percent',
-                    '100', '0', '%3.0lf'),
+                    '100', '0', '%3.0lf', '%3.0lf%%'),
                 'sys-proc': ('System Process count',
-                    None, None, '%4.0lf'),
-                'sys-net-io': ('System network IO, KB/s',
-                    None, None,'%5.0lf', '--units-exponent','0'),
-                'sys-disk-io': ('System disk IO, KB/s',
-                    None, None,'%5.0lf', '--units-exponent','0'),
-                'sys-cpu-int': ('Soft interrupts, per second',
-                    None, None, '%5.0lf', '--units-exponent','0'),
+                    None, None, '%4.0lf', '%4.0lf'),
+                'sys-net-io': ('System network IO, k/s',
+                    None, None, '%5.0lf', '%5.0lf k/s', '--units-exponent','0'),
+                'sys-disk-io': ('System disk IO, k/s',
+                    None, None, '%5.0lf', '%5.0lf k/s', '--units-exponent','0'),
+                'sys-cpu-int': ('CPU Soft interrupts, per second',
+                    None, None, '%5.0lf', '%5.0lf /s', '--units-exponent','0'),
                 }
         # pins
         for name in s.pin_map.keys():
             self.data_sources[f'pin-{name}'] = ('0','1')
             self.graph_map[f'pin-{name}'] = (f'{name} Pin State, '\
                     f'0={s.web_pin_states[0]}, 1={s.web_pin_states[1]}',
-                    '1', '0' ,'%3.1lf', '--alt-autoscale', '--units-exponent','0')
+                    '1', '0' ,'%3.1lf', '%3.0lf', '--alt-autoscale', '--units-exponent','0')
 
         # set the list of active and storable sources
         self.template= ''
@@ -288,15 +281,20 @@ class Robin:
 
     def draw_graph(self, start, end, duration, graph):
         '''Generate a graph, returns a raw png image'''
+        print(f'Graph: {start}:{end}')
         graph_local.response = bytearray()
         if (graph in self.sources) and (graph in self.graph_map.keys()):
             self.write_updates()
             params = self.graph_map[graph]
             timestamp = time.strftime(self.graph_args['time_format'])
+            timeformat_escaped = self.graph_args['time_format'].replace(':','\:')
+            duration = duration.replace('now',
+                    f'{time.strftime(self.graph_args["time_stamp"])}')
             rrd_args = ["--full-size-mode",
                         "--start", start,
                         "--end", end,
-                        "--watermark", f'{self.graph_args["name"]} :: {timestamp}',
+                        "--watermark",
+                        f'{self.graph_args["name"]} :: {graph} :: {timestamp}',
                         "--width", str(self.graph_args["wide"])
                         ]
             if graph[:4] == 'pin-':
@@ -309,10 +307,20 @@ class Robin:
             if params[2]:
                  rrd_args.extend(["--lower-limit", params[2]])
             rrd_args.extend(["--left-axis-format", params[3]])
-            if len(params) > 4:
-                rrd_args.extend(params[4:])
-            rrd_args.extend([f'DEF:data={str(self.db_file)}:{graph}:AVERAGE',
-                             *self.graph_args["style"]])
+            if len(params) > 5:
+                rrd_args.extend(params[5:])
+            rrd_args.extend([f'DEF:data={str(self.db_file)}:{graph}:AVERAGE'])
+            if self.graph_args["area_color"]:
+                rrd_args.extend([f'AREA:data{self.graph_args["area_color"]}:'\
+                        f'gradheight={self.graph_args["area_depth"]}'])
+            rrd_args.extend([f'LINE{self.graph_args["line_width"]}:'\
+                    f'data{self.graph_args["line_color"]}:'\
+                    f'{self.graph_args["name"]} {params[0]}',
+                    f'GPRINT:data:MIN:Min\:{params[4]}',
+                    f'GPRINT:data:AVERAGE:Average\:{params[4]}',
+                    f'GPRINT:data:MAX:Max\:{params[4]}',
+                    f'GPRINT:data:LAST:Last\:{params[4]}'])
+            rrd_args.extend(['COMMENT: ', 'COMMENT: '])
 
             try:
                 graph_local.response = subprocess.check_output(
