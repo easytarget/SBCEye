@@ -112,9 +112,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 body {{display:flex; flex-direction: column; align-items: center;}}
                 a {{color:#555555; text-decoration: none;}}
                 img {{width:auto; max-width:100%;}}
-                table {{border-spacing: 0.2em; width:auto; max-width:100%;}}
+                table {{border-spacing-top: 0.4em; width:auto; max-width:100%;}}
                 th {{font-size: 110%; text-align: left;}}
-                td {{padding-left: 1em;}}
+                td {{padding-left: 1em; padding-right: 0;}}
                 </style>
                 </head>
                 <body>'''

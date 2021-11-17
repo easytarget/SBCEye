@@ -265,7 +265,7 @@ class Robin:
                 return
             # check if cache was emptied in another thread while waiting for lock
             if len(self.cache) > 0:
-                print(f'DB WRITE:len={len(self.cache)}')
+                # print(f'DB WRITE:len={len(self.cache)}')
                 try:
                     rrdtool.update(
                             str(self.db_file),

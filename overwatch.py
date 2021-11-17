@@ -142,7 +142,6 @@ class TheData(dict):
         if data_queue:
             data_queue.put([item, value])
         super().__setitem__(item, value)
-        #super(TheData, self).__setitem__(item, value)
     def __delitem__(self, item):
         if data_queue:
             data_queue.put([item], None)
@@ -165,7 +164,6 @@ if bme280:
     data["env-pres"] = 0
 for pin_name,_ in settings.pin_map.items():
     data[f"pin-{pin_name}"] = 0
-data["update-time"] = 0   # time of last data update
 
 # Counters - used for incremental data, need pre-populating
 counter = {}
@@ -174,6 +172,8 @@ counter["sys-net-io"] = psutil.net_io_counters().bytes_sent \
 counter["sys-disk-io"] = psutil.disk_io_counters().read_bytes\
         + psutil.disk_io_counters().write_bytes
 counter["sys-cpu-int"] = psutil.cpu_stats().soft_interrupts
+
+data["update-time"] = time.time() # time of last data update
 
 #
 # Local functions

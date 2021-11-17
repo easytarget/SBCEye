@@ -252,7 +252,7 @@ def animate(settings, disp, queue):
         pass
 
     # Start the animator
-    data = {}
+    data = {"update-time": time()}
     animation = Animator(settings, disp, data)
 
     # Loop forever servicing scheduler and queue
