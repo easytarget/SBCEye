@@ -27,12 +27,17 @@ FRAME_MAP = {
         "sys-screen1": {
             "sys-temp": ('CPU:  ', '.1f', DEGREE_SIGN, 5),
             "sys-load": ('Load: ', '1.2f', '', 25),
-            "sys-freq": ('Freq: ', '.0f', 'MHz', 45),
+            "sys-freq": ('Freq: ', '.0f', '', 45),
             },
         "sys-screen2": {
             "sys-mem":  ('Mem:  ', '.1f', '%', 5),
             "sys-disk": ('Disk: ', '.1f', '%', 25),
             "sys-proc": ('Proc: ', '.0f', '', 45),
+            },
+        "sys-screen3": {
+            "sys-net-io":  ('N: ', '.0f', 'k/s', 5),
+            "sys-disk-io": ('D: ', '.0f', 'k/s', 25),
+            "sys-cpu-int": ('I: ', '.0f', '/s', 45),
             },
         }
 
@@ -252,7 +257,7 @@ def animate(settings, disp, queue):
     while animation:
         while not queue.empty():
             key, value = queue.get_nowait()
-            if value:
+            if value != None:
                 data.update({key: value})
             else:
                 data.pop(key, None)

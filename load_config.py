@@ -96,12 +96,10 @@ class Settings:
         self.graph_durations = graph.get("durations").split(',')
         self.graph_wide = graph.getint("wide")
         self.graph_high = graph.getint("high")
-        self.graph_line = graph.get("line")
-        self.graph_area = graph.get("area")
-        self.graph_comment_l = graph.get("comment_l").replace(':',r'\:')
-        self.graph_comment_r = graph.get("comment_r").replace(':',r'\:')
-        if not self.graph_comment_l and self.graph_comment_r:
-            self.graph_comment_l = " "
+        self.graph_line_color = graph.get("line_color")
+        self.graph_line_width = graph.get("line_width")
+        self.graph_area_color = graph.get("area_color")
+        self.graph_area_depth = graph.get("area_depth")
 
         self.pin_map = {}
         for key in config["pins"]:

@@ -171,8 +171,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 'sys-mem': ('Memory used','.1f','<span style="font-size: 75%;">%</span>'),
                 'sys-disk': ('Disk used','.1f','<span style="font-size: 75%;">%</span>'),
                 'sys-proc': ('Processes','.0f',''),
-                'sys-net-io': ('Network IO','.1f','<span style="font-size: 75%;"> KB/s</span>'),
-                'sys-disk-io': ('Disk IO','.1f','<span style="font-size: 75%;"> KB/s</span>'),
+                'sys-net-io': ('Network IO','.1f','<span style="font-size: 75%;"> k/s</span>'),
+                'sys-disk-io': ('Disk IO','.1f','<span style="font-size: 75%;"> k/s</span>'),
                 'sys-cpu-int': ('Interrupts','.0f','<span style="font-size: 75%;"> /s</span>'),
                 }
         ret = ''

@@ -83,15 +83,18 @@ DEGREE_SIGN= u'\N{DEGREE SIGN}'
 
 # Items to appear in the log data set
 LOG_LIST = {
-        "env-temp": ('Temp', '.1f', DEGREE_SIGN),
-        "env-humi": ('Humi', '.1f', '%'),
-        "env-pres": ('Pres', '.0f', 'mb'),
-        "sys-temp": ('CPU', '.1f', DEGREE_SIGN),
-        "sys-load": ('Load', '1.2f', ''),
-        "sys-freq": ('Freq', '.0f', 'MHz'),
-        "sys-mem":  ('Mem', '.1f', '%'),
-        "sys-disk": ('Disk', '.1f', '%'),
-        "sys-proc": ('Proc', '.0f', ''),
+        "env-temp": ('Temperature', '.1f', DEGREE_SIGN),
+        "env-humi": ('Humidity', '.1f', '%'),
+        "env-pres": ('Presssure', '.0f', 'mb'),
+        "sys-temp": ('CPU Temp', '.1f', DEGREE_SIGN),
+        "sys-load": ('CPU Load', '1.2f', ''),
+        "sys-freq": ('CPU Freq', '.0f', 'MHz'),
+        "sys-mem":  ('Mem used', '.1f', '%'),
+        "sys-disk": ('Disk used', '.1f', '%'),
+        "sys-proc": ('Processes', '.0f', ''),
+        "sys-net-io":  ('Net IO', '.0f', 'k/s'),
+        "sys-disk-io": ('Disk IO', '.0f', 'k/s'),
+        "sys-cpu-int": ('Soft Interrupts', '.0f', '/s'),
         }
 
 # Now we have logging, notify we are starting up
@@ -234,8 +237,8 @@ def update_data():
         disk_count = psutil.disk_io_counters().read_bytes\
                 + psutil.disk_io_counters().write_bytes
         int_count = psutil.cpu_stats().soft_interrupts
-        data["sys-net-io"] = (net_count - counter["sys-net-io"]) / time_period / 1024
-        data["sys-disk-io"] = (disk_count - counter["sys-disk-io"]) / time_period / 1024
+        data["sys-net-io"] = (net_count - counter["sys-net-io"]) / time_period / 1000
+        data["sys-disk-io"] = (disk_count - counter["sys-disk-io"]) / time_period / 1000
         data["sys-cpu-int"] = (int_count - counter["sys-cpu-int"]) / time_period
         counter["sys-net-io"] = net_count
         counter["sys-disk-io"] = disk_count
