@@ -214,36 +214,34 @@ def button_interrupt(*_):
         button_control()
 
 def update_data():
-    '''Get current environmental and system data, called on demand
-    enforces a minimum update interval to avoid spamming the sensors'''
+    '''Get current environmental and system data, called on a schedule
+    '''
     time_period = time.time() - data["update-time"]
-    if time_period >= settings.data_interval:
-        if bme280:
-            data['env-temp'] = bme280.temperature
-            data['env-humi'] = bme280.relative_humidity
-            data['env-pres'] = bme280.pressure
-            # Failed pressure measurements really foul up the graph, skip
-            if data['env-pres'] == 0:
-                data['env-pres'] = 'U'
-        data['sys-temp'] = psutil.sensors_temperatures()["cpu_thermal"][0].current
-        data['sys-load'] = psutil.getloadavg()[0]
-        data["sys-freq"] = psutil.cpu_freq().current
-        data['sys-mem'] = psutil.virtual_memory().percent
-        data["sys-disk"] = psutil.disk_usage('/').percent
-        data["sys-proc"] = len(psutil.pids())
-        net_count = psutil.net_io_counters().bytes_sent \
-                + psutil.net_io_counters().bytes_recv
-        disk_count = psutil.disk_io_counters().read_bytes\
-                + psutil.disk_io_counters().write_bytes
-        int_count = psutil.cpu_stats().soft_interrupts
-        data["sys-net-io"] = (net_count - counter["sys-net-io"]) / time_period / 1000
-        data["sys-disk-io"] = (disk_count - counter["sys-disk-io"]) / time_period / 1000
-        data["sys-cpu-int"] = (int_count - counter["sys-cpu-int"]) / time_period
-        counter["sys-net-io"] = net_count
-        counter["sys-disk-io"] = disk_count
-        counter["sys-cpu-int"] = int_count
-
-        data["update-time"] = time.time()
+    if bme280:
+        data['env-temp'] = bme280.temperature
+        data['env-humi'] = bme280.relative_humidity
+        data['env-pres'] = bme280.pressure
+        # Failed pressure measurements really foul up the graph, skip
+        if data['env-pres'] == 0:
+            data['env-pres'] = 'U'
+    data['sys-temp'] = psutil.sensors_temperatures()["cpu_thermal"][0].current
+    data['sys-load'] = psutil.getloadavg()[0]
+    data["sys-freq"] = psutil.cpu_freq().current
+    data['sys-mem'] = psutil.virtual_memory().percent
+    data["sys-disk"] = psutil.disk_usage('/').percent
+    data["sys-proc"] = len(psutil.pids())
+    net_count = psutil.net_io_counters().bytes_sent \
+            + psutil.net_io_counters().bytes_recv
+    disk_count = psutil.disk_io_counters().read_bytes\
+            + psutil.disk_io_counters().write_bytes
+    int_count = psutil.cpu_stats().soft_interrupts
+    data["sys-net-io"] = (net_count - counter["sys-net-io"]) / time_period / 1000
+    data["sys-disk-io"] = (disk_count - counter["sys-disk-io"]) / time_period / 1000
+    data["sys-cpu-int"] = (int_count - counter["sys-cpu-int"]) / time_period
+    counter["sys-net-io"] = net_count
+    counter["sys-disk-io"] = disk_count
+    counter["sys-cpu-int"] = int_count
+    data["update-time"] = time.time()
 
 def update_pins():
     '''Check if any pins have changed state, and log'''
