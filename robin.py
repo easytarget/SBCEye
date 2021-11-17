@@ -281,7 +281,6 @@ class Robin:
 
     def draw_graph(self, start, end, duration, graph):
         '''Generate a graph, returns a raw png image'''
-        print(f'Graph: {start}:{end}')
         graph_local.response = bytearray()
         if (graph in self.sources) and (graph in self.graph_map.keys()):
             self.write_updates()
