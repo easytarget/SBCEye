@@ -155,6 +155,12 @@ class Settings:
         self.animate_passes = animate.getint("passes")
         self.animate_speed = animate.getint("speed")
 
+        self.cam_url = None
+        if "webcam" in config:
+            cam = config["webcam"]
+            self.cam_url = cam.get("url")
+            self.cam_width = cam.getint("width", 50)
+
         if "debug" in config:
             self.debug = True
         else:

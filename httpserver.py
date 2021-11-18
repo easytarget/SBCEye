@@ -422,6 +422,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             scroll_page = False
             if "deco" in view:
                 response += f'<h2>{http.settings.name}</h2>\n'
+            if ("cam" in view) and http.settings.cam_url:
+                response += f'<img src="{http.settings.cam_url}" alt="Webcam" '\
+                        f'style="display: block; width: {http.settings.cam_width}%">\n'
             response += '<table>\n'
             if "env" in view:
                 response += self._give_env()
