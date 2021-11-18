@@ -225,7 +225,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # Link to the log and pin contol pages
         ret = f'''{self._give_graphlinks()}
                 <tr><td colspan="2" style="text-align: center;">
-                <a href="./?view=deco&view=log" title="Open log in a new page" target="_blank">
+                <a href="./?view=log&exclude=env,sys,gpio,links" title="Open log in a new page" target="_blank">
                 Log</a>\n'''
         if http.settings.web_show_control and (http.settings.button_pin > 0):
             ret += f'&nbsp;&nbsp;<a href="./{http.settings.button_url}" '\
@@ -257,9 +257,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <hr><pre>\n{log}</pre><hr>
                 <span style="font-size: 80%;">Latest {lines} lines shown</span>\n
                 </div>\n
-                <div><a href="./?view=deco&view=log&lines=25" title="show 25 lines">25</a>&nbsp;:
-                &nbsp;<a href="./?view=deco&view=log&lines=250" title="show 250 lines">250</a>&nbsp;:
-                &nbsp;<a href="./?view=deco&view=log&lines=2500" title="show 2500 lines">2500</a>&nbsp;:
+                <div><a href="./?view=log&exclude=env,sys,gpio,links&lines=25" title="show 25 lines">25</a>&nbsp;:
+                &nbsp;<a href="./?view=log&exclude=env,sys,gpio,links&lines=250" title="show 250 lines">250</a>&nbsp;:
+                &nbsp;<a href="./?view=log&exclude=env,sys,gpio,links&lines=2500" title="show 2500 lines">2500</a>&nbsp;:
                 &nbsp;<a href="./" title="Main page">Home</a></div>\n'''
         return ret
 
@@ -414,31 +414,32 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._write_dedented(response)
         elif urlparse(self.path).path == '/':
             # Main Page
-            view = parse_qs(urlparse(self.path).query).get('view', None)
-            if not view:
-                view = ["deco", "env", "sys", "gpio", "links"]
+            view = parse_qs(urlparse(self.path).query).get('view', '')
+            exclude = parse_qs(urlparse(self.path).query).get('exclude', '')
+            view = [item for sublist in view for item in sublist.split(',')]
+            exclude = [item for sublist in exclude for item in sublist.split(',')]
             self._set_headers()
             response = self._give_head()
             scroll_page = False
-            if "deco" in view:
+            if not "deco" in exclude:
                 response += f'<h2>{http.settings.name}</h2>\n'
             if ("cam" in view) and http.settings.cam_url:
                 response += f'<img src="{http.settings.cam_url}" alt="Webcam" '\
                         f'style="display: block; width: {http.settings.cam_width}%">\n'
             response += '<table>\n'
-            if "env" in view:
+            if not "env" in exclude:
                 response += self._give_env()
-            if "sys" in view:
+            if not "sys" in exclude:
                 response += self._give_sys()
-            if "gpio" in view:
+            if not "gpio" in exclude:
                 response += self._give_pins()
-            if "links" in view:
+            if not "links" in exclude:
                 response += self._give_links()
             response += '</table>\n'
             if "log" in view:
                 response += self._give_log()
                 scroll_page = True
-            if "deco" in view:
+            if not "deco" in exclude:
                 response += self._give_timestamp()
             response += self._give_foot(refresh= 60, scroll= scroll_page)
             self._write_dedented(response)
