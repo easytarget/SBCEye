@@ -1,13 +1,6 @@
 # Installing in virtualenv
 * https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/
 
-
-# WARNING
-# RPi.GPIO does not (currently) install on BULLSEYE (the very latest Pi release)
-#
-# These instructions apply to BUSTER only.
-I need a vanilla system to test on, I'll do that later.
-
 ### Setup
 
 Start by making sure that you are running a fully updated Raspian install (Buster as of this time of writing), have git, python3, python3-pip and python3-dev installed, and have cloned the repo to `/~/HAT/pi-overwatch` eg:
@@ -68,7 +61,9 @@ Now we install/upgrade the requirements
 (env) pi@pi:~/HAT/pi-overwatch $ pip install --upgrade wheel
 
 (env) pi@pi:~/HAT/pi-overwatch $ sudo apt install rrdtool librrd-dev
-(env) pi@pi:~/HAT/pi-overwatch $ pip install psutil RPi.GPIO schedule setproctitle rrdtool
+(env) pi@pi:~/HAT/pi-overwatch $ pip install psutil schedule setproctitle rrdtool
+; RPi.GPIO is (currently, november'21) broken on BULLSEYE unless you use a pre-release. sigh. 
+(env) pi@pi:~/HAT/pi-overwatch $ pip install RPi.GPIO==0.7.1a4
 
 ; Only if you plan to use a BME280 Temperature/Humidity/Pressure sensor:
 (env) pi@pi:~/HAT/pi-overwatch $ pip install adafruit-circuitpython-bme280
