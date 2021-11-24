@@ -62,6 +62,9 @@ Now we install/upgrade the requirements
 
 (env) pi@pi:~/HAT/pi-overwatch $ sudo apt install rrdtool librrd-dev
 (env) pi@pi:~/HAT/pi-overwatch $ pip install psutil schedule setproctitle rrdtool
+
+; If you wish to control a gpio pin via a button or url you need to install RPi.GPIO
+; - this is not necesscary if you just want to monitor (not control) pins.
 ; RPi.GPIO is (currently, november'21) broken on BULLSEYE unless you use a pre-release. sigh. 
 (env) pi@pi:~/HAT/pi-overwatch $ pip install RPi.GPIO==0.7.1a4
 
