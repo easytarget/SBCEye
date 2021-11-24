@@ -119,7 +119,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 </head>
                 <body>'''
 
-    def _give_foot(self, refresh = 0, scroll = False):
+    def _give_foot(self, refresh=0, scroll=False):
         ret = '''</body>\n
                 <script>\n'''
         if refresh > 0:
@@ -225,7 +225,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # Link to the log and pin contol pages
         ret = f'''{self._give_graphlinks()}
                 <tr><td colspan="2" style="text-align: center;">
-                <a href="./?view=log&exclude=env,sys,gpio,links" title="Open log in a new page" target="_blank">
+                <a href="./log" title="Open log in a new page" target="_blank">
                 Log</a>\n'''
         if http.settings.web_show_control and (http.settings.button_pin > 0):
             ret += f'&nbsp;&nbsp;<a href="./{http.settings.button_url}" '\
@@ -249,7 +249,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # Use a shell one-liner used to extract the last {lines} of data from the logs
         # There is doubtless a more 'python' way to do this, but it is fast, cheap and works..
         log_command = \
-                f"for a in `ls -tr {http.settings.log_file}*`;do cat $a ; done | tail -{lines}"
+            f"for a in `ls -tr {http.settings.log_file}*`;do cat $a ; done | tail -{lines}"
         log = subprocess.check_output(log_command, shell=True).decode('utf-8')
         ret = f'''
                 <div style="overflow-x: auto; width: 100%;">\n
@@ -257,9 +257,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <hr><pre>\n{log}</pre><hr>
                 <span style="font-size: 80%;">Latest {lines} lines shown</span>\n
                 </div>\n
-                <div><a href="./?view=log&exclude=env,sys,gpio,links&lines=25" title="show 25 lines">25</a>&nbsp;:
-                &nbsp;<a href="./?view=log&exclude=env,sys,gpio,links&lines=250" title="show 250 lines">250</a>&nbsp;:
-                &nbsp;<a href="./?view=log&exclude=env,sys,gpio,links&lines=2500" title="show 2500 lines">2500</a>&nbsp;:
+                <div><a href="./log?lines=25" title="show 25 lines">25</a>&nbsp;:
+                &nbsp;<a href="./log?lines=250" title="show 250 lines">250</a>&nbsp;:
+                &nbsp;<a href="./log?lines=2500" title="show 2500 lines">2500</a>&nbsp;:
                 &nbsp;<a href="./" title="Main page">Home</a></div>\n'''
         return ret
 
@@ -412,18 +412,24 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_dump_portal()
             response += self._give_foot()
             self._write_dedented(response)
+        elif (urlparse(self.path).path == '/log'):
+            self._set_headers()
+            response = self._give_head()
+            response += f'<h2>{http.settings.name} Log</h2>\n'
+            response += self._give_log()
+            response += self._give_timestamp()
+            response += self._give_foot(refresh=60, scroll=True)
+            self._write_dedented(response)
         elif urlparse(self.path).path == '/':
             # Main Page
-            view = parse_qs(urlparse(self.path).query).get('view', '')
+            cam = parse_qs(urlparse(self.path).query).get('cam', None)
             exclude = parse_qs(urlparse(self.path).query).get('exclude', '')
-            view = [item for sublist in view for item in sublist.split(',')]
             exclude = [item for sublist in exclude for item in sublist.split(',')]
             self._set_headers()
             response = self._give_head()
-            scroll_page = False
             if not "deco" in exclude:
                 response += f'<h2>{http.settings.name}</h2>\n'
-            if ("cam" in view) and http.settings.cam_url:
+            if cam and http.settings.cam_url:
                 response += f'<img src="{http.settings.cam_url}" alt="Webcam" '\
                         f'style="display: block; width: {http.settings.cam_width}%">\n'
             response += '<table>\n'
@@ -436,12 +442,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             if not "links" in exclude:
                 response += self._give_links()
             response += '</table>\n'
-            if "log" in view:
-                response += self._give_log()
-                scroll_page = True
             if not "deco" in exclude:
                 response += self._give_timestamp()
-            response += self._give_foot(refresh= 60, scroll= scroll_page)
+            response += self._give_foot(refresh=60)
             self._write_dedented(response)
         else:
             self.send_error(404, 'No Such Page', 'Nothing matches the given URL on this OverWatch server')
