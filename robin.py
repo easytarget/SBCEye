@@ -3,7 +3,6 @@
 
 # pragma pylint: disable=logging-fstring-interpolation
 
-import tempfile
 import time
 from pathlib import Path
 import logging
@@ -286,7 +285,6 @@ class Robin:
             self.write_updates()
             params = self.graph_map[graph]
             timestamp = time.strftime(self.graph_args['time_format'])
-            timeformat_escaped = self.graph_args['time_format'].replace(':','\:')
             duration = duration.replace('now',
                     f'{time.strftime(self.graph_args["time_stamp"])}')
             rrd_args = ["--full-size-mode",
@@ -302,9 +300,9 @@ class Robin:
                 rrd_args.extend(["--height", str(self.graph_args["high"])])
             rrd_args.extend(["--title", f'{params[0]}: {duration}'])
             if params[1]:
-                 rrd_args.extend(["--upper-limit", params[1]])
+                rrd_args.extend(["--upper-limit", params[1]])
             if params[2]:
-                 rrd_args.extend(["--lower-limit", params[2]])
+                rrd_args.extend(["--lower-limit", params[2]])
             rrd_args.extend(["--left-axis-format", params[3]])
             if len(params) > 5:
                 rrd_args.extend(params[5:])
@@ -315,10 +313,10 @@ class Robin:
             rrd_args.extend([f'LINE{self.graph_args["line_width"]}:'\
                     f'data{self.graph_args["line_color"]}:'\
                     f'{self.graph_args["name"]} {params[0]}',
-                    f'GPRINT:data:MIN:Min\:{params[4]}',
-                    f'GPRINT:data:AVERAGE:Average\:{params[4]}',
-                    f'GPRINT:data:MAX:Max\:{params[4]}',
-                    f'GPRINT:data:LAST:Last\:{params[4]}'])
+                    rf'GPRINT:data:MIN:Min\:{params[4]}',
+                    rf'GPRINT:data:AVERAGE:Average\:{params[4]}',
+                    rf'GPRINT:data:MAX:Max\:{params[4]}',
+                    rf'GPRINT:data:LAST:Last\:{params[4]}'])
             rrd_args.extend(['COMMENT: ', 'COMMENT: '])
 
             try:

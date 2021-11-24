@@ -12,7 +12,7 @@ import re
 # HTTP server
 import http.server
 from urllib.parse import urlparse, parse_qs
-from threading import Thread, local
+from threading import Thread
 
 # Logging
 import logging
@@ -412,7 +412,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_dump_portal()
             response += self._give_foot()
             self._write_dedented(response)
-        elif (urlparse(self.path).path == '/log'):
+        elif urlparse(self.path).path == '/log':
             self._set_headers()
             response = self._give_head()
             response += f'<h2>{http.settings.name} Log</h2>\n'
@@ -447,7 +447,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_foot(refresh=60)
             self._write_dedented(response)
         else:
-            self.send_error(404, 'No Such Page', 'Nothing matches the given URL on this OverWatch server')
+            self.send_error(404, 'No Such Page',
+                    'Nothing matches the given URL on this OverWatch server')
 
     def do_HEAD(self):
         '''returns headers'''

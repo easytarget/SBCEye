@@ -42,7 +42,6 @@ import random
 from atexit import register
 from signal import signal, SIGTERM, SIGINT, SIGHUP
 from multiprocessing import Process, Queue
-import subprocess
 import schedule
 import psutil
 

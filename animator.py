@@ -259,7 +259,7 @@ def animate(settings, disp, queue):
     while animation:
         while not queue.empty():
             key, value = queue.get_nowait()
-            if value != None:
+            if value is not None:
                 data.update({key: value})
             else:
                 data.pop(key, None)
