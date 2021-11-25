@@ -204,7 +204,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_graphlinks(self, skip=""):
         # A list of available graph pages
         ret = ''
-        skip = skip.lstrip('-')
+        skip = skip.lstrip('end-')
         if (len(http.settings.graph_durations) > 0) and http.db_graphable:
             if len(skip) == 0:
                 ret += '<tr><th>Graphs</th></tr>\n'
