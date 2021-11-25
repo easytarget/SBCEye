@@ -366,19 +366,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 and (http.settings.button_out > 0)):
             # Web button control
             http.update_pins()
-            parsed = parse_qs(urlparse(self.path).query).get('state', None)
-            if parsed:
-                action = parsed[0]
-            elif urlparse(self.path).query:
-                self.send_error(404, 'Unknown Parameters',
-                        'This URL takes a single parameter: "?state=<new state>"')
-                return
-            else:
-                action = 'status'
-            status, state = http.button_control(action)
-            if not status == f'{http.settings.button_name} : {http.settings.web_pin_states[state]}':
+            parsed = parse_qs(urlparse(self.path).query).get('state', ['status'])
+            action = parsed[0]
+            if action is not 'status':
                 logging.info(f'Web button triggered by: {self.client_address[0]}'\
                             f' with action: {action}')
+            status, state = http.button_control(action)
             self._set_headers()
             response = self._give_head(f" :: {http.settings.button_name}")
             response += f'<h2>{status}</h2>\n'
