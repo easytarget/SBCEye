@@ -14,7 +14,7 @@ Written in Python as a learning excercise, it draws heavily on [RRDtool](https:/
 
 Default Web Interface
 
-![env](/docs/img/default-main.png)![env](/docs/img/default-graphs.png)
+![env](/docs/img/default-main.png)
 
 Add a BME280 sensor and/or some GPIO pins to monitor
 
@@ -23,7 +23,7 @@ Add a BME280 sensor and/or some GPIO pins to monitor
 
 Add a 128x64 OLED display
 
-![env](/docs/img/pihat-env-thumb.jpg)![sys](/docs/img/pihat-sys-thumb.jpg)
+![env](/docs/img/pihat-env-thumb.jpg)
 
 Log GPIO actions etc..
 
