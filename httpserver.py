@@ -187,6 +187,29 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                             f'<td style="padding-left: 0;">{suffix}</td></tr>\n'
         return ret
 
+    def _give_net(self):
+        # Network Connectivity
+        ret = ''
+        netlist = {}
+        for key in http.data.keys():
+            if key[0:4] == 'net-':
+                netlist[key] = key[4:]
+        if len(http.data.keys() & netlist.keys()) > 0:
+            ret += '<tr><th>Ping</th></tr>\n'
+            for item,name in netlist.items():
+                ret += f'<tr><td>{name}:</td><td style="text-align: right;">'
+                if http.data[item] == 'U':
+                    ret += f'{http.settings.net_state_names[0]}</td></tr>\n'
+                elif http.data[item] >= http.settings.net_timeout:
+                    ret += f'{http.settings.net_state_names[1]}</td></tr>\n'
+                else:
+                    ret += f'{http.data[item]:.1f}</td>'\
+                            '<td style="padding-left: 0;">'\
+                            '<span style="font-size: 75%;"> ms</span>'\
+                            '</td></tr>\n'
+        return ret
+
+
     def _give_pins(self):
         # GPIO states
         ret = ''
@@ -196,9 +219,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 pinlist[key] = key[4:]
         if len(http.data.keys() & pinlist.keys()) > 0:
             ret += '<tr><th>GPIO</th></tr>\n'
-            for sense,name in pinlist.items():
+            for item,name in pinlist.items():
                 ret += f'<tr><td>{name}:</td><td style="text-align: right;">'\
-                       f'{http.settings.web_pin_states[bool(http.data[sense])]}</td></tr>\n'
+                       f'{http.settings.pin_state_names[http.data[item]]}</td></tr>\n'
         return ret
 
     def _give_graphlinks(self, skip=""):
@@ -375,7 +398,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._set_headers()
             response = self._give_head(f" :: {http.settings.button_name}")
             response += f'<h2>{status}</h2>\n'
-            invert_state = http.settings.web_pin_states[not state]
+            invert_state = http.settings.pin_state_names[not state]
             response += f'''<div>
                     <a href="./{http.settings.button_url}?state={invert_state}"
                     title = "Switch {http.settings.button_name} {invert_state}">
@@ -432,6 +455,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 response += self._give_sys()
             if not "gpio" in exclude:
                 response += self._give_pins()
+            if not "net" in exclude:
+                response += self._give_net()
             if not "links" in exclude:
                 response += self._give_links()
             response += '</table>\n'

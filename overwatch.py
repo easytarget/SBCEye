@@ -164,7 +164,7 @@ if bme280:
 for pin_name,_ in settings.pin_map.items():
     data[f"pin-{pin_name}"] = 0
 for host,_ in settings.net_map.items():
-    data[f"net-{host}"] = 0
+    data[f"net-{host}"] = settings.net_timeout - 1
 
 # Counters - used for incremental data, need pre-populating
 counter = {}
@@ -176,7 +176,6 @@ counter["sys-cpu-int"] = psutil.cpu_stats().soft_interrupts
 
 data["update-time"] = time.time() # time of last data update
 
-print(f'DataSet: {data}')
 
 #
 # Local functions
@@ -189,10 +188,10 @@ def button_control(action="toggle"):
         if action.lower() in ['toggle','invert','button']:
             GPIO.output(pin, not GPIO.input(pin))
             ret += 'Toggled: '
-        elif action.lower() in [settings.web_pin_states[1].lower(),'on','true']:
+        elif action.lower() in [settings.pin_state_names[1].lower(),'on','true']:
             GPIO.output(pin,True)
             ret += 'Switched: '
-        elif action.lower() in [settings.web_pin_states[0].lower(),'off','false']:
+        elif action.lower() in [settings.pin_state_names[0].lower(),'off','false']:
             GPIO.output(pin,False)
             ret += 'Switched: '
         elif action.lower() in ['random','easter']:
@@ -201,7 +200,7 @@ def button_control(action="toggle"):
         else:
             ret += ': '
         state = GPIO.input(pin)
-        ret += settings.web_pin_states[state]
+        ret += settings.pin_state_names[state]
     else:
         state = False
         ret = 'Not supported, no controlled pin number defined'
@@ -245,6 +244,8 @@ def update_data():
     counter["sys-disk-io"] = disk_count
     counter["sys-cpu-int"] = int_count
     data["update-time"] = time.time()
+    for host,_ in settings.net_map.items():
+        data[f"net-{host}"] = random.randrange(50,settings.net_timeout*1300)/1000
 
 def update_pins():
     '''Check if any pins have changed state, and log'''
@@ -253,7 +254,7 @@ def update_pins():
         if this_pin_state != data[f"pin-{name}"]:
             # Pin has changed state, store new state and log
             data[f'pin-{name}'] = this_pin_state
-            logging.info(f'{name}: {settings.web_pin_states[this_pin_state]}')
+            logging.info(f'{name}: {settings.pin_state_names[this_pin_state]}')
 
 def update_db():
     '''Runs on a scedule, refresh readings and update RRD'''
@@ -318,7 +319,7 @@ if __name__ == '__main__':
 
     for pin_name, pin_number in settings.pin_map.items():
         data[f'pin-{pin_name}'] = get_pin(pin_number)
-        logging.info(f'{pin_name}: {settings.web_pin_states[data[f"pin-{pin_name}"]]}')
+        logging.info(f'{pin_name}: {settings.pin_state_names[data[f"pin-{pin_name}"]]}')
 
     # Set pin interrupt and output if we have a button and a pin to control
     if settings.button_out > 0:

@@ -5,6 +5,7 @@ Otherwise we use the local config.ini if it exists
 If not we use default.ini, which has sensible defaults
 '''
 
+import os
 import sys
 import textwrap
 from pathlib import Path
@@ -83,12 +84,15 @@ class Settings:
         self.short_format = general.get("short_format")
         self.have_sensor = general.getboolean("sensor")
         self.have_screen = general.getboolean("screen")
+        self.net_state_names = tuple(general.get("net_state_names").split(','))
+        self.pin_state_names = tuple(general.get("pin_state_names").split(','))
+        if self.name == "":
+            self.name = f'{os.uname().nodename}'
 
         web = config["web"]
         self.web_host = web.get("host")
         self.web_port = web.getint("port")
         self.web_sensor_name = web.get("sensor_name")
-        self.web_pin_states = tuple(web.get("pin_states").split(','))
         self.web_allow_dump = web.getboolean("allow_dump")
         self.web_show_control = web.getboolean("show_control")
 
@@ -100,6 +104,7 @@ class Settings:
         self.graph_line_width = graph.get("line_width")
         self.graph_area_color = graph.get("area_color")
         self.graph_area_depth = graph.get("area_depth")
+        self.graph_half_height = graph.get("half_height").split(',')
 
         self.pin_map = {}
         for pin in config["pins"]:
@@ -108,7 +113,7 @@ class Settings:
         self.net_map = {}
         for host in config["ping"]:
             if host == 'timeout':
-                self.net_timeout = int(config.getfloat("ping",host) * 1000)
+                self.net_timeout = config.getfloat("ping",host)
             else:
                 self.net_map[host] = config.get("ping",host)
 
