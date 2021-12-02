@@ -163,6 +163,8 @@ if bme280:
     data["env-pres"] = 0
 for pin_name,_ in settings.pin_map.items():
     data[f"pin-{pin_name}"] = 0
+for host,_ in settings.net_map.items():
+    data[f"net-{host}"] = 0
 
 # Counters - used for incremental data, need pre-populating
 counter = {}
@@ -173,6 +175,8 @@ counter["sys-disk-io"] = psutil.disk_io_counters().read_bytes\
 counter["sys-cpu-int"] = psutil.cpu_stats().soft_interrupts
 
 data["update-time"] = time.time() # time of last data update
+
+print(f'DataSet: {data}')
 
 #
 # Local functions

@@ -102,8 +102,15 @@ class Settings:
         self.graph_area_depth = graph.get("area_depth")
 
         self.pin_map = {}
-        for key in config["pins"]:
-            self.pin_map[key] = config.getint("pins",key)
+        for pin in config["pins"]:
+            self.pin_map[pin] = config.getint("pins",pin)
+
+        self.net_map = {}
+        for host in config["ping"]:
+            if host == 'timeout':
+                self.net_timeout = int(config.getfloat("ping",host) * 1000)
+            else:
+                self.net_map[host] = config.get("ping",host)
 
         button = config["button"]
         self.button_out = button.getint("out")
