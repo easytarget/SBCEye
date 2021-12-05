@@ -6,7 +6,7 @@
 import sys
 import os.path
 import time
-import subprocess
+from subprocess import check_output
 import re
 
 # HTTP server
@@ -273,7 +273,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # There is doubtless a more 'python' way to do this, but it is fast, cheap and works..
         log_command = \
             f"for a in `ls -tr {http.settings.log_file}*`;do cat $a ; done | tail -{lines}"
-        log = subprocess.check_output(log_command, shell=True).decode('utf-8')
+        log = check_output(log_command, shell=True).decode('utf-8')
         ret = f'''
                 <div style="overflow-x: auto; width: 100%;">\n
                 <span style="font-size: 110%; font-weight: bold;">Recent log activity:</span>

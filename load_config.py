@@ -112,10 +112,7 @@ class Settings:
 
         self.net_map = {}
         for host in config["ping"]:
-            if host == 'timeout':
-                self.net_timeout = config.getfloat("ping",host)
-            else:
-                self.net_map[host] = config.get("ping",host)
+            self.net_map[host] = config.get("ping",host)
 
         button = config["button"]
         self.button_out = button.getint("out")
@@ -130,11 +127,12 @@ class Settings:
                 if pin == self.button_out:
                     self.button_name = name
 
-        interval = config["interval"]
-        self.pin_interval = interval.getint("pin")
-        self.data_interval = interval.getint("data")
-        self.rrd_interval = interval.getint("rrd")
-        self.log_interval = interval.getint("log")
+        intervals = config["intervals"]
+        self.pin_interval = intervals.getint("pin")
+        self.data_interval = intervals.getint("data")
+        self.rrd_interval = intervals.getint("rrd")
+        self.log_interval = intervals.getint("log")
+        self.net_timeout = intervals.getfloat("ping")
 
         log = config["log"]
         self.log_file_dir = log.get("file_dir")
@@ -147,7 +145,6 @@ class Settings:
         rrd = config["rrd"]
         self.rrd_dir = rrd.get("dir")
         self.rrd_file_name = rrd.get("file_name")
-        self.rrd_cache_age = abs(rrd.getint("cache_age"))
         self.rrd_backup_count = rrd.getint("backup_count")
         self.rrd_backup_age = int(abs(rrd.getfloat("backup_age")) * 86400)
         self.rrd_backup_time = rrd.get("backup_time")

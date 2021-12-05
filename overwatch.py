@@ -148,23 +148,23 @@ class TheData(dict):
 
 # Use a (custom overridden) dictionary to store current readings
 data = TheData({})
-data["sys-temp"] = 0
-data["sys-load"] = 0
-data["sys-freq"] = 0
-data["sys-mem"] = 0
-data["sys-disk"] = 0
-data["sys-proc"] = 0
-data["sys-net-io"] = 0
-data["sys-disk-io"] = 0
-data["sys-cpu-int"] = 0
+data["sys-temp"] = 'U'
+data["sys-load"] = 'U'
+data["sys-freq"] = 'U'
+data["sys-mem"] = 'U'
+data["sys-disk"] = 'U'
+data["sys-proc"] = 'U'
+data["sys-net-io"] = 'U'
+data["sys-disk-io"] = 'U'
+data["sys-cpu-int"] = 'U'
 if bme280:
-    data["env-temp"] = 0
-    data["env-humi"] = 0
-    data["env-pres"] = 0
+    data["env-temp"] = 'U'
+    data["env-humi"] = 'U'
+    data["env-pres"] = 'U'
 for pin_name,_ in settings.pin_map.items():
-    data[f"pin-{pin_name}"] = 0
+    data[f"pin-{pin_name}"] = 'U'
 for host,_ in settings.net_map.items():
-    data[f"net-{host}"] = settings.net_timeout - 1
+    data[f"net-{host}"] = 'U'
 
 # Counters - used for incremental data, need pre-populating
 counter = {}
@@ -215,10 +215,9 @@ def button_interrupt(*_):
         logging.info('Button pressed')
         button_control()
 
-def update_data():
-    '''Get current environmental and system data, called on a schedule
+def update_sensors():
+    '''Get current environmental data
     '''
-    time_period = time.time() - data["update-time"]
     if bme280:
         data['env-temp'] = bme280.temperature
         data['env-humi'] = bme280.relative_humidity
@@ -226,6 +225,10 @@ def update_data():
         # Failed pressure measurements really foul up the graph, skip
         if data['env-pres'] == 0:
             data['env-pres'] = 'U'
+
+def update_system():
+    '''Get current environmental and system data, called on a schedule
+    '''
     data['sys-temp'] = psutil.sensors_temperatures()["cpu_thermal"][0].current
     data['sys-load'] = psutil.getloadavg()[0]
     data["sys-freq"] = psutil.cpu_freq().current
@@ -237,13 +240,18 @@ def update_data():
     disk_count = psutil.disk_io_counters().read_bytes\
             + psutil.disk_io_counters().write_bytes
     int_count = psutil.cpu_stats().soft_interrupts
+    time_period = time.time() - data["update-time"]
+    data["update-time"] = time.time()
     data["sys-net-io"] = (net_count - counter["sys-net-io"]) / time_period / 1000
     data["sys-disk-io"] = (disk_count - counter["sys-disk-io"]) / time_period / 1000
     data["sys-cpu-int"] = (int_count - counter["sys-cpu-int"]) / time_period
     counter["sys-net-io"] = net_count
     counter["sys-disk-io"] = disk_count
     counter["sys-cpu-int"] = int_count
-    data["update-time"] = time.time()
+
+def update_net():
+    '''Get current environmental and system data, called on a schedule
+    '''
     for host,_ in settings.net_map.items():
         data[f"net-{host}"] = random.randrange(50,settings.net_timeout*1300)/1000
 
@@ -256,9 +264,11 @@ def update_pins():
             data[f'pin-{name}'] = this_pin_state
             logging.info(f'{name}: {settings.pin_state_names[this_pin_state]}')
 
-def update_db():
+def update_data():
     '''Runs on a scedule, refresh readings and update RRD'''
-    update_data()
+    update_sensors()
+    update_system()
+    update_net()
     rrd.update(data)
 
 def log_data():
@@ -351,12 +361,15 @@ if __name__ == '__main__':
             logging.warning('Display configured but did not initialise properly: '\
                     'Display features disabled')
 
-    # Get an initial data reading
-    update_data()
-    update_pins()
-
     # RRD init
     rrd = Robin(settings, data)
+
+    # Get an initial data reading
+    print('Performing initial data update')
+    if settings.net_map:
+        print(f'- May take up to {settings.net_timeout}s if ping targets are down')
+    update_data()
+    update_pins()
 
     # Start the web server, it will fork into a seperate thread and run continually
     serve_http(settings, rrd, data, (button_control, update_pins))
@@ -369,11 +382,11 @@ if __name__ == '__main__':
 
     # Schedule pin monitoring, database updates and logging events
     schedule.every().hour.at(":00").do(hourly)
-    schedule.every(settings.rrd_interval).seconds.do(update_db)
-    if len(settings.pin_map.keys()) > 0:
-        schedule.every(settings.pin_interval).seconds.do(update_pins)
     if settings.log_interval > 0:
         schedule.every(settings.log_interval).seconds.do(log_data)
+    schedule.every(settings.data_interval).seconds.do(update_data)
+    if len(settings.pin_map.keys()) > 0:
+        schedule.every(settings.pin_interval).seconds.do(update_pins)
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedules and entering service loop")

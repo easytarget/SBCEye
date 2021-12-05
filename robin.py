@@ -178,8 +178,7 @@ class Robin:
         # Use a home-brew local cache
         self.cache = []
         self.last_write = 0
-        self.cache_age = s.rrd_cache_age
-        self.update_interval = s.rrd_interval
+        self.cache_age = s.rrd_interval
 
         # Notify
         print('RRD database and cache configured and enabled')
