@@ -49,7 +49,8 @@ import psutil
 from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
-from pinreader import get_pin
+from net_test import Net_test
+from pinreader import Pinreader
 from bus_drivers import i2c_setup
 
 # Re-nice to reduce blocking of other processes
@@ -148,33 +149,15 @@ class TheData(dict):
 
 # Use a (custom overridden) dictionary to store current readings
 data = TheData({})
-data["sys-temp"] = 'U'
-data["sys-load"] = 'U'
-data["sys-freq"] = 'U'
-data["sys-mem"] = 'U'
-data["sys-disk"] = 'U'
-data["sys-proc"] = 'U'
-data["sys-net-io"] = 'U'
-data["sys-disk-io"] = 'U'
-data["sys-cpu-int"] = 'U'
-if bme280:
-    data["env-temp"] = 'U'
-    data["env-humi"] = 'U'
-    data["env-pres"] = 'U'
-for pin_name,_ in settings.pin_map.items():
-    data[f"pin-{pin_name}"] = 'U'
-for host,_ in settings.net_map.items():
-    data[f"net-{host}"] = 'U'
 
-# Counters - used for incremental data, need pre-populating
+# Counters used for incremental data need pre-populating
 counter = {}
 counter["sys-net-io"] = psutil.net_io_counters().bytes_sent \
         + psutil.net_io_counters().bytes_recv
 counter["sys-disk-io"] = psutil.disk_io_counters().read_bytes\
         + psutil.disk_io_counters().write_bytes
 counter["sys-cpu-int"] = psutil.cpu_stats().soft_interrupts
-
-data["update-time"] = time.time() # time of last data update
+data["update-time"] = time.time() # time of last update
 
 
 #
@@ -203,8 +186,8 @@ def button_control(action="toggle"):
         ret += settings.pin_state_names[state]
     else:
         state = False
-        ret = 'Not supported, no controlled pin number defined'
-    update_pins()
+        ret = 'Not supported, no output pin defined'
+    pins.update_pins()
     return (ret, state)
 
 def button_interrupt(*_):
@@ -214,17 +197,6 @@ def button_interrupt(*_):
     if GPIO.input(settings.button_pin):
         logging.info('Button pressed')
         button_control()
-
-def update_sensors():
-    '''Get current environmental data
-    '''
-    if bme280:
-        data['env-temp'] = bme280.temperature
-        data['env-humi'] = bme280.relative_humidity
-        data['env-pres'] = bme280.pressure
-        # Failed pressure measurements really foul up the graph, skip
-        if data['env-pres'] == 0:
-            data['env-pres'] = 'U'
 
 def update_system():
     '''Get current environmental and system data, called on a schedule
@@ -249,20 +221,22 @@ def update_system():
     counter["sys-disk-io"] = disk_count
     counter["sys-cpu-int"] = int_count
 
+def update_sensors():
+    '''Get current environmental sensor data
+    '''
+    if bme280:
+        data['env-temp'] = bme280.temperature
+        data['env-humi'] = bme280.relative_humidity
+        data['env-pres'] = bme280.pressure
+        # Failed pressure measurements really foul up the graph, skip
+        if data['env-pres'] == 0:
+            data['env-pres'] = 'U'
+
 def update_net():
-    '''Get current environmental and system data, called on a schedule
+    ''' STUB
     '''
     for host,_ in settings.net_map.items():
         data[f"net-{host}"] = random.randrange(50,settings.net_timeout*1300)/1000
-
-def update_pins():
-    '''Check if any pins have changed state, and log'''
-    for name, pin in settings.pin_map.items():
-        this_pin_state =  get_pin(pin)
-        if this_pin_state != data[f"pin-{name}"]:
-            # Pin has changed state, store new state and log
-            data[f'pin-{name}'] = this_pin_state
-            logging.info(f'{name}: {settings.pin_state_names[this_pin_state]}')
 
 def update_data():
     '''Runs on a scedule, refresh readings and update RRD'''
@@ -324,14 +298,7 @@ if __name__ == '__main__':
         logging.warning('Environmental data configured but no sensor detected: '\
                 'Environment status and logging disabled')
 
-    if any(key.startswith('pin-') for key in data):
-        logging.info('GPIO monitoring configured and logging enabled')
-
-    for pin_name, pin_number in settings.pin_map.items():
-        data[f'pin-{pin_name}'] = get_pin(pin_number)
-        logging.info(f'{pin_name}: {settings.pin_state_names[data[f"pin-{pin_name}"]]}')
-
-    # Set pin interrupt and output if we have a button and a pin to control
+    # Set button interrupt and output if we have a button and a pin to control
     if settings.button_out > 0:
         GPIO.setmode(GPIO.BCM)  # Use BCM GPIO numbering
         GPIO.setup(settings.button_out, GPIO.OUT)
@@ -361,18 +328,27 @@ if __name__ == '__main__':
             logging.warning('Display configured but did not initialise properly: '\
                     'Display features disabled')
 
+    print('Performing initial data update')
+
+    # Populate initial system data
+    update_system()
+
+    # Populate initial sensor data
+    update_sensors()
+
+    # Network (ping) monitoring
+    if settings.net_map:
+        print(f'- May take up to {settings.net_timeout}s if ping targets are down')
+    net = Net_test((settings.net_map, settings.net_timeout), data)
+
+    # GPIO Pin monitoring
+    pins = Pinreader((settings.pin_map, settings.pin_state_names), data)
+
     # RRD init
     rrd = Robin(settings, data)
 
-    # Get an initial data reading
-    print('Performing initial data update')
-    if settings.net_map:
-        print(f'- May take up to {settings.net_timeout}s if ping targets are down')
-    update_data()
-    update_pins()
-
     # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(settings, rrd, data, (button_control, update_pins))
+    serve_http(settings, rrd, data, (button_control,))
 
     # Exit handlers (needed for rrd data-safe shutdown)
     signal(SIGTERM, handle_signal)
@@ -386,7 +362,7 @@ if __name__ == '__main__':
         schedule.every(settings.log_interval).seconds.do(log_data)
     schedule.every(settings.data_interval).seconds.do(update_data)
     if len(settings.pin_map.keys()) > 0:
-        schedule.every(settings.pin_interval).seconds.do(update_pins)
+        schedule.every(settings.pin_interval).seconds.do(pins.update_pins)
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedules and entering service loop")

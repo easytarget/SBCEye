@@ -32,7 +32,6 @@ def serve_http(settings, rrd, data, helpers):
     http.rrd = rrd
     http.data = data
     http.button_control = helpers[0]
-    http.update_pins = helpers[1]
     http.icon_file = 'favicon.ico'
     if not os.path.exists(http.icon_file):
         http.icon_file = f'{sys.path[0]}/{http.icon_file}'
@@ -388,7 +387,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 and (len(http.settings.button_url) > 0)
                 and (http.settings.button_out > 0)):
             # Web button control
-            http.update_pins()
             parsed = parse_qs(urlparse(self.path).query).get('state', ['status'])
             action = parsed[0]
             if action is not 'status':
