@@ -387,7 +387,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             # Web button control
             parsed = parse_qs(urlparse(self.path).query).get('state', ['status'])
             action = parsed[0]
-            if action is not 'status':
+            if action != 'status':
                 logging.info(f'Web button triggered by: {self.client_address[0]}'\
                             f' with action: {action}')
             status, state = http.button_control(action)
