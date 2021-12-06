@@ -35,6 +35,7 @@ class Robin:
         self.graph_args["line_width"] = s.graph_line_width
         self.graph_args["area_color"] = s.graph_area_color
         self.graph_args["area_depth"] = s.graph_area_depth
+        self.half_height = s.graph_half_height
 
 
         # Sensor and system sources with limits (min,max)
@@ -81,11 +82,17 @@ class Robin:
                 'sys-cpu-int': ('CPU Soft interrupts, per second',
                     None, None, '%5.0lf', '%5.0lf /s', '--units-exponent','0'),
                 }
+        # connectivity
+        for host in s.net_map.keys():
+            self.data_sources[f'net-{host}'] = ('0','U')
+            self.graph_map[f'net-{host}'] = (f'{host} Ping, milliseconds',
+                    '100', '0' ,'%3.0lf', '%3.1lf ms', '--alt-autoscale', '--units-exponent','0')
+
         # pins
         for name in s.pin_map.keys():
             self.data_sources[f'pin-{name}'] = ('0','1')
             self.graph_map[f'pin-{name}'] = (f'{name} Pin State, '\
-                    f'0={s.web_pin_states[0]}, 1={s.web_pin_states[1]}',
+                    f'0 = {s.pin_state_names[0]}, 1 = {s.pin_state_names[1]}',
                     '1', '0' ,'%3.1lf', '%3.0lf', '--alt-autoscale', '--units-exponent','0')
 
         # set the list of active and storable sources
@@ -169,8 +176,7 @@ class Robin:
         # Use a home-brew local cache
         self.cache = []
         self.last_write = 0
-        self.cache_age = s.rrd_cache_age
-        self.update_interval = s.rrd_interval
+        self.cache_age = s.rrd_interval
 
         # Notify
         print('RRD database and cache configured and enabled')
@@ -249,8 +255,7 @@ class Robin:
         dataline = str(int(time.time()))
         for source in self.sources:
             dataline += f':{data[source]}'
-        if dataline:
-            self.cache.append(dataline)
+        self.cache.append(dataline)
         if time.time() > (self.last_write + self.cache_age)\
                 and not db_lock.locked():
             self.write_updates()
@@ -294,7 +299,7 @@ class Robin:
                         f'{self.graph_args["name"]} :: {graph} :: {timestamp}',
                         "--width", str(self.graph_args["wide"])
                         ]
-            if graph[:4] == 'pin-':
+            if graph.split('-')[0] in self.half_height:
                 rrd_args.extend(["--height", str(self.graph_args["high"]/2)])
             else:
                 rrd_args.extend(["--height", str(self.graph_args["high"])])
@@ -312,7 +317,7 @@ class Robin:
                         f'gradheight={self.graph_args["area_depth"]}'])
             rrd_args.extend([f'LINE{self.graph_args["line_width"]}:'\
                     f'data{self.graph_args["line_color"]}:'\
-                    f'{self.graph_args["name"]} {params[0]}',
+                    f'{self.graph_args["name"]}',
                     rf'GPRINT:data:MIN:Min\:{params[4]}',
                     rf'GPRINT:data:AVERAGE:Average\:{params[4]}',
                     rf'GPRINT:data:MAX:Max\:{params[4]}',

@@ -6,7 +6,7 @@
 import sys
 import os.path
 import time
-import subprocess
+from subprocess import check_output
 import re
 
 # HTTP server
@@ -32,7 +32,6 @@ def serve_http(settings, rrd, data, helpers):
     http.rrd = rrd
     http.data = data
     http.button_control = helpers[0]
-    http.update_pins = helpers[1]
     http.icon_file = 'favicon.ico'
     if not os.path.exists(http.icon_file):
         http.icon_file = f'{sys.path[0]}/{http.icon_file}'
@@ -187,6 +186,27 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                             f'<td style="padding-left: 0;">{suffix}</td></tr>\n'
         return ret
 
+    def _give_net(self):
+        # Network Connectivity
+        ret = ''
+        netlist = {}
+        for key in http.data.keys():
+            if key[0:4] == 'net-':
+                netlist[key] = key[4:]
+        if len(http.data.keys() & netlist.keys()) > 0:
+            ret += '<tr><th>Ping</th></tr>\n'
+            for item,name in netlist.items():
+                ret += f'<tr><td>{name}:</td><td style="text-align: right;">'
+                if http.data[item] == 'U':
+                    ret += 'Fail</td></tr>\n'
+                else:
+                    ret += f'{http.data[item]:.1f}</td>'\
+                            '<td style="padding-left: 0;">'\
+                            '<span style="font-size: 75%;"> ms</span>'\
+                            '</td></tr>\n'
+        return ret
+
+
     def _give_pins(self):
         # GPIO states
         ret = ''
@@ -196,9 +216,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 pinlist[key] = key[4:]
         if len(http.data.keys() & pinlist.keys()) > 0:
             ret += '<tr><th>GPIO</th></tr>\n'
-            for sense,name in pinlist.items():
+            for item,name in pinlist.items():
                 ret += f'<tr><td>{name}:</td><td style="text-align: right;">'\
-                       f'{http.settings.web_pin_states[bool(http.data[sense])]}</td></tr>\n'
+                       f'{http.settings.pin_state_names[http.data[item]]}</td></tr>\n'
         return ret
 
     def _give_graphlinks(self, skip=""):
@@ -250,7 +270,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # There is doubtless a more 'python' way to do this, but it is fast, cheap and works..
         log_command = \
             f"for a in `ls -tr {http.settings.log_file}*`;do cat $a ; done | tail -{lines}"
-        log = subprocess.check_output(log_command, shell=True).decode('utf-8')
+        log = check_output(log_command, shell=True).decode('utf-8')
         ret = f'''
                 <div style="overflow-x: auto; width: 100%;">\n
                 <span style="font-size: 110%; font-weight: bold;">Recent log activity:</span>
@@ -365,17 +385,16 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 and (len(http.settings.button_url) > 0)
                 and (http.settings.button_out > 0)):
             # Web button control
-            http.update_pins()
             parsed = parse_qs(urlparse(self.path).query).get('state', ['status'])
             action = parsed[0]
-            if action is not 'status':
+            if action != 'status':
                 logging.info(f'Web button triggered by: {self.client_address[0]}'\
                             f' with action: {action}')
             status, state = http.button_control(action)
             self._set_headers()
             response = self._give_head(f" :: {http.settings.button_name}")
             response += f'<h2>{status}</h2>\n'
-            invert_state = http.settings.web_pin_states[not state]
+            invert_state = http.settings.pin_state_names[not state]
             response += f'''<div>
                     <a href="./{http.settings.button_url}?state={invert_state}"
                     title = "Switch {http.settings.button_name} {invert_state}">
@@ -430,6 +449,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 response += self._give_env()
             if not "sys" in exclude:
                 response += self._give_sys()
+            if not "net" in exclude:
+                response += self._give_net()
             if not "gpio" in exclude:
                 response += self._give_pins()
             if not "links" in exclude:

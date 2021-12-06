@@ -49,7 +49,8 @@ import psutil
 from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
-from pinreader import get_pin
+from netreader import Netreader
+from pinreader import Pinreader
 from bus_drivers import i2c_setup
 
 # Re-nice to reduce blocking of other processes
@@ -148,31 +149,16 @@ class TheData(dict):
 
 # Use a (custom overridden) dictionary to store current readings
 data = TheData({})
-data["sys-temp"] = 0
-data["sys-load"] = 0
-data["sys-freq"] = 0
-data["sys-mem"] = 0
-data["sys-disk"] = 0
-data["sys-proc"] = 0
-data["sys-net-io"] = 0
-data["sys-disk-io"] = 0
-data["sys-cpu-int"] = 0
-if bme280:
-    data["env-temp"] = 0
-    data["env-humi"] = 0
-    data["env-pres"] = 0
-for pin_name,_ in settings.pin_map.items():
-    data[f"pin-{pin_name}"] = 0
 
-# Counters - used for incremental data, need pre-populating
+# Counters used for incremental data need pre-populating
 counter = {}
 counter["sys-net-io"] = psutil.net_io_counters().bytes_sent \
         + psutil.net_io_counters().bytes_recv
 counter["sys-disk-io"] = psutil.disk_io_counters().read_bytes\
         + psutil.disk_io_counters().write_bytes
 counter["sys-cpu-int"] = psutil.cpu_stats().soft_interrupts
+data["update-time"] = time.time() # time of last update
 
-data["update-time"] = time.time() # time of last data update
 
 #
 # Local functions
@@ -185,10 +171,10 @@ def button_control(action="toggle"):
         if action.lower() in ['toggle','invert','button']:
             GPIO.output(pin, not GPIO.input(pin))
             ret += 'Toggled: '
-        elif action.lower() in [settings.web_pin_states[1].lower(),'on','true']:
+        elif action.lower() in [settings.pin_state_names[1].lower(),'on','true']:
             GPIO.output(pin,True)
             ret += 'Switched: '
-        elif action.lower() in [settings.web_pin_states[0].lower(),'off','false']:
+        elif action.lower() in [settings.pin_state_names[0].lower(),'off','false']:
             GPIO.output(pin,False)
             ret += 'Switched: '
         elif action.lower() in ['random','easter']:
@@ -197,11 +183,11 @@ def button_control(action="toggle"):
         else:
             ret += ': '
         state = GPIO.input(pin)
-        ret += settings.web_pin_states[state]
+        ret += settings.pin_state_names[state]
     else:
         state = False
-        ret = 'Not supported, no controlled pin number defined'
-    update_pins()
+        ret = 'Not supported, no output pin defined'
+    pins.update_pins()
     return (ret, state)
 
 def button_interrupt(*_):
@@ -212,17 +198,9 @@ def button_interrupt(*_):
         logging.info('Button pressed')
         button_control()
 
-def update_data():
+def update_system():
     '''Get current environmental and system data, called on a schedule
     '''
-    time_period = time.time() - data["update-time"]
-    if bme280:
-        data['env-temp'] = bme280.temperature
-        data['env-humi'] = bme280.relative_humidity
-        data['env-pres'] = bme280.pressure
-        # Failed pressure measurements really foul up the graph, skip
-        if data['env-pres'] == 0:
-            data['env-pres'] = 'U'
     data['sys-temp'] = psutil.sensors_temperatures()["cpu_thermal"][0].current
     data['sys-load'] = psutil.getloadavg()[0]
     data["sys-freq"] = psutil.cpu_freq().current
@@ -234,26 +212,31 @@ def update_data():
     disk_count = psutil.disk_io_counters().read_bytes\
             + psutil.disk_io_counters().write_bytes
     int_count = psutil.cpu_stats().soft_interrupts
+    time_period = time.time() - data["update-time"]
+    data["update-time"] = time.time()
     data["sys-net-io"] = (net_count - counter["sys-net-io"]) / time_period / 1000
     data["sys-disk-io"] = (disk_count - counter["sys-disk-io"]) / time_period / 1000
     data["sys-cpu-int"] = (int_count - counter["sys-cpu-int"]) / time_period
     counter["sys-net-io"] = net_count
     counter["sys-disk-io"] = disk_count
     counter["sys-cpu-int"] = int_count
-    data["update-time"] = time.time()
 
-def update_pins():
-    '''Check if any pins have changed state, and log'''
-    for name, pin in settings.pin_map.items():
-        this_pin_state =  get_pin(pin)
-        if this_pin_state != data[f"pin-{name}"]:
-            # Pin has changed state, store new state and log
-            data[f'pin-{name}'] = this_pin_state
-            logging.info(f'{name}: {settings.web_pin_states[this_pin_state]}')
+def update_sensors():
+    '''Get current environmental sensor data
+    '''
+    if bme280:
+        data['env-temp'] = bme280.temperature
+        data['env-humi'] = bme280.relative_humidity
+        data['env-pres'] = bme280.pressure
+        # Failed pressure measurements really foul up the graph, skip
+        if data['env-pres'] == 0:
+            data['env-pres'] = 'U'
 
-def update_db():
+def update_data():
     '''Runs on a scedule, refresh readings and update RRD'''
-    update_data()
+    update_sensors()
+    update_system()
+    net.update(data)
     rrd.update(data)
 
 def log_data():
@@ -309,14 +292,7 @@ if __name__ == '__main__':
         logging.warning('Environmental data configured but no sensor detected: '\
                 'Environment status and logging disabled')
 
-    if any(key.startswith('pin-') for key in data):
-        logging.info('GPIO monitoring configured and logging enabled')
-
-    for pin_name, pin_number in settings.pin_map.items():
-        data[f'pin-{pin_name}'] = get_pin(pin_number)
-        logging.info(f'{pin_name}: {settings.web_pin_states[data[f"pin-{pin_name}"]]}')
-
-    # Set pin interrupt and output if we have a button and a pin to control
+    # Set button interrupt and output if we have a button and a pin to control
     if settings.button_out > 0:
         GPIO.setmode(GPIO.BCM)  # Use BCM GPIO numbering
         GPIO.setup(settings.button_out, GPIO.OUT)
@@ -346,15 +322,29 @@ if __name__ == '__main__':
             logging.warning('Display configured but did not initialise properly: '\
                     'Display features disabled')
 
-    # Get an initial data reading
-    update_data()
-    update_pins()
+    print('Performing initial data update', end='')
+    if settings.net_map:
+        print(f' may take up to {settings.net_timeout}s if ping targets are down')
+    else:
+        print()
 
-    # RRD init
+    # Populate initial system data
+    update_system()
+
+    # Populate initial sensor data
+    update_sensors()
+
+    # Network (ping) monitoring
+    net = Netreader((settings.net_map, settings.net_timeout), data)
+
+    # GPIO Pin monitoring
+    pins = Pinreader((settings.pin_map, settings.pin_state_names), data)
+
+    # RRD init now that the data{} structure is populated
     rrd = Robin(settings, data)
 
     # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(settings, rrd, data, (button_control, update_pins))
+    serve_http(settings, rrd, data, (button_control,))
 
     # Exit handlers (needed for rrd data-safe shutdown)
     signal(SIGTERM, handle_signal)
@@ -364,11 +354,11 @@ if __name__ == '__main__':
 
     # Schedule pin monitoring, database updates and logging events
     schedule.every().hour.at(":00").do(hourly)
-    schedule.every(settings.rrd_interval).seconds.do(update_db)
-    if len(settings.pin_map.keys()) > 0:
-        schedule.every(settings.pin_interval).seconds.do(update_pins)
     if settings.log_interval > 0:
         schedule.every(settings.log_interval).seconds.do(log_data)
+    schedule.every(settings.data_interval).seconds.do(update_data)
+    if len(settings.pin_map.keys()) > 0:
+        schedule.every(settings.pin_interval).seconds.do(pins.update_pins)
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedules and entering service loop")

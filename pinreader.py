@@ -1,16 +1,57 @@
 '''Really simple and direct reading of BCM GPIO pins
 
 provides:
-    pinreader.get_pin(pin):
-    - pin (int) is the bcm pin number
-    - returns an integer, 0 or 1 corresponding to on/off
+    Pinreader: A class to update and log the pin statuses
+    get_pin(pin): reads a bcm gpio pin and returns it's raw value
 '''
 
 import os
+import logging
 
 GPIO_ROOT = '/sys/class/gpio'
 export_handle = f'{GPIO_ROOT}/export'
 unexport_handle = f'{GPIO_ROOT}/unexport'
+
+class Pinreader:
+    '''Read and update pin status
+
+    Reads the currrent (boolean) status of a set of gipo pins defined in a dictionary
+    Updates the relevant entries in data{} and logs state changes
+
+    parameters:
+        settings: (tuple) consisting of:
+            map: (dict) pin names and BCM GPIO number
+            state_names: (tuple) localised names for pin states (text,text)
+        data: the main data{} dictionary, a key/value pair; 'pin-<name>=value'
+            will be added to it and the vaue updated with pin state changes.
+
+    provides:
+        update_pins(): processes and updates the pins
+    '''
+
+    def __init__(self, settings, data):
+        '''Setup and do initial reading'''
+        (self.map, self.state_names) = settings
+        self.data = data
+        if not self.map:
+            print('No GPIO pins configured for monitoring')
+            return
+        for pin_name, pin_number in self.map.items():
+            data[f'pin-{pin_name}'] = get_pin(pin_number)
+            logging.info(f'{pin_name}: {self.state_names[data[f"pin-{pin_name}"]]}')
+        print('GPIO monitoring configured and logging enabled')
+        logging.info('GPIO monitoring configured and logging enabled')
+
+    def update_pins(self):
+        '''Check if any pins have changed state, and log if so
+        updates the main data{} dictionary with new state
+        no parameters, no return'''
+        for name, pin in self.map.items():
+            this_pin_state =  get_pin(pin)
+            if this_pin_state != self.data[f"pin-{name}"]:
+                # Pin has changed state, store new state and log
+                self.data[f'pin-{name}'] = this_pin_state
+                logging.info(f'{name}: {self.state_names[this_pin_state]}')
 
 def get_pin(pin):
     '''Read pin state, return an integer

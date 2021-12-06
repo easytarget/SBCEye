@@ -5,6 +5,7 @@ Otherwise we use the local config.ini if it exists
 If not we use default.ini, which has sensible defaults
 '''
 
+import os
 import sys
 import textwrap
 from pathlib import Path
@@ -83,12 +84,14 @@ class Settings:
         self.short_format = general.get("short_format")
         self.have_sensor = general.getboolean("sensor")
         self.have_screen = general.getboolean("screen")
+        self.pin_state_names = tuple(general.get("pin_state_names").split(','))
+        if self.name == "":
+            self.name = f'{os.uname().nodename}'
 
         web = config["web"]
         self.web_host = web.get("host")
         self.web_port = web.getint("port")
         self.web_sensor_name = web.get("sensor_name")
-        self.web_pin_states = tuple(web.get("pin_states").split(','))
         self.web_allow_dump = web.getboolean("allow_dump")
         self.web_show_control = web.getboolean("show_control")
 
@@ -100,10 +103,15 @@ class Settings:
         self.graph_line_width = graph.get("line_width")
         self.graph_area_color = graph.get("area_color")
         self.graph_area_depth = graph.get("area_depth")
+        self.graph_half_height = graph.get("half_height").split(',')
 
         self.pin_map = {}
-        for key in config["pins"]:
-            self.pin_map[key] = config.getint("pins",key)
+        for pin in config["pins"]:
+            self.pin_map[pin] = config.getint("pins",pin)
+
+        self.net_map = {}
+        for host in config["ping"]:
+            self.net_map[host] = config.get("ping",host)
 
         button = config["button"]
         self.button_out = button.getint("out")
@@ -118,11 +126,12 @@ class Settings:
                 if pin == self.button_out:
                     self.button_name = name
 
-        interval = config["interval"]
-        self.pin_interval = interval.getint("pin")
-        self.data_interval = interval.getint("data")
-        self.rrd_interval = interval.getint("rrd")
-        self.log_interval = interval.getint("log")
+        intervals = config["intervals"]
+        self.pin_interval = intervals.getint("pin")
+        self.data_interval = intervals.getint("data")
+        self.rrd_interval = intervals.getint("rrd")
+        self.log_interval = intervals.getint("log")
+        self.net_timeout = min(intervals.getfloat("ping"),self.data_interval-0.5)
 
         log = config["log"]
         self.log_file_dir = log.get("file_dir")
@@ -135,7 +144,6 @@ class Settings:
         rrd = config["rrd"]
         self.rrd_dir = rrd.get("dir")
         self.rrd_file_name = rrd.get("file_name")
-        self.rrd_cache_age = abs(rrd.getint("cache_age"))
         self.rrd_backup_count = rrd.getint("backup_count")
         self.rrd_backup_age = int(abs(rrd.getfloat("backup_age")) * 86400)
         self.rrd_backup_time = rrd.get("backup_time")
@@ -161,6 +169,10 @@ class Settings:
             self.cam_url = cam.get("url")
             self.cam_width = cam.getint("width", 50)
 
+        # Optional [DEBUG] section can be enabled
+        #  If this section is present it changes the operation of
+        #  SIGINT (eg Ctrl-c) to restart the service, instead of exiting
+        # Currently has no other configurable items
         if "debug" in config:
             self.debug = True
         else:
