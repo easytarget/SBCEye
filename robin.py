@@ -82,20 +82,18 @@ class Robin:
                 'sys-cpu-int': ('CPU Soft interrupts, per second',
                     None, None, '%5.0lf', '%5.0lf /s', '--units-exponent','0'),
                 }
+        # connectivity
+        for host in s.net_map.keys():
+            self.data_sources[f'net-{host}'] = ('0','U')
+            self.graph_map[f'net-{host}'] = (f'{host} Ping, milliseconds',
+                    '100', '0' ,'%3.0lf', '%3.1lf ms', '--alt-autoscale', '--units-exponent','0')
+
         # pins
         for name in s.pin_map.keys():
             self.data_sources[f'pin-{name}'] = ('0','1')
             self.graph_map[f'pin-{name}'] = (f'{name} Pin State, '\
                     f'0 = {s.pin_state_names[0]}, 1 = {s.pin_state_names[1]}',
                     '1', '0' ,'%3.1lf', '%3.0lf', '--alt-autoscale', '--units-exponent','0')
-
-        # connectivity
-        for host in s.net_map.keys():
-            self.data_sources[f'net-{host}'] = ('0','U')
-            self.graph_map[f'net-{host}'] = (f'{host} Ping, milliseconds, '\
-                    f'{s.net_state_names[1]} = {s.net_timeout:.0f}ms, '\
-                    f'no data = {s.net_state_names[0]}',
-                    '100', '0' ,'%3.0lf', '%3.1lf ms', '--alt-autoscale', '--units-exponent','0')
 
         # set the list of active and storable sources
         self.template= ''

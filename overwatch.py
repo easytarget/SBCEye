@@ -49,7 +49,7 @@ import psutil
 from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
-from net_test import Net_test
+from netreader import Netreader
 from pinreader import Pinreader
 from bus_drivers import i2c_setup
 
@@ -232,17 +232,11 @@ def update_sensors():
         if data['env-pres'] == 0:
             data['env-pres'] = 'U'
 
-def update_net():
-    ''' STUB
-    '''
-    for host,_ in settings.net_map.items():
-        data[f"net-{host}"] = random.randrange(50,settings.net_timeout*1300)/1000
-
 def update_data():
     '''Runs on a scedule, refresh readings and update RRD'''
     update_sensors()
     update_system()
-    update_net()
+    net.update(data)
     rrd.update(data)
 
 def log_data():
@@ -328,7 +322,11 @@ if __name__ == '__main__':
             logging.warning('Display configured but did not initialise properly: '\
                     'Display features disabled')
 
-    print('Performing initial data update')
+    print('Performing initial data update', end='')
+    if settings.net_map:
+        print(f' may take up to {settings.net_timeout}s if ping targets are down')
+    else:
+        print()
 
     # Populate initial system data
     update_system()
@@ -337,14 +335,12 @@ if __name__ == '__main__':
     update_sensors()
 
     # Network (ping) monitoring
-    if settings.net_map:
-        print(f'- May take up to {settings.net_timeout}s if ping targets are down')
-    net = Net_test((settings.net_map, settings.net_timeout), data)
+    net = Netreader((settings.net_map, settings.net_timeout), data)
 
     # GPIO Pin monitoring
     pins = Pinreader((settings.pin_map, settings.pin_state_names), data)
 
-    # RRD init
+    # RRD init now that the data{} structure is populated
     rrd = Robin(settings, data)
 
     # Start the web server, it will fork into a seperate thread and run continually

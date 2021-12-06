@@ -84,7 +84,6 @@ class Settings:
         self.short_format = general.get("short_format")
         self.have_sensor = general.getboolean("sensor")
         self.have_screen = general.getboolean("screen")
-        self.net_state_names = tuple(general.get("net_state_names").split(','))
         self.pin_state_names = tuple(general.get("pin_state_names").split(','))
         if self.name == "":
             self.name = f'{os.uname().nodename}'
@@ -132,7 +131,7 @@ class Settings:
         self.data_interval = intervals.getint("data")
         self.rrd_interval = intervals.getint("rrd")
         self.log_interval = intervals.getint("log")
-        self.net_timeout = intervals.getfloat("ping")
+        self.net_timeout = min(intervals.getfloat("ping"),self.data_interval-0.5)
 
         log = config["log"]
         self.log_file_dir = log.get("file_dir")
@@ -170,6 +169,10 @@ class Settings:
             self.cam_url = cam.get("url")
             self.cam_width = cam.getint("width", 50)
 
+        # Optional [DEBUG] section can be enabled
+        #  If this section is present it changes the operation of
+        #  SIGINT (eg Ctrl-c) to restart the service, instead of exiting
+        # Currently has no other configurable items
         if "debug" in config:
             self.debug = True
         else:

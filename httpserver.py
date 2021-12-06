@@ -198,9 +198,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             for item,name in netlist.items():
                 ret += f'<tr><td>{name}:</td><td style="text-align: right;">'
                 if http.data[item] == 'U':
-                    ret += f'{http.settings.net_state_names[0]}</td></tr>\n'
-                elif http.data[item] >= http.settings.net_timeout:
-                    ret += f'{http.settings.net_state_names[1]}</td></tr>\n'
+                    ret += 'Fail</td></tr>\n'
                 else:
                     ret += f'{http.data[item]:.1f}</td>'\
                             '<td style="padding-left: 0;">'\
@@ -451,10 +449,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 response += self._give_env()
             if not "sys" in exclude:
                 response += self._give_sys()
-            if not "gpio" in exclude:
-                response += self._give_pins()
             if not "net" in exclude:
                 response += self._give_net()
+            if not "gpio" in exclude:
+                response += self._give_pins()
             if not "links" in exclude:
                 response += self._give_links()
             response += '</table>\n'
