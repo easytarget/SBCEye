@@ -254,7 +254,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         ret += '</td></tr>\n'
         return ret
 
-    def _give_log(self, lines=100):
+    def _give_log(self, lines=25):
         # Combine and give last (lines) lines of log
         parsed_lines = parse_qs(urlparse(self.path).query).get('lines', None)
         if isinstance(parsed_lines, list):

@@ -66,7 +66,7 @@ class Robin:
                 'sys-temp': ('CPU Temperature, \u00B0Centigrade',
                     None, None, '%3.0lf\u00B0', '%3.1lf\u00B0C'),
                 'sys-load': ('CPU Load Average',
-                    None, '0','%2.2lf', '%2.2lf', '--alt-autoscale-max'),
+                    None, '0','%3.1lf', '%3.2lf', '--units-exponent','0'),
                 'sys-freq': ('CPU frequency, MHz',
                     None, None, '%4.0lf', '%4.0lf MHz', '--units-exponent','0'),
                 'sys-mem':  ('System Memory Use, % percent',
@@ -86,7 +86,7 @@ class Robin:
         for host in s.net_map.keys():
             self.data_sources[f'net-{host}'] = ('0','U')
             self.graph_map[f'net-{host}'] = (f'{host} Ping, milliseconds',
-                    '100', '0' ,'%3.0lf', '%3.1lf ms', '--alt-autoscale', '--units-exponent','0')
+                    '25', '0' ,'%3.0lf', '%3.1lf ms', '--alt-autoscale', '--units-exponent','0')
 
         # pins
         for name in s.pin_map.keys():
