@@ -37,8 +37,9 @@ import os
 import time
 import sys
 import logging
-from logging.handlers import RotatingFileHandler
 import random
+from datetime import timedelta
+from logging.handlers import RotatingFileHandler
 from atexit import register
 from signal import signal, SIGTERM, SIGINT, SIGHUP
 from multiprocessing import Process, Queue
@@ -74,28 +75,9 @@ logging.basicConfig(level=logging.INFO,
         datefmt=settings.short_format,
         handlers=[handler])
 
-# Older scheduler versions can log debug to 'INFO' not 'DEBUG', ignore it.
+# Older scheduler versions can log debug to 'INFO' not 'DEBUG', change threshold.
 schedule_logger = logging.getLogger('schedule')
 schedule_logger.setLevel(level=logging.WARN)
-
-# Unicode degrees character
-DEGREE_SIGN= u'\N{DEGREE SIGN}'
-
-# Items to appear in the log data set
-LOG_LIST = {
-        "env-temp": ('Temperature', '.1f', DEGREE_SIGN),
-        "env-humi": ('Humidity', '.1f', '%'),
-        "env-pres": ('Presssure', '.0f', 'mb'),
-        "sys-temp": ('CPU Temp', '.1f', DEGREE_SIGN),
-        "sys-load": ('CPU Load', '1.2f', ''),
-        "sys-freq": ('CPU Freq', '.0f', 'MHz'),
-        "sys-mem":  ('Mem used', '.1f', '%'),
-        "sys-disk": ('Disk used', '.1f', '%'),
-        "sys-proc": ('Processes', '.0f', ''),
-        "sys-net-io":  ('Net IO', '.0f', 'k/s'),
-        "sys-disk-io": ('Disk IO', '.0f', 'k/s'),
-        "sys-cpu-int": ('Soft Interrupts', '.0f', '/s'),
-        }
 
 # Now we have logging, notify we are starting up
 logging.info('')
@@ -135,16 +117,16 @@ if settings.button_out > 0:
 #
 # Local Classes, Globals
 
-data_queue = None
+display_queue = None  # will be set during
 class TheData(dict):
     '''Override the dictionary class to also send data to the queue for the display'''
     def __setitem__(self, item, value):
-        if data_queue:
-            data_queue.put([item, value])
+        if display_queue:
+            display_queue.put([item, value])
         super().__setitem__(item, value)
     def __delitem__(self, item):
-        if data_queue:
-            data_queue.put([item], None)
+        if display_queue:
+            display_queue.put([item], None)
         super().__delitem__(item)
 
 # Use a (custom overridden) dictionary to store current readings
@@ -239,21 +221,13 @@ def update_data():
     net.update(data)
     rrd.update(data)
 
-def log_data():
-    '''Runs on a user defined schedule to dump a line of sensor data in the log
-    Dictionary with tuples specifying name, format and suffix'''
-    log_line = ''
-    for sense,(name,fmt,suffix) in LOG_LIST.items():
-        if sense in data.keys():
-            log_line += f'{name}: {data[sense]:{fmt}}{suffix}, '
-    logging.info(log_line[:-2])
-    print(log_line[:-2])
-
 def hourly():
     '''Remind everybody we are alive'''
     myself = os.path.basename(__file__)
     timestamp = time.strftime(settings.long_format)
-    print(f'{myself} :: {timestamp}')
+    uptime = timedelta(seconds=int(time.time() - psutil.boot_time()))
+    logging.info(f'{settings.name} :: up {uptime}')
+    print(f'{myself} :: {timestamp} :: {settings.name} :: up {uptime}')
 
 def handle_signal(sig, *_):
     '''Handle common signals'''
@@ -312,8 +286,8 @@ if __name__ == '__main__':
     # Display animation setup
     if disp:
         from animator import animate
-        data_queue = Queue()
-        DISPLAY = Process(target=animate, args=(settings, disp, data_queue),
+        display_queue = Queue()
+        DISPLAY = Process(target=animate, args=(settings, disp, display_queue),
                 name='overwatch_animator')
         DISPLAY.start()
     else:
@@ -346,16 +320,15 @@ if __name__ == '__main__':
     # Start the web server, it will fork into a seperate thread and run continually
     serve_http(settings, rrd, data, (button_control,))
 
-    # Exit handlers (needed for rrd data-safe shutdown)
+    # Exit handlers (needed for rrd cache write on shutdown)
     signal(SIGTERM, handle_signal)
     signal(SIGINT, handle_signal)
     signal(SIGHUP, handle_signal)
     register(handle_exit)
 
     # Schedule pin monitoring, database updates and logging events
-    schedule.every().hour.at(":00").do(hourly)
-    if settings.log_interval > 0:
-        schedule.every(settings.log_interval).seconds.do(log_data)
+    if settings.log_hourly:
+        schedule.every().hour.at(":00").do(hourly)
     schedule.every(settings.data_interval).seconds.do(update_data)
     if len(settings.pin_map.keys()) > 0:
         schedule.every(settings.pin_interval).seconds.do(pins.update_pins)

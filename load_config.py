@@ -82,6 +82,7 @@ class Settings:
         self.name = general.get("name")
         self.long_format = general.get("long_format")
         self.short_format = general.get("short_format")
+        self.log_hourly = general.getboolean("log_hourly")
         self.have_sensor = general.getboolean("sensor")
         self.have_screen = general.getboolean("screen")
         self.pin_state_names = tuple(general.get("pin_state_names").split(','))
@@ -130,7 +131,6 @@ class Settings:
         self.pin_interval = intervals.getint("pin")
         self.data_interval = intervals.getint("data")
         self.rrd_interval = intervals.getint("rrd")
-        self.log_interval = intervals.getint("log")
         self.net_timeout = min(intervals.getfloat("ping"),self.data_interval-0.5)
 
         log = config["log"]
