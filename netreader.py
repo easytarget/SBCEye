@@ -32,7 +32,7 @@ class Netreader:
         if not self.map:
             print('No network addresses configured for monitoring')
             return
-        for name,address in self.map.items():
+        for name,_ in self.map.items():
             self.states[name] = "init"
         self.update(data)
         print('Network monitoring configured and logging enabled')
@@ -64,7 +64,7 @@ class Netreader:
     def update(self, data):
         '''Test each target in parallel via threads'''
         threadlist = []
-        for target, address in self.map.items():
+        for target,_ in self.map.items():
             gatherer = threading.Thread(target=self._ping_runner, args=[target, data])
             gatherer.start()
             threadlist.append(gatherer)
@@ -109,5 +109,3 @@ def ping_target(address, timeout):
         time_string= next(x for x in line1.split(' ') if x[:5] == 'time=')
         time_data = float(time_string[5:])
     return time_data, err_txt
-
-
