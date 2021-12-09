@@ -34,6 +34,7 @@ class Netreader:
             return
         for name,_ in self.map.items():
             self.states[name] = "init"
+            data[f'net-{name}'] = 'U'
         self.update(data)
         print('Network monitoring configured and logging enabled')
         logging.info('Network monitoring configured and logging enabled')
