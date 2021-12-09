@@ -95,6 +95,10 @@ try:
 except ImportError:
     pass
 
+# Pick up the principal CPU thermal zone from the sysfs class
+with open('/sys/class/thermal/thermal_zone0/type','r') as cpu_temp_zone:
+    cpu_thermal_device = cpu_temp_zone.read().strip().replace('-','_')
+
 #
 # Import, setup and return hardware drivers, or 'None' if setup fails
 
@@ -183,7 +187,7 @@ def button_interrupt(*_):
 def update_system():
     '''Get current environmental and system data, called on a schedule
     '''
-    data['sys-temp'] = psutil.sensors_temperatures()["cpu_thermal"][0].current
+    data['sys-temp'] = psutil.sensors_temperatures()[cpu_thermal_device][0].current
     data['sys-load'] = psutil.getloadavg()[0]
     data["sys-freq"] = psutil.cpu_freq().current
     data['sys-mem'] = psutil.virtual_memory().percent
