@@ -16,10 +16,11 @@ Default Web Interface
 
 ![env](/docs/img/default-main.png)
 
-Add a BME280 sensor and/or some GPIO pins to monitor
+Add a some network targets, a BME280 sensor and/or some GPIO pins to monitor
+
+![Web](/docs/img/workshop-all.png)
 
 ![bme280](/docs/img/pihat-bme280-thumb.jpg)
-![Web](/docs/img/workshop-main.png)![Web](/docs/img/workshop-graphs.png)
 
 Add a 128x64 OLED display
 
