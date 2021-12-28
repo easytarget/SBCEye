@@ -2,11 +2,13 @@
 
 Monitors my Workshop PI, and lets me see my printroom conditions at a glance via an embeddable web interface and also on a small OLED display. 
 
-It records and displays the CPU temperature, load and memory useage of the Pi itself, and uses an (optional) environmental sensor to also record the room temperature, pressure and humidity readings
+It records and displays the CPU temperature, load and memory useage of the Pi itself, and uses an (optional) environmental sensor to also record the room temperature, pressure and humidity readings. Readings happen every 10 seconds and are held in a database so you can view graphs of how they change with time.
 
-It also has the ability to (optionally) monitor and log specified GPIO pins as they are toggled by other programs (eg printer power control pins controlled by Octoprint, etc.)
+It also has the ability to optionally monitor and log specified GPIO pins as they are toggled by other programs (eg printer power control pins controlled by Octoprint, etc.) and monitor ping times and status for network targets you specify (eg your router, or a wifi enabled controller, etc.)
 
-_Bonus!_ Control a light connected to a GPIO pin via a button and/or url, useful in the room or if you have webcams.
+I have written it to be very low impact on the host; database readings are cached and disk writes only happen every five minutes in order to minimise impact on the SD card. When running without a display the the program typically consumes less than 1% of one CUP core. Adding a display increases this but not by much overall. There is in-built housekeeping to do database backups, dumps and log rotation.
+
+_Bonus!_ Control a light connected to a GPIO pin via a button and/or url, this is a convenience feature I added for myself so I can easily toggle my workbench lamps when in the room, or remotely via the web when viewing my webcams.
 
 Written in Python as a learning excercise, it draws heavily on [RRDtool](https://pypi.org/project/rrdtool/), [RPI.GPIO](https://pypi.org/project/RPi.GPIO/), [psutil](https://pypi.org/project/psutil/), the default python [http.server](https://docs.python.org/3/library/http.server.html) and [CircuitPython](https://github.com/adafruit/circuitpython) for interfacing with sensor and screen.
 
