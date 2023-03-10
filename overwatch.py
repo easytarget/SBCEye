@@ -96,9 +96,9 @@ except ImportError:
     pass
 
 # Pick up the principal CPU thermal zone from the sysfs class
-with open('/sys/class/thermal/thermal_zone0/type','r') as cpu_temp_zone:
-    cpu_thermal_device = cpu_temp_zone.read().strip().replace('-','_')
-
+#with open('/sys/class/thermal/thermal_zone0/type','r') as cpu_temp_zone:
+#    cpu_thermal_device = cpu_temp_zone.read().strip().replace('-','_')
+cpu_thermal_device = '120e0000.tmon'
 #
 # Import, setup and return hardware drivers, or 'None' if setup fails
 

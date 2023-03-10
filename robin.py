@@ -45,7 +45,7 @@ class Robin:
                 'env-pres': ('300','1100'),
                 'sys-temp': ('-10','110'),
                 'sys-load': ('0','100'),
-                'sys-freq': ('500','6000'),
+                'sys-freq': ('1','U'),
                 'sys-mem': ('0','100'),
                 'sys-disk': ('0','100'),
                 'sys-proc': ('0','U'),
