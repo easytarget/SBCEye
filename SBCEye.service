@@ -1,0 +1,14 @@
+[Unit]
+Description=SBCEye monitoring script
+After=multi-user.target
+
+[Service]
+Type=simple
+Restart=always
+WorkingDirectory=/home/eye/SBCEye/
+ExecStart=/home/eye/SBCEye/env/bin/python /home/eye/SBCEye/SPBEye.py
+User=eye
+Group=eye
+
+[Install]
+WantedBy=multi-user.target

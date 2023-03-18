@@ -1,10 +1,10 @@
 '''Bus based hardware driver initialisation
 
 Imports and starts the optional Bus based devices.
-Gracefully fails and disables services as appropriate if anything goes wrong
+Gracefully fails and disables funcions as appropriate if anything goes wrong
 
 I'd probably do this differently if writing from scratch/refactoring, and
-make better use of Importlib in overwatch.py.
+try to make better use of Importlib in SBCEye.py.
 '''
 # pragma pylint: disable=import-outside-toplevel
 

@@ -3,38 +3,41 @@
 
 ### Setup
 
-Start by making sure that you are running a fully updated Raspian install (Buster as of this time of writing), have git, python3, python3-pip and python3-dev installed, and have cloned the repo to `/~/HAT/pi-overwatch` eg:
+---------  FIX: Base INSTALL more than buster etc... ---------
+Start by making sure that you are running a fully updated Raspian install (Buster as of this time of writing), have git, python3, python3-pip and python3-dev installed, and have cloned the repo to `~eye/SBCEye` eg:
 
 ```console
-pi@pi:~$ sudo apt update
-pi@pi:~$ sudo apt install python3 python3-dev python3-pip git
-pi@pi:~$ mkdir ~/HAT
-pi@pi:~$ git clone https://github.com/easytarget/pi-overwatch.git ~/HAT/pi-overwatch
-; Alternatively, if you do not use git and have downloaded a zip or tarball, you should unpack it to: ~/HAT/pi-overwatch
-pi@pi:~$ cd ~/HAT/pi-overwatch
+admin@sbc:~$ sudo apt update
+admin@sbc:~$ sudo apt install python3 python3-dev python3-pip git
+admin@sbc:~$ sudo addser -G eye    <-----------------------------------------flesh out
+admin@sbc:~$ sudo su - eye
+
+eye@sbc:~$ git clone https://github.com/easytarget/SBCEye.git ~/SBCEye
+; Alternatively, if you do not use git and have downloaded a zip or tarball, you should unpack it to: ~/SBCEye
+eye@sbc:~$ cd ~/SBCEye
 ```
 
 ### Install and Upgrade Requirements
 
 In the cloned repo upgrade our local (user) modules of `pip` and `virtualenv`
 ```console
-pi@pi:~/HAT/pi-overwatch $ pwd
-/home/pi/HAT/pi-overwatch
+eye@sbc:~/SBCEye $ pwd
+/home/eye/SBCEye
 
-pi@pi:~/HAT/pi-overwatch $ python3 -m pip --version
-pip 18.1 from /usr/lib/python3/dist-packages/pip (python 3.7)
+eye@sbc:~/SBCEye $ python3 -m pip --version
+pip 18.1 from /usr/lib/python3/dist-packages/eyep (python 3.7)
 
-pi@pi:~/HAT/pi-overwatch $ python3 -m pip install --user --upgrade pip
-pi@pi:~/HAT/pi-overwatch $ python3 -m pip --version
-pip 21.3 from /home/pi/.local/lib/python3.7/site-packages/pip (python 3.7)
+eye@sbc:~/SBCEye $ python3 -m pip install --user --upgrade pip
+eye@sbc:~/SBCEye $ python3 -m pip --version
+pip 21.3 from /home/eye/.local/lib/python3.7/site-packages/eyep (python 3.7)
 
-pi@pi:~/HAT/pi-overwatch $ python3 -m pip install --user --upgrade virtualenv
-pi@pi:~/HAT/pi-overwatch $ python3 -m virtualenv --version
-virtualenv 20.8.1 from /home/pi/.local/lib/python3.7/site-packages/virtualenv/__init__.py
+eye@sbc:~/SBCEye $ python3 -m pip install --user --upgrade virtualenv
+eye@sbc:~/SBCEye $ python3 -m virtualenv --version
+virtualenv 20.8.1 from /home/eye/.local/lib/python3.7/site-packages/virtualenv/__init__.py
 ```
 
 Create the virtual environment and activate it
-- The virtual environment will be located at `/home/pi/HAT/pi-overwatch/env`
+- The virtual environment will be located at `/home/eye/SBCEye/env`
 - TL;DR: (Quick primer for the unitiated and curious):
   - A python virtual environment is, simply put, a complete and self-contained copy of python and all it's utilities, libraries, and packages.
   - It is installed into a folder (which you specify when creating it)
@@ -44,37 +47,37 @@ Create the virtual environment and activate it
   - [This Video](https://www.youtube.com/watch?v=N5vscPTWKOk) and [This](https://www.youtube.com/watch?v=4jt9JPoIDpY) explain it quite well.
 
 ```console
-pi@pi:~/HAT/pi-overwatch $ python3 -m virtualenv env
+eye@sbc:~/SBCEye $ python3 -m virtualenv env
 
-pi@pi:~/HAT/pi-overwatch $ source env/bin/activate
+eye@sbc:~/SBCEye $ source env/bin/activate
 
-(env) pi@pi:~/HAT/pi-overwatch $ which python
-/home/pi/HAT/pi-overwatch/env/bin/python
+(env) eye@sbc:~/SBCEye $ which python
+/home/eye/SBCEye/env/bin/python
 
-(env) pi@pi:~/HAT/pi-overwatch $ python --version
+(env) eye@sbc:~/SBCEye $ python --version
 Python 3.7.3
 ```
 
 Now we install/upgrade the requirements
 ```console
-(env) pi@pi:~/HAT/pi-overwatch $ pip install --upgrade pip
-(env) pi@pi:~/HAT/pi-overwatch $ pip install --upgrade wheel
+(env) eye@sbc:~/SBCEye $ pip install --upgrade pip
+(env) eye@sbc:~/SBCEye $ pip install --upgrade wheel
 
-(env) pi@pi:~/HAT/pi-overwatch $ sudo apt install rrdtool librrd-dev
-(env) pi@pi:~/HAT/pi-overwatch $ pip install psutil schedule setproctitle rrdtool
+(env) eye@sbc:~/SBCEye $ sudo apt install rrdtool librrd-dev
+(env) eye@sbc:~/SBCEye $ pip install psutil schedule setproctitle rrdtool
 
 ; If you wish to control a gpio pin via a button or url you need to install RPi.GPIO
 ; - this is not necesscary if you just want to monitor (not control) pins.
 ; RPi.GPIO is (currently, november'21) broken on BULLSEYE unless you use a pre-release. sigh. 
-(env) pi@pi:~/HAT/pi-overwatch $ pip install RPi.GPIO==0.7.1a4
+(env) eye@sbc:~/SBCEye $ pip install RPi.GPIO==0.7.1a4
 
 ; Only if you plan to use a BME280 Temperature/Humidity/Pressure sensor:
-(env) pi@pi:~/HAT/pi-overwatch $ pip install adafruit-circuitpython-bme280
+(env) eye@sbc:~/SBCEye $ pip install adafruit-circuitpython-bme280
 
 ; Only if you plan to use a SSD1306 OLED display:
-(env) pi@pi:~/HAT/pi-overwatch $ pip install adafruit-circuitpython-ssd1306
-(env) pi@pi:~/HAT/pi-overwatch $ sudo apt install libjpeg-dev libopenjp2-7-dev libtiff-dev fonts-liberation
-(env) pi@pi:~/HAT/pi-overwatch $ pip install image
+(env) eye@sbc:~/SBCEye $ pip install adafruit-circuitpython-ssd1306
+(env) eye@sbc:~/SBCEye $ sudo apt install libjpeg-dev libopenjp2-7-dev libtiff-dev fonts-liberation
+(env) eye@sbc:~/SBCEye $ pip install image
 ```
 
 Copy the `defaults.ini` file to `config.ini` and edit as required.
@@ -84,15 +87,15 @@ Copy the `defaults.ini` file to `config.ini` and edit as required.
 
 If using either a screen, BME sensor or GPIO pin monitoring you must make sure the pi user is in the gpio group:
 ```console
-pi@pi:~$ sudo usermod -a -G gpio pi
+eye@sbc:~$ sudo usermod -a -G gpio pi
 ```
 
 Then test run with:
 
 ```console
-(env) pi@pi:~/HAT/pi-overwatch $ python overwatch.py
+(env) eye@sbc:~/SBCEye $ python SBCEye.py
 ```
-The file `overwatch.log` should be created in the pi-overwatch directory, and contain a startup log
+The file `SBCEye.log` should be created in the SBCEye directory, and contain a startup log
 
 Debug messages, errors, etc are printed to the console
 
@@ -102,29 +105,29 @@ Note; If you want to leave the virtualenv at any time you can do so with `$ deac
 
 ## Set up as a service
 
-Once you have everything installed, configured and tested by running on the console you should start running this as a system service. The OverWatch will then run automatically at boot and operate in the background like other services.
+Once you have everything installed, configured and tested by running on the console you should start running this as a system service. The SBCEye will then run automatically at boot and operate in the background like other services.
 
 ```console
-pi@pi:~/HAT/pi-overwatch $ sudo ln -s /home/pi/HAT/pi-overwatch/OverWatch.service /etc/systemd/system/
-pi@pi:~/HAT/pi-overwatch $ sudo systemctl daemon-reload
-pi@pi:~/HAT/pi-overwatch $ sudo systemctl enable OverWatch.service
-pi@pi:~/HAT/pi-overwatch $ sudo systemctl start OverWatch.service
+eye@sbc:~/SBCEye $ sudo ln -s /home/eye/SBCEye/SBCEye.service /etc/systemd/system/
+eye@sbc:~/SBCEye $ sudo systemctl daemon-reload
+eye@sbc:~/SBCEye $ sudo systemctl enable SBCEye.service
+eye@sbc:~/SBCEye $ sudo systemctl start SBCEye.service
 
-pi@pi:~ $ sudo systemctl status OverWatch.service
-● OverWatch.service - OverWatch script for PI Hat
-   Loaded: loaded (/etc/systemd/system/OverWatch.service; enabled; vendor preset: enabled)
+eye@sbc:~ $ sudo systemctl status SBCEye.service
+● SBCEye.service - SBCEye monitoring for SBCs
+   Loaded: loaded (/etc/systemd/system/SBCEye.service; enabled; vendor preset: enabled)
    Active: active (running) since Wed 2021-10-13 19:37:49 CEST; 10min ago
  Main PID: 20376 (python)
     Tasks: 2 (limit: 4164)
-   CGroup: /system.slice/OverWatch.service
-           └─20376 /home/pi/HAT/pi-overwatch/env/bin/python /home/pi/HAT/pi-overwatch/overwatch.py
+   CGroup: /system.slice/SBCEye.service
+           └─20376 /home/eye/SBCEye/env/bin/python /home/eye/SBCEye/SBCEye.py
 
-Oct 13 19:37:49 pi.easytarget.org systemd[1]: Started OverWatch script for PI Hat.
+Oct 13 19:37:49 pi.easytarget.org systemd[1]: Started SBCEye script for PI Hat.
 ```
 
 ## Upgrading
 Quick notes; to be expanded later as required, assumes you use git.
-- go to the pi-overwatch repo
+- go to the SBCEye repo
 - git pull
 - merge any changes from defaults.ini to config.ini
 - stop the service

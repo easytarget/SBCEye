@@ -1,6 +1,6 @@
 #!/usr/bin/python
 '''
-Pi Overwatch:
+SBCEye:
 Animate the OLED display attached to my OctoPrint server with bme280 and system data
 Show, log and graph the environmental, system and gpio data via a web interface
 Give me a on/off button + url to control the bench lights via a GPIO pin
@@ -61,7 +61,7 @@ os.nice(10)
 settings = Settings()
 
 # Let the console know we are starting
-print("Starting OverWatch")
+print("Starting SBCEye")
 print(f"Working directory: {os.getcwd()}")
 print(f'Running: {sys.argv[0]}  @ {settings.my_version}')
 print(f"Logging to: {settings.log_file}")
@@ -81,7 +81,7 @@ schedule_logger.setLevel(level=logging.WARN)
 
 # Now we have logging, notify we are starting up
 logging.info('')
-logging.info(f'Starting overwatch service for: {settings.name}')
+logging.info(f'Starting SBCEye service for: {settings.name}')
 logging.info(f'Version: {settings.my_version}')
 if settings.default_config:
     logging.warning('Running from default configuration')
@@ -91,7 +91,7 @@ if settings.default_config:
 try:
     import setproctitle
     process_name = settings.name.encode("ascii", "ignore").decode("ascii")
-    setproctitle.setproctitle(f'overwatch: {process_name}')
+    setproctitle.setproctitle(f'SBCEye: {process_name}')
 except ImportError:
     pass
 
@@ -292,7 +292,7 @@ if __name__ == '__main__':
         from animator import animate
         display_queue = Queue()
         DISPLAY = Process(target=animate, args=(settings, disp, display_queue),
-                name='overwatch_animator')
+                name='sbceye_animator')
         DISPLAY.start()
     else:
         DISPLAY = None

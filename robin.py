@@ -1,4 +1,4 @@
-'''Data-Driven RRDB database handling for the pi overwatch
+'''Data-Driven RRDB database handling for the SBCEye project
 '''
 
 # pragma pylint: disable=logging-fstring-interpolation

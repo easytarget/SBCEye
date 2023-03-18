@@ -1,4 +1,4 @@
-'''Implements a screen saver/inverter for the pi overwatch
+'''Implements a screen saver/inverter for the SBCEye project
 '''
 
 import time
