@@ -1,4 +1,4 @@
-# All hail the PI Python OverWatch
+# SBCEye : a lightweight monitoring tool for controllers
 
 Monitors my Workshop PI, and lets me see my printroom conditions at a glance via an embeddable web interface and also on a small OLED display. 
 
@@ -56,12 +56,12 @@ This is covered in detail here: [docs/INSTALL.md](docs/INSTALL.md)
 ## Configuration
 Copy the `default.ini` file in the repo to `config.ini` and edit..
 * All the useful options are commented in the file
-* Restart Overwatch to apply any changes
+* Restart SBCEye to apply any changes
 
 ## Customisation and Architecture
 I need to flesh this out in a sepaerate document.
 
-In brief: Customising should be relatively easy, add a data source and commands to gather it in `overwatch.py` (see how this is done for the CPU temperature, etc); then add it to the graph structures in `robin.py` and the sensorlist in `httpserver.py`. Customising the screens for an OLED display can be done in `animate.py`
+In brief: Customising should be relatively easy, add a data source and commands to gather it in `SBCEye.py` (see how this is done for the CPU temperature, etc); then add it to the graph structures in `robin.py` and the sensorlist in `httpserver.py`. Customising the screens for an OLED display can be done in `animate.py`
 
 ## Wiring:
 The sensor, display and GPIO control is all optional. The unit itself can only control a single pin, but it can monitor and log multiple pins if you are also using GPIO for controlling other aparatus (eg 3d printer power supplies)
@@ -69,10 +69,10 @@ The sensor, display and GPIO control is all optional. The unit itself can only c
 * GPIO outputs controlling lights etc; opto-isolated relay boards are your friend here.
 * Button goes to a spare GPIO with a pulldown resistor
 
-![schematic](/docs/img/OverWatch-hardware-small.png)
+![schematic](/docs/img/SBCEye-hardware-small.png)
 
 ## Plans
-I want to add an extensible alerting function.. see [#15](https://github.com/easytarget/pi-overwatch/issues/15)
+I want to add an extensible alerting function.. see [#15](https://github.com/easytarget/SBCEye/issues/15)
 
 ### Docs for CP libs:
 https://circuitpython.readthedocs.io/en/latest/shared-bindings/index.html

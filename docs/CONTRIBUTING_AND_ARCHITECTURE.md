@@ -1,7 +1,7 @@
 # A brief guide to the architecture of this tool and how to contribute
-I created the overwatch to monitor a RaspberryPI that sits in my workshop and runs a couple of 3D printers, a couple of USB webcams, a wireless access point (hostapd) and also controls some GPIO relays for a lamp and the 3D printer power. 
+I created the SBCEye to monitor a RaspberryPI that sits in my workshop and runs a couple of 3D printers, a couple of USB webcams, a wireless access point (hostapd) and also controls some GPIO relays for a lamp and the 3D printer power. 
 - This machine also has a small OLED display, a BME280 environmental sensor and a button on a space GPIO pin mounted on a HAT that also provides adequate power.
-- Overwatch, as it stands, reflects my needs for this machine. But has core functionality suitable for many PI's sitting in corners doing routine tasks.
+- SBCEye, as it stands, reflects my needs for this machine. But has core functionality suitable for many Small Systems sitting in corners doing routine tasks.
 
 ## Features
 - Gathers Data, every 10 seconds by default:
@@ -21,7 +21,7 @@ I created the overwatch to monitor a RaspberryPI that sits in my workshop and ru
   - If a display is configured the environmental and system info is displayed on that via 'sliding' screens
     - The display can be configured with a 'screensaver' to blank or invert it in order to reduce oled burn-in issues
 - Housekeeping:
-  - Overwatch uses nice() to run with reduced priority, and does not need root access
+  - SBCEye uses nice() to run with reduced priority, and does not need root access
   - An internal cache is used to reduce RRDB disk writes (important on machines running from SD Cards)
     - The cache is written into the database once its contents exceed five minutes of data, by default
     - Requesting graphs causes an immediate cache write since the RRD graph tool works from the database
