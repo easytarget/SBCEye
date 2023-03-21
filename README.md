@@ -2,7 +2,12 @@
 
 Monitors my Workshop PI, and lets me see my printroom conditions at a glance via an embeddable web interface and also on a small OLED display. 
 
-It records and displays the CPU temperature, load and memory useage of the Pi itself, and uses an (optional) environmental sensor to also record the room temperature, pressure and humidity readings. Readings happen every 10 seconds and are held in a database so you can view graphs of how they change with time.
+It records and displays the CPU temperature, load and memory useage of the SBC itself, plus some other basics. Readings happen every 10 seconds and are held in a database so you can view graphs of how they change with time.
+
+![env](/docs/img/default-main.png)
+
+You can use an optional BME280 environmental sensor to also record the room temperature, pressure and humidity readings. 
+![env](/docs/img/default-bme280.png)
 
 It also has the ability to optionally monitor and log specified GPIO pins as they are toggled by other programs (eg printer power control pins controlled by Octoprint, etc.) and monitor ping times and status for network targets you specify (eg your router, or a wifi enabled controller, etc.)
 
@@ -14,11 +19,7 @@ Written in Python as a learning excercise, it draws heavily on [RRDtool](https:/
 
 ## A Picture is Worth a Thousand Words
 
-Default Web Interface
-
-![env](/docs/img/default-main.png)
-
-Add a some network targets, a BME280 sensor and/or some GPIO pins to monitor
+On a PI3b with some network targets, a BME280 sensor and/or some GPIO pins to monitor
 
 ![Web](/docs/img/workshop-all.png)
 
