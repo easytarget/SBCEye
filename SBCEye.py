@@ -1,9 +1,12 @@
 #!/usr/bin/python
 '''
-Pi Overwatch:
+SBCEye:
 Animate the OLED display attached to my OctoPrint server with bme280 and system data
 Show, log and graph the environmental, system and gpio data via a web interface
 Give me a on/off button + url to control the bench lights via a GPIO pin
+
+!! DISPLAY, BME280 and GPIO functionality is CURRENTLY Raspberry PI only!
+- Needs to be made generic for other architectures
 
 I2C BME280 Sensor and SSD1306 Display:
 
@@ -61,7 +64,7 @@ os.nice(10)
 settings = Settings()
 
 # Let the console know we are starting
-print("Starting OverWatch")
+print("Starting SBCEye")
 print(f"Working directory: {os.getcwd()}")
 print(f'Running: {sys.argv[0]}  @ {settings.my_version}')
 print(f"Logging to: {settings.log_file}")
@@ -81,7 +84,7 @@ schedule_logger.setLevel(level=logging.WARN)
 
 # Now we have logging, notify we are starting up
 logging.info('')
-logging.info(f'Starting overwatch service for: {settings.name}')
+logging.info(f'Starting SBCEye service for: {settings.name}')
 logging.info(f'Version: {settings.my_version}')
 if settings.default_config:
     logging.warning('Running from default configuration')
@@ -91,13 +94,18 @@ if settings.default_config:
 try:
     import setproctitle
     process_name = settings.name.encode("ascii", "ignore").decode("ascii")
-    setproctitle.setproctitle(f'overwatch: {process_name}')
+    setproctitle.setproctitle(f'SBCEye: {process_name}')
 except ImportError:
     pass
 
 # Pick up the principal CPU thermal zone from the sysfs class
-with open('/sys/class/thermal/thermal_zone0/type','r') as cpu_temp_zone:
-    cpu_thermal_device = cpu_temp_zone.read().strip().replace('-','_')
+try:
+    with open('/sys/class/thermal/thermal_zone0/type','r') as cpu_temp_zone:
+        cpu_thermal_device = cpu_temp_zone.read().strip().replace('-','_')
+except:
+    # Fallback to 1st device in psutils.sensors_temperatures
+    cpu_thermal_device = next(iter(psutil.sensors_temperatures()))
+logging.info('CPU thermal device detected as: ' + cpu_thermal_device)
 
 #
 # Import, setup and return hardware drivers, or 'None' if setup fails
@@ -292,7 +300,7 @@ if __name__ == '__main__':
         from animator import animate
         display_queue = Queue()
         DISPLAY = Process(target=animate, args=(settings, disp, display_queue),
-                name='overwatch_animator')
+                name='sbceye_animator')
         DISPLAY.start()
     else:
         DISPLAY = None

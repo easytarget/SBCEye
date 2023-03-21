@@ -1,7 +1,7 @@
 ''' Functions to ping network targets and return their status
 
 provides:
-    Netreader: A class to handle overwatch net tests
+    Netreader: A class to handle SBCEye net tests
     ping_target(host,timeout): test an individual target with a ping
 '''
 from subprocess import check_output, CalledProcessError, TimeoutExpired, PIPE

@@ -33,15 +33,15 @@ class Settings:
         parser = argparse.ArgumentParser(
             formatter_class=RawTextHelpFormatter,
             description=textwrap.dedent('''
-                All hail the python Overwatch!
+                SBCEye: a monitoring tool for unseen devices
                 See 'default_settings.py' for more info on how to configure'''),
             epilog=textwrap.dedent('''
-                Homepage: https://github.com/easytarget/pi-overwatch
+                Homepage: https://github.com/easytarget/SBCEye
                 '''))
         parser.add_argument("--config", "-c", type=str,
                 help="Config file name, default = config.ini")
         parser.add_argument("--version", "-v", action='store_true',
-                help="Return Overwatch version string and exit")
+                help="Return version string and exit")
         args = parser.parse_args()
 
         if args.version:

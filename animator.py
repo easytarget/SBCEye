@@ -1,5 +1,5 @@
 '''Display Animator class and start function
-part of the OverWatch Project
+part of the SBCEye Project
 '''
 
 # pragma pylint: disable=logging-fstring-interpolation
@@ -159,8 +159,8 @@ class Animator:
         Will be run automagicallly at startup when the main loop
         force-runs all schedules during initialisation'''
         def _text(xpos):
-            self.draw.text((8 + xpos, 0), 'Over-',  font=self.splash_font, fill=255)
-            self.draw.text((8 + xpos, 28), 'Watch',  font=self.splash_font, fill=255)
+            self.draw.text((8 + xpos, 0), 'SBC',  font=self.splash_font, fill=255)
+            self.draw.text((8 + xpos, 28), 'Eye',  font=self.splash_font, fill=255)
         self.current_pass = -1
         self.current_frame = 0
         self.draw.rectangle((self.width + self.margin,0,self.span-1,self.height-1),
@@ -227,7 +227,7 @@ def animate(settings, disp, queue):
     for incoming data pairs, and updates the values it displays.
 
     parameters:
-        settings: main overwatch settings class
+        settings: main SBCEye settings class
         disp:     display module object
         queue:    multiprocess queue, used to recieve data updates
 
@@ -247,7 +247,7 @@ def animate(settings, disp, queue):
         # Set a user-friendly process name if possible
         import setproctitle
         process_name = settings.name.encode("ascii", "ignore").decode("ascii")
-        setproctitle.setproctitle(f'overwatch screen: {process_name}')
+        setproctitle.setproctitle(f'SBCEye screen: {process_name}')
     except ModuleNotFoundError:
         pass
 

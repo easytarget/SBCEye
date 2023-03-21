@@ -1,4 +1,4 @@
-'''Provides the threaded http handler for the Pi OverWatch
+'''Provides the threaded http handler for the SBCEye project
 '''
 
 # pragma pylint: disable=logging-fstring-interpolation,no-self-use
@@ -142,9 +142,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 font-size: 94%; padding-top: 0.5em;">{timestamp}</div>
                 <div style="color:#888888;
                 font-size: 66%; font-weight: lighter; padding-top:0.5em">
-                <a href="https://github.com/easytarget/pi-overwatch"
+                <a href="https://github.com/easytarget/SBCEye"
                 title="Project homepage on GitHub" target="_blank">
-                OverWatch</a></div>'''
+                SBCEye</a></div>'''
 
     def _give_env(self):
         # Environmental sensor
@@ -306,7 +306,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 </div>
                 <div style="text-align: center;">
                 <hr>
-                Generating the dump imposes a high load on the overwatch process and
+                Generating the dump imposes a high load on the SBCEye process and
                 can potentially impact other software running on the system.
                 <br>
                 It can take several minutes to complete; depending on the
@@ -462,7 +462,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._write_dedented(response)
         else:
             self.send_error(404, 'No Such Page',
-                    'Nothing matches the given URL on this OverWatch server')
+                    'Nothing matches the given URL on this server')
 
     def do_HEAD(self):
         '''returns headers'''
