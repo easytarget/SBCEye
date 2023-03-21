@@ -6,7 +6,9 @@ It records and displays the CPU temperature, load and memory useage of the SBC i
 
 ![env](/docs/img/default-main.png)
 
+### Currently Sensor, Display and GPIO features are Raspberry Pi only. Sorry.
 You can use an optional BME280 environmental sensor to also record the room temperature, pressure and humidity readings. 
+
 ![env](/docs/img/default-bme280.png)
 
 It also has the ability to optionally monitor and log specified GPIO pins as they are toggled by other programs (eg printer power control pins controlled by Octoprint, etc.) and monitor ping times and status for network targets you specify (eg your router, or a wifi enabled controller, etc.)
@@ -45,7 +47,9 @@ The [install guide](docs/INSTALL.md) covers installing these, and the rest of th
 * [Schedule](https://github.com/dbader/schedule)
 * [python RRDtool](https://pythonhosted.org/rrdtool/index.html)
 * [psutil](https://psutil.readthedocs.io/en/latest/)
+For sensor:
 * [CircuitPython BME280](https://github.com/adafruit/Adafruit_CircuitPython_BME280)
+For display:
 * [CircuitPython SSD_1306](https://github.com/adafruit/Adafruit_CircuitPython_SSD1306)
 * [image](https://pypi.org/project/image/)
 * [Liberation Fonts](https://en.wikipedia.org/wiki/Liberation_fonts)
