@@ -6,7 +6,7 @@ After=multi-user.target
 Type=simple
 Restart=always
 WorkingDirectory=/home/eye/SBCEye/
-ExecStart=/home/eye/SBCEye/env/bin/python /home/eye/SBCEye/SPBEye.py
+ExecStart=/home/eye/SBCEye/env/bin/python /home/eye/SBCEye/SBCEye.py
 User=eye
 Group=eye
 
