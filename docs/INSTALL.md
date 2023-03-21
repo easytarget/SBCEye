@@ -3,14 +3,13 @@
 
 ### Setup
 
----------  FIX: Base INSTALL more than buster etc... ---------
-Start by making sure that you are running a fully updated OS install, have git, python3, python3-pip and python3-dev and lm-sensors installed, and have cloned the repo to `~eye/SBCEye` eg:
+Start by making sure that you are running a fully updated OS install, have git, python3, python3-pip and python3-dev and lm-sensors installed, have created an 'eye' user and have cloned the repo to `~eye/SBCEye` eg:
 
 ```console
 admin@sbc:~$ sudo apt update
 admin@sbc:~$ sudo apt install python3 python3-dev python3-pip git lm-sensors
-?also? python-is-python3   ? useful for noobs...
-admin@sbc:~$ sudo addser -G eye    <-----------------------------------------flesh out
+
+admin@sbc:~$ sudo useradd -m eye
 admin@sbc:~$ sudo su - eye
 
 eye@sbc:~$ git clone https://github.com/easytarget/SBCEye.git ~/SBCEye
