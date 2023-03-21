@@ -5,6 +5,9 @@ Animate the OLED display attached to my OctoPrint server with bme280 and system 
 Show, log and graph the environmental, system and gpio data via a web interface
 Give me a on/off button + url to control the bench lights via a GPIO pin
 
+!! DISPLAY, BME280 and GPIO functionality is CURRENTLY Raspberry PI only!
+- Needs to be made generic for other architectures
+
 I2C BME280 Sensor and SSD1306 Display:
 
 Note: the sensor and display are optional, if not found their functionality will be
@@ -96,9 +99,14 @@ except ImportError:
     pass
 
 # Pick up the principal CPU thermal zone from the sysfs class
-#with open('/sys/class/thermal/thermal_zone0/type','r') as cpu_temp_zone:
-#    cpu_thermal_device = cpu_temp_zone.read().strip().replace('-','_')
-cpu_thermal_device = '120e0000.tmon'
+try:
+    with open('/sys/class/thermal/thermal_zone0/type','r') as cpu_temp_zone:
+        cpu_thermal_device = cpu_temp_zone.read().strip().replace('-','_')
+except:
+    # Fallback to 1st device in psutils.sensors_temperatures
+    cpu_thermal_device = next(iter(psutil.sensors_temperatures()))
+logging.info('CPU thermal device detected as: ' + cpu_thermal_device)
+
 #
 # Import, setup and return hardware drivers, or 'None' if setup fails
 
