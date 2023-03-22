@@ -79,7 +79,7 @@ Copy the `defaults.ini` file to `config.ini` and edit as required.
 
 If using either a screen, BME sensor or GPIO pin monitoring you must make sure the pi user is in the gpio group:
 ```console
-eye@sbc:~$ sudo usermod -a -G gpio pi
+eye@sbc:~$ sudo usermod -a -G gpio eye
 ```
 
 Then test run with:
