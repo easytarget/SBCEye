@@ -23,17 +23,8 @@ In the cloned repo upgrade our local (user) modules of `pip` and `virtualenv`
 ```console
 eye@sbc:~/SBCEye $ pwd
 /home/eye/SBCEye
-
-eye@sbc:~/SBCEye $ python3 -m pip --version
-pip 18.1 from /usr/lib/python3/dist-packages/eyep (python 3.7)
-
 eye@sbc:~/SBCEye $ python3 -m pip install --user --upgrade pip
-eye@sbc:~/SBCEye $ python3 -m pip --version
-pip 21.3 from /home/eye/.local/lib/python3.7/site-packages/eyep (python 3.7)
-
 eye@sbc:~/SBCEye $ python3 -m pip install --user --upgrade virtualenv
-eye@sbc:~/SBCEye $ python3 -m virtualenv --version
-virtualenv 20.8.1 from /home/eye/.local/lib/python3.7/site-packages/virtualenv/__init__.py
 ```
 
 Create the virtual environment and activate it
@@ -53,17 +44,18 @@ eye@sbc:~/SBCEye $ source env/bin/activate
 
 (env) eye@sbc:~/SBCEye $ which python
 /home/eye/SBCEye/env/bin/python
-
-(env) eye@sbc:~/SBCEye $ python --version
-Python 3.7.3
 ```
 
 Now we install/upgrade the requirements
+- note there are some `apt install` commands to be run as root here too... I'll split them into the 'root prep' section, with distro-specific notes in the future.
 ```console
 (env) eye@sbc:~/SBCEye $ pip install --upgrade pip
 (env) eye@sbc:~/SBCEye $ pip install --upgrade wheel
 
-(env) eye@sbc:~/SBCEye $ sudo apt install rrdtool librrd-dev
+root@sbc:~/SBCEye # apt install rrdtool librrd-dev
+; On the VisionFive board, you currently also need:
+; root@sbc:~/SBCEye # apt install lm-sensors
+
 (env) eye@sbc:~/SBCEye $ pip install psutil schedule setproctitle rrdtool
 
 ; If you wish to control a gpio pin via a button or url you need to install RPi.GPIO
@@ -76,7 +68,7 @@ Now we install/upgrade the requirements
 
 ; Only if you plan to use a SSD1306 OLED display:
 (env) eye@sbc:~/SBCEye $ pip install adafruit-circuitpython-ssd1306
-(env) eye@sbc:~/SBCEye $ sudo apt install libjpeg-dev libopenjp2-7-dev libtiff-dev fonts-liberation
+root@sbc:~/SBCEye # apt install libjpeg-dev libopenjp2-7-dev libtiff-dev fonts-liberation
 (env) eye@sbc:~/SBCEye $ pip install image
 ```
 
@@ -108,10 +100,10 @@ Note; If you want to leave the virtualenv at any time you can do so with `$ deac
 Once you have everything installed, configured and tested by running on the console you should start running this as a system service. The SBCEye will then run automatically at boot and operate in the background like other services.
 
 ```console
-eye@sbc:~/SBCEye $ sudo ln -s /home/eye/SBCEye/SBCEye.service /etc/systemd/system/
-eye@sbc:~/SBCEye $ sudo systemctl daemon-reload
-eye@sbc:~/SBCEye $ sudo systemctl enable SBCEye.service
-eye@sbc:~/SBCEye $ sudo systemctl start SBCEye.service
+root@sbc:~/SBCEye # sudo ln -s /home/eye/SBCEye/SBCEye.service /etc/systemd/system/
+root@sbc:~/SBCEye # systemctl daemon-reload
+root@sbc:~/SBCEye # systemctl enable SBCEye.service
+root@sbc:~/SBCEye # systemctl start SBCEye.service
 
 eye@sbc:~ $ sudo systemctl status SBCEye.service
 ● SBCEye.service - SBCEye monitoring for SBCs
