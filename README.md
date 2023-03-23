@@ -1,19 +1,33 @@
 # SBCEye : a lightweight monitoring tool for controllers
 
-Monitors my Workshop PI, and lets me see my printroom conditions at a glance via an embeddable web interface and also on a small OLED display. 
+I designed this to monitor my Workshop using the Raspberry PI that also serves as an octoprint server. This lets me see my printroom conditions at a glance via an embeddable web interface and also on a small OLED display.
 
-It records and displays the CPU temperature, load and memory useage of the SBC itself, plus some other basics. Readings happen every 10 seconds and are held in a database so you can view graphs of how they change with time.
+## Core functions
+
+SBCeye records and displays the CPU temperature, load and memory useage of the SBC itself, plus some other system basics. It can also monitor ping times and status for network targets you specify (eg your router, or a wifi enabled controller, etc.)
+
+Readings happen every 10 seconds and are held in a database, it has a built in graph generator and you can view graphs for arbitary time priods. This tool is designed to provide a 'fine grained' low-level logging for machines that work as controllers, as opposed to the slower but more sophisticated and comprehensive  system health logging supplied by [Munin](https://munin-monitoring.org/) and similar.
 
 ![env](/docs/img/default-main.png)
 
+This can be run on any system that supports the Python3 `psutil` package and the rrdb tool. Currently tested on Debian, Fedora and FreeBSD.
+
+## GPIO Functions
 ### Currently Sensor, Display and GPIO features are Raspberry Pi only. Sorry.
-You can use an optional BME280 environmental sensor to also record the room temperature, pressure and humidity readings. 
+
+You can use an optional I2C BME280 environmental sensor to also record the room temperature, pressure and humidity readings.
+
+You can display the current status on a small OLED I2C display sharing the same bus as the BME280, this animates through the current status and has a night/screensaver feature.
 
 ![env](/docs/img/default-bme280.png)
 
-It also has the ability to optionally monitor and log specified GPIO pins as they are toggled by other programs (eg printer power control pins controlled by Octoprint, etc.) and monitor ping times and status for network targets you specify (eg your router, or a wifi enabled controller, etc.)
+It also has the ability to optionally monitor and log specified GPIO pins as they are toggled by other programs (eg printer power control pins controlled by Octoprint, etc.)
 
-I have written it to be very low impact on the host; database readings are cached and disk writes only happen every five minutes in order to minimise impact on the SD card. When running without a display the the program typically consumes less than 1% of one CUP core. Adding a display increases this but not by much overall. There is in-built housekeeping to do database backups, dumps and log rotation.
+## Database and ssd wear reduction.
+
+I have written this to be very low impact on the host; database readings are cached and disk writes only happen every five minutes in order to minimise impact on the SD card.
+
+When running without a display the the program typically consumes less than 1% of one CUP core. Adding a display increases this but not by much overall. There is in-built housekeeping to do database backups, dumps and log rotation.
 
 _Bonus!_ Control a light connected to a GPIO pin via a button and/or url, this is a convenience feature I added for myself so I can easily toggle my workbench lamps when in the room, or remotely via the web when viewing my webcams.
 

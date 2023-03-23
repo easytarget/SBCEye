@@ -1,6 +1,10 @@
 # Installing in virtualenv
 * https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/
 
+## Supporteed install method
+
+The install steps below will set SBCEye up using a seperate user in a virtual environment, and start it automatically via a system service. This provides some security and isolation but SBCEye is still not suitable for running on a public IP address. If you are familiar with Python then feel free to improvise on these isntructions, but I wont be very helpful if it all goes wrong.
+
 ### Setup
 
 Start by making sure that you are running a fully updated OS install, have git, python3, python3-pip and python3-dev and lm-sensors installed, have created an 'eye' user and have cloned the repo to `~eye/SBCEye` eg:
@@ -29,12 +33,12 @@ eye@sbc:~/SBCEye $ python3 -m pip install --user --upgrade virtualenv
 
 Create the virtual environment and activate it
 - The virtual environment will be located at `/home/eye/SBCEye/env`
-- TL;DR: (Quick primer for the unitiated and curious):
+- TL;DR: (Quick primer about Python Virtual Environments, if needed):
   - A python virtual environment is, simply put, a complete and self-contained copy of python and all it's utilities, libraries, and packages.
   - It is installed into a folder (which you specify when creating it)
-  - *Everything* is located in that folder, nothing gets installed to the machines OS, and you can do this as an ordinary user without needing root privileges.
-  - This means that your virtualenv can have, say, a different version of python in it than the main 'os' version, either higher or lower, most useful when the OS python version is lagging behind the version you want to use.
-  - You can also install python modules into the virtual environment directly, this allows you to use modules and module versions that are different or unsupported on your main OS
+  - *Everything* is located in that folder, *nothing* gets installed to the machines OS, which means you can do this as an ordinary user without needing root privileges.
+  - The end result is, essentially, a form of containerization. Your virtualenv can have a different version of python in it than the main 'os' version, either higher or lower. This is useful when the OS default Python version is lagging behind the version you want to use.
+  - You install python modules into the virtual environment directly, supersceeding the system and user package installs. This allows you to use modules and module versions that are different or unsupported on your main OS
   - [This Video](https://www.youtube.com/watch?v=N5vscPTWKOk) and [This](https://www.youtube.com/watch?v=4jt9JPoIDpY) explain it quite well.
 
 ```console
