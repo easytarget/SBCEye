@@ -1,12 +1,12 @@
 # SBCEye : a lightweight monitoring tool for controllers
 
-I designed this to monitor my Workshop using the Raspberry PI that also serves as an octoprint server. This lets me see my printroom conditions at a glance via an embeddable web interface and also on a small OLED display.
+I designed this to monitor my Workshop using the Raspberry PI that also serves as an octoprint server. This lets me see my printroom conditions at a glance via an embedded web interface and also on a small OLED display.
 
 ## Core functions
 
-SBCeye records and displays the CPU temperature, load and memory useage of the SBC itself, plus some other system basics. It can also monitor ping times and status for network targets you specify (eg your router, or a wifi enabled controller, etc.)
+SBCeye records and displays the CPU temperature, load and memory usage of the SBC itself, plus some other system basics. It can also monitor ping times and status for network targets you specify (eg your router, or a wifi enabled controller, etc.)
 
-Readings happen every 10 seconds and are held in a database, it has a built in graph generator and you can view graphs for arbitary time priods. This tool is designed to provide a 'fine grained' low-level logging for machines that work as controllers, as opposed to the slower but more sophisticated and comprehensive  system health logging supplied by [Munin](https://munin-monitoring.org/) and similar.
+Readings happen every 10 seconds and are held in a database, it has a built in graph generator and you can view graphs for arbitrary time periods. This tool is designed to provide a 'fine grained' low-level logging for machines that work as controllers, as opposed to the slower but more sophisticated and comprehensive  system health logging supplied by [Munin](https://munin-monitoring.org/) and similar.
 
 ![env](/docs/img/default-main.png)
 
@@ -25,13 +25,11 @@ It also has the ability to optionally monitor and log specified GPIO pins as the
 
 ## Database and ssd wear reduction.
 
-I have written this to be very low impact on the host; database readings are cached and disk writes only happen every five minutes in order to minimise impact on the SD card.
+I have written this to be very low impact on the host; database readings are cached and disk writes only happen every five minutes in order to minimize impact on the SD card. There is in-built housekeeping to do database backups, online dumps and log rotation.
 
-When running without a display the the program typically consumes less than 1% of one CUP core. Adding a display increases this but not by much overall. There is in-built housekeeping to do database backups, dumps and log rotation.
+_Bonus!_ Control a light connected to a GPIO pin via a button and/or URL, this is a convenience feature I added for myself so I can easily toggle my workbench lamps when in the room, or remotely via the web when viewing my webcams.
 
-_Bonus!_ Control a light connected to a GPIO pin via a button and/or url, this is a convenience feature I added for myself so I can easily toggle my workbench lamps when in the room, or remotely via the web when viewing my webcams.
-
-Written in Python as a learning excercise, it draws heavily on [RRDtool](https://pypi.org/project/rrdtool/), [RPI.GPIO](https://pypi.org/project/RPi.GPIO/), [psutil](https://pypi.org/project/psutil/), the default python [http.server](https://docs.python.org/3/library/http.server.html) and [CircuitPython](https://github.com/adafruit/circuitpython) for interfacing with sensor and screen.
+Written in Python as a learning exercise, it draws heavily on [RRDtool](https://pypi.org/project/rrdtool/), [RPI.GPIO](https://pypi.org/project/RPi.GPIO/), [psutil](https://pypi.org/project/psutil/), the default python [http.server](https://docs.python.org/3/library/http.server.html) and [CircuitPython](https://github.com/adafruit/circuitpython) for interfacing with sensor and screen.
 
 ## A Picture is Worth a Thousand Words
 
@@ -78,15 +76,15 @@ Copy the `default.ini` file in the repo to `config.ini` and edit..
 * Restart SBCEye to apply any changes
 
 ## Customisation and Architecture
-I need to flesh this out in a sepaerate document.
+I need to flesh this out in a separate document.
 
-In brief: Customising should be relatively easy, add a data source and commands to gather it in `SBCEye.py` (see how this is done for the CPU temperature, etc); then add it to the graph structures in `robin.py` and the sensorlist in `httpserver.py`. Customising the screens for an OLED display can be done in `animate.py`
+In brief: Customizing should be relatively easy, add a data source and commands to gather it in `SBCEye.py` (see how this is done for the CPU temperature, etc); then add it to the graph structures in `robin.py` and the sensorlist in `httpserver.py`. Customizing the screens for an OLED display can be done in `animate.py`
 
 ## Wiring:
-The sensor, display and GPIO control is all optional. The unit itself can only control a single pin, but it can monitor and log multiple pins if you are also using GPIO for controlling other aparatus (eg 3d printer power supplies)
+The sensor, display and GPIO control is all optional. The unit itself can only control a single pin, but it can monitor and log multiple pins if you are also using GPIO for controlling other apparatus (eg 3d printer power supplies)
 * I2C goes to the 0.96' OLED screen and BME280 Sensor module
 * GPIO outputs controlling lights etc; opto-isolated relay boards are your friend here.
-* Button goes to a spare GPIO with a pulldown resistor
+* Button goes to a spare GPIO with a pull-down resistor
 
 ![schematic](/docs/img/SBCEye-hardware-small.png)
 

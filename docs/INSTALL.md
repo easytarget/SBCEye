@@ -3,7 +3,7 @@
 
 ## Supporteed install method
 
-The install steps below will set SBCEye up using a seperate user in a virtual environment, and start it automatically via a system service. This provides some security and isolation but SBCEye is still not suitable for running on a public IP address. If you are familiar with Python then feel free to improvise on these isntructions, but I wont be very helpful if it all goes wrong.
+The install steps below will set SBCEye up using a separate user in a virtual environment, and start it automatically via a system service. This provides some security and isolation but SBCEye is still not suitable for running on a public IP address. If you are familiar with Python then feel free to improvise on these instructions, but I wont be very helpful if it all goes wrong.
 
 ### Setup
 
@@ -38,7 +38,7 @@ Create the virtual environment and activate it
   - It is installed into a folder (which you specify when creating it)
   - *Everything* is located in that folder, *nothing* gets installed to the machines OS, which means you can do this as an ordinary user without needing root privileges.
   - The end result is, essentially, a form of containerization. Your virtualenv can have a different version of python in it than the main 'os' version, either higher or lower. This is useful when the OS default Python version is lagging behind the version you want to use.
-  - You install python modules into the virtual environment directly, supersceeding the system and user package installs. This allows you to use modules and module versions that are different or unsupported on your main OS
+  - You install python modules into the virtual environment directly, superseding the system and user package installs. This allows you to use modules and module versions that are different or unsupported on your main OS
   - [This Video](https://www.youtube.com/watch?v=N5vscPTWKOk) and [This](https://www.youtube.com/watch?v=4jt9JPoIDpY) explain it quite well.
 
 ```console
@@ -97,7 +97,7 @@ Debug messages, errors, etc are printed to the console
 
 The web server should be available on `http://<machines-address>:7080/` (or whatever is configured in the settings)
 
-Note; If you want to leave the virtualenv at any time you can do so with `$ deactivate`, if you want to delete the virtualenv it is as simple as deleting the 'env' folder and all it's sunfolders.
+Note; If you want to leave the virtualenv at any time you can do so with `$ deactivate`, if you want to delete the virtualenv it is as simple as deleting the 'env' folder and all it's sub-folders.
 
 ## Set up as a service
 
