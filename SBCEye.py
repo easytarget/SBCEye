@@ -98,13 +98,8 @@ try:
 except ImportError:
     pass
 
-# Pick up the principal CPU thermal zone from the sysfs class
-try:
-    with open('/sys/class/thermal/thermal_zone0/type','r') as cpu_temp_zone:
-        cpu_thermal_device = cpu_temp_zone.read().strip().replace('-','_')
-except:
-    # Fallback to 1st device in psutils.sensors_temperatures
-    cpu_thermal_device = next(iter(psutil.sensors_temperatures()))
+# Assume CPU is 1st device in psutils.sensors_temperatures()
+cpu_thermal_device = next(iter(psutil.sensors_temperatures()))
 logging.info('CPU thermal device detected as: ' + cpu_thermal_device)
 
 #
