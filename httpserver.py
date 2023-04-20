@@ -109,7 +109,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <title>{title}</title>
                 <style>
                 body {{display:flex; flex-direction: column; align-items: center;}}
-                a {{color:#555555; text-decoration: none;}}
+                a {{color:#000000; text-decoration: none;}}
                 img {{width:auto; max-width:100%;}}
                 table {{border-spacing-top: 0.4em; width:auto; max-width:100%;}}
                 th {{font-size: 110%; text-align: left;}}
@@ -140,9 +140,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         return  f'''<div title="Time of latest data readings"
                 style="color:#555555;
                 font-size: 94%; padding-top: 0.5em;">{timestamp}</div>
-                <div style="color:#888888;
+                <div style="color:#555555;
                 font-size: 66%; font-weight: lighter; padding-top:0.5em">
-                <a href="https://github.com/easytarget/SBCEye"
+                <a style="color:#555555;"
+                href="https://github.com/easytarget/SBCEye"
                 title="Project homepage on GitHub" target="_blank">
                 SBCEye</a></div>'''
 
@@ -367,7 +368,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 stamp = f'{start} >> {end}'
             self._set_headers()
             response = self._give_head(f" :: graphs {stamp}")
-            response += f'<h2>{http.settings.name}</h2>'
+            response += f'<h2><a href="/">{http.settings.name}</a></h2>'
             response += self._give_graphs(start, end, stamp)
             response += self._give_timestamp()
             response += self._give_foot(refresh=300)
@@ -427,7 +428,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         elif urlparse(self.path).path == '/log':
             self._set_headers()
             response = self._give_head()
-            response += f'<h2>{http.settings.name} Log</h2>\n'
+            response += f'<h2><a href="/" title="Home">{http.settings.name}</a> Log</h2>\n'
             response += self._give_log()
             response += self._give_timestamp()
             response += self._give_foot(refresh=60, scroll=True)
