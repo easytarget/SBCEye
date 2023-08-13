@@ -10,14 +10,25 @@ The install steps below will set SBCEye up using a separate user in a virtual en
 Start by making sure that you are running a fully updated OS install, have git, python3, python3-pip and python3-dev and lm-sensors installed, have created an 'eye' user and have cloned the repo to `~eye/SBCEye` eg:
 
 ```console
+; Install python and dependencies
 admin@sbc:~$ sudo apt update
-admin@sbc:~$ sudo apt install python3 python3-dev python3-pip git lm-sensors
+admin@sbc:~$ sudo apt install python3 python3-dev python3-pip git rrdtool librrd-dev lm-sensors
+
+; Only if you plan to use a SSD1306 OLED display:
+admin@sbc:~$ sudo apt install libjpeg-dev libopenjp2-7-dev libtiff-dev fonts-liberation
 
 admin@sbc:~$ sudo useradd -m eye
+
+; If using either a screen, BME sensor or GPIO pin monitoring you must make sure the eye user is in the gpio group:
+admin@sbc:~$ sudo usermod -a -G gpio eye
+
+; Become the 'eye' user
 admin@sbc:~$ sudo su - eye
 
+; Clone the repo
 eye@sbc:~$ git clone https://github.com/easytarget/SBCEye.git ~/SBCEye
 ; Alternatively, if you do not use git and have downloaded a zip or tarball, you should unpack it to: ~/SBCEye
+
 eye@sbc:~$ cd ~/SBCEye
 ```
 
@@ -56,10 +67,6 @@ Now we install/upgrade the requirements
 (env) eye@sbc:~/SBCEye $ pip install --upgrade pip
 (env) eye@sbc:~/SBCEye $ pip install --upgrade wheel
 
-root@sbc:~/SBCEye # apt install rrdtool librrd-dev
-; On the VisionFive board, you currently also need:
-; root@sbc:~/SBCEye # apt install lm-sensors
-
 (env) eye@sbc:~/SBCEye $ pip install psutil schedule setproctitle rrdtool
 
 ; If you wish to control a gpio pin via a button or url you need to install RPi.GPIO
@@ -71,19 +78,13 @@ root@sbc:~/SBCEye # apt install rrdtool librrd-dev
 (env) eye@sbc:~/SBCEye $ pip install adafruit-circuitpython-bme280
 
 ; Only if you plan to use a SSD1306 OLED display:
-(env) eye@sbc:~/SBCEye $ pip install adafruit-circuitpython-ssd1306
-root@sbc:~/SBCEye # apt install libjpeg-dev libopenjp2-7-dev libtiff-dev fonts-liberation
-(env) eye@sbc:~/SBCEye $ pip install image
+(env) eye@sbc:~/SBCEye $ pip install adafruit-circuitpython-ssd1306 image
 ```
 
 Copy the `defaults.ini` file to `config.ini` and edit as required.
 - See the comments in the file
 - The default configuration is sufficient for testing, but screens, sensors and GPIO settings need to be enabled in the settings
 - Some other parameters for the web server, logging and display can be set there too
-
-If using either a screen, BME sensor or GPIO pin monitoring you must make sure the pi user is in the gpio group:
-```console
-eye@sbc:~$ sudo usermod -a -G gpio eye
 ```
 
 Then test run with:
@@ -104,11 +105,12 @@ Note; If you want to leave the virtualenv at any time you can do so with `$ deac
 Once you have everything installed, configured and tested by running on the console you should start running this as a system service. The SBCEye will then run automatically at boot and operate in the background like other services.
 
 ```console
-root@sbc:~/SBCEye # ln -s /home/eye/SBCEye/SBCEye.service /etc/systemd/system/
-root@sbc:~/SBCEye # systemctl daemon-reload
-root@sbc:~/SBCEye # systemctl enable --now SBCEye.service
+admin@sbc:~ $ cd ~eye/SPBEye
+admin@sbc:/home/eye/SBCEye $ sudo ln -s /home/eye/SBCEye/SBCEye.service /etc/systemd/system/
+admin@sbc:/home/eye/SBCEye $ sudo systemctl daemon-reload
+admin@sbc:/home/eye/SBCEye $ sudo systemctl enable --now SBCEye.service
 
-eye@sbc:~ $ sudo systemctl status SBCEye.service
+admin@sbc:/home/eye/SBCEye $ sudo systemctl status SBCEye.service
 ● SBCEye.service - SBCEye monitoring for SBCs
    Loaded: loaded (/etc/systemd/system/SBCEye.service; enabled; vendor preset: enabled)
    Active: active (running) since Wed 2021-10-13 19:37:49 CEST; 10min ago
