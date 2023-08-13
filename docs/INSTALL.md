@@ -107,7 +107,7 @@ Note; If you want to leave the virtualenv at any time you can do so with `$ deac
 Once you have everything installed, configured and tested by running on the console you should start running this as a system service. The SBCEye will then run automatically at boot and operate in the background like other services.
 
 ```console
-admin@sbc:~ $ cd ~eye/SPBEye
+admin@sbc:~ $ cd ~eye/SBCEye
 admin@sbc:/home/eye/SBCEye $ sudo ln -s /home/eye/SBCEye/SBCEye.service /etc/systemd/system/
 admin@sbc:/home/eye/SBCEye $ sudo systemctl daemon-reload
 admin@sbc:/home/eye/SBCEye $ sudo systemctl enable --now SBCEye.service
