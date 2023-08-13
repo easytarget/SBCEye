@@ -17,7 +17,9 @@ admin@sbc:~$ sudo apt install python3 python3-dev python3-pip git rrdtool librrd
 ; Only if you plan to use a SSD1306 OLED display:
 admin@sbc:~$ sudo apt install libjpeg-dev libopenjp2-7-dev libtiff-dev fonts-liberation
 
+; Create a dedicate user account (and set bash as our shell)
 admin@sbc:~$ sudo useradd -m eye
+admin@sbc:~$ sudo usermod -s /bin/bash eye
 
 ; If using either a screen, BME sensor or GPIO pin monitoring you must make sure the eye user is in the gpio group:
 admin@sbc:~$ sudo usermod -a -G gpio eye
