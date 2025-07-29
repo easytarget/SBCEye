@@ -243,16 +243,22 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         return ret
 
     def _give_links(self):
-        # Link to the log and pin contol pages
-        ret = f'''{self._give_graphlinks()}
-                <tr><td colspan="2" style="text-align: center;">
-                <a href="./log" title="Open log in a new page" target="_blank">
-                Log</a>\n'''
+        # Links to the graph pages
+        ret = f'{self._give_graphlinks()}'
+        # Links to the log and pin contol pages
+        ret += f'<tr><th>Server</th></tr>\n'
         if http.settings.web_show_control and (http.settings.button_pin > 0):
-            ret += f'&nbsp;&nbsp;<a href="./{http.settings.button_url}" '\
-                    f'title="{http.settings.button_name} status and control page">'\
-                    f'{http.settings.button_name}</a>\n'
-        ret += '</td></tr>\n'
+            _, onoff = http.button_control('status')
+            state = 'On' if onoff else 'Off'
+            ret += f'<tr><td>\n'\
+                   f'<a href="./{http.settings.button_url}" '\
+                   f'title="{http.settings.button_label} status and control page">'\
+                   f'{http.settings.button_label}</a></td>\n'
+            ret += f'<td style="text-align: right">{state}</td>\n'\
+
+        ret += f'<tr><td>\n'\
+               f'<a href="./log" title="Open log in a new page" target="_blank">'\
+               f' Log</a></td></tr>\n'
         return ret
 
     def _give_log(self, lines=25):
@@ -393,7 +399,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                             f' with action: {action}')
             status, state = http.button_control(action)
             self._set_headers()
-            response = self._give_head(f" :: {http.settings.button_name}")
+            response = self._give_head(f" :: {http.settings.button_label}")
             response += f'<h2>{status}</h2>\n'
             invert_state = http.settings.pin_state_names[not state]
             response += f'''<div>

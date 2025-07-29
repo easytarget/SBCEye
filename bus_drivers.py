@@ -1,14 +1,14 @@
 '''Bus based hardware driver initialisation
 
 Imports and starts the optional Bus based devices.
-Gracefully fails and disables funcions as appropriate if anything goes wrong
+Gracefully fails and disables services as appropriate if anything goes wrong
 
 I'd probably do this differently if writing from scratch/refactoring, and
-try to make better use of Importlib in SBCEye.py.
+make better use of Importlib in overwatch.py.
 '''
 # pragma pylint: disable=import-outside-toplevel
 
-import importlib
+import importlib.util
 
 
 def i2c_setup(screen, sensor):
@@ -49,7 +49,8 @@ def i2c_setup(screen, sensor):
     if sensor:
         # BME280 I2C Tepmerature Pressure and Humidity sensor
         try:
-            import adafruit_bme280
+            #import adafruit_bme280
+            from adafruit_bme280 import basic as adafruit_bme280
         except ImportError as error:
             print(error)
             print("ERROR: BME280 environment sensor requirements not met")
@@ -84,6 +85,7 @@ def i2c_setup(screen, sensor):
         try:
             # Create the I2C BME280 sensor object
             bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x76)
+            #bme280 = adafruit_bme280.adafruit_bme280_i2c(i2c, address=0x76)
             print("BME280 sensor found with address 0x76")
         except RuntimeError as error:
             try:

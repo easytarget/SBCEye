@@ -118,14 +118,12 @@ class Settings:
         self.button_out = button.getint("out")
         self.button_pin = button.getint("pin")
         self.button_url = button.get("url")
+        self.button_label = button.get("label")
         self.button_hold = button.getfloat("hold")
         if self.button_out == 0:
             self.button_name = 'Undefined'
         else:
             self.button_name = f'gpio-{self.button_out}'
-            for name, pin in self.pin_map.items():
-                if pin == self.button_out:
-                    self.button_name = name
 
         intervals = config["intervals"]
         self.pin_interval = intervals.getint("pin")

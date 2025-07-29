@@ -155,7 +155,7 @@ data["update-time"] = time.time() # time of last update
 def button_control(action="toggle"):
     '''Set the controlled pin to a specified state'''
     if settings.button_out > 0:
-        ret = f'{settings.button_name} '
+        ret = f'{settings.button_label} '
         pin = settings.button_out
         if action.lower() in ['toggle','invert','button']:
             GPIO.output(pin, not GPIO.input(pin))
@@ -287,8 +287,10 @@ if __name__ == '__main__':
             logging.info('Button enabled')
         if len(settings.button_url) > 0:
             logging.info(f'Web Button enabled on: /{settings.button_url}')
-        print(f'Controllable pin ({settings.button_name}) configured and enabled; '\
-                f'(pin={settings.button_pin}, url="{settings.button_url})"')
+        print(f'Button controllable pin ({settings.button_name}) configured and enabled; '\
+                f'(button=gpio-{settings.button_pin}, '\
+                f'label="{settings.button_label}", '\
+                f'url="{settings.button_url})"')
 
     # Display animation setup
     if disp:
