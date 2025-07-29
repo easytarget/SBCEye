@@ -449,8 +449,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             if not "deco" in exclude:
                 response += f'<h2>{http.settings.name}</h2>\n'
             if cam and http.settings.cam_url:
-                response += f'<img src="{http.settings.cam_url}" alt="Webcam" '\
-                        f'style="display: block; width: {http.settings.cam_width}%">\n'
+                response += f'<a href="{http.settings.cam_home}" title="Webcam homepage" '\
+                        f'style="display: block; width: {http.settings.cam_width}%">'\
+                        f'<img src="{http.settings.cam_url}" alt="Webcam">'\
+                        f'</a><br>\n'
             response += '<table>\n'
             if not "env" in exclude:
                 response += self._give_env()

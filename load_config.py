@@ -165,7 +165,8 @@ class Settings:
         if "webcam" in config:
             cam = config["webcam"]
             self.cam_url = cam.get("url")
-            self.cam_width = cam.getint("width", 50)
+            self.cam_home = cam.get("home")
+            self.cam_width = cam.getint("width")
 
         # Optional [DEBUG] section can be enabled
         #  If this section is present it changes the operation of
