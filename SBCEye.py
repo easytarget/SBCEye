@@ -78,7 +78,7 @@ logging.basicConfig(level=logging.INFO,
         datefmt=settings.short_format,
         handlers=[handler])
 
-# Older scheduler versions can log debug to 'INFO' not 'DEBUG', change threshold.
+# Older scheduler versions might log debug at wrong level, change threshold.
 schedule_logger = logging.getLogger('schedule')
 schedule_logger.setLevel(level=logging.WARN)
 
@@ -228,13 +228,13 @@ def update_data():
     net.update(data)
     rrd.update(data)
 
-def hourly():
+def daily():
     '''Remind everybody we are alive'''
     myself = os.path.basename(__file__)
     timestamp = time.strftime(settings.long_format)
     uptime = timedelta(seconds=int(time.time() - psutil.boot_time()))
     logging.info(f'{settings.name} :: up {uptime}')
-    print(f'{myself} :: {timestamp} :: {settings.name} :: up {uptime}')
+    print(f'{myself} :: {timestamp} :: {settings.name} :: up {uptime}',flush=True)
 
 def handle_signal(sig, *_):
     '''Handle common signals'''
@@ -243,7 +243,7 @@ def handle_signal(sig, *_):
         DISPLAY.join()
     if sig == SIGHUP:
         handle_restart()
-    elif sig == SIGINT and settings.debug:
+    elif sig == SIGINT and settings.debug_sigint:
         handle_restart()
     else:
         # calling sys.exit() will invoke handle_exit()
@@ -252,7 +252,7 @@ def handle_signal(sig, *_):
 def handle_restart():
     '''In-Place safe restart (re-reads config)'''
     logging.info('Safe Restarting')
-    print('Restart\n')
+    print('Restart\n',flush=True)
     rrd.write_updates()
     os.execv(sys.executable, ['python'] + sys.argv)
 
@@ -260,7 +260,7 @@ def handle_exit():
     '''Ensure we write ipending data to the RRD database as we exit'''
     rrd.write_updates()
     logging.info('Exiting')
-    print('Graceful Exit\n')
+    print('Graceful Exit\n',flush=True)
 
 
 # The fun starts here:
@@ -336,8 +336,8 @@ if __name__ == '__main__':
     register(handle_exit)
 
     # Schedule pin monitoring, database updates and logging events
-    if settings.log_hourly:
-        schedule.every().hour.at(":00").do(hourly)
+    if settings.log_daily:
+        schedule.every().day.at("00:00").do(daily)
     schedule.every(settings.data_interval).seconds.do(update_data)
     if len(settings.pin_map.keys()) > 0:
         schedule.every(settings.pin_interval).seconds.do(pins.update_pins)

@@ -47,6 +47,9 @@ def serve_http(settings, rrd, data, helpers):
                 'graphing and dumping functions are unavailable')
         http.db_dumpable = False
         http.db_graphable = False
+    if settings.cam_url:
+        logging.info(f"Webcam configured at: {settings.cam_url}")
+    http.show_cam = settings.web_show_cam
 
     # Start the server
     logging.info(f'HTTP server will bind to port {str(settings.web_port)} '\
@@ -69,6 +72,14 @@ def serve_http(settings, rrd, data, helpers):
 
 class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     '''Handles each individual request in a new thread'''
+
+    def log_message(self, format, *args):
+        # This function effectively suppresses the http server log output
+        if http.settings.debug_http:
+            print(f'HTTP request:: {self.client_address[0]} : {args[0]} '\
+                  f'({args[1]})',flush=True)
+        return
+
 
     def _set_headers(self):
         self.send_response(200)
@@ -146,6 +157,24 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 href="https://github.com/easytarget/SBCEye"
                 title="Project homepage on GitHub" target="_blank">
                 SBCEye</a></div>'''
+
+    #def _give_cam(self):
+    #    return f'''<tr><th>Cam</th></tr>\n
+    #           <tr><td colspan="2">
+    #           <a href="{http.settings.cam_home}" title="Webcam homepage"
+    #           target="_blank">
+    #           <img src="{http.settings.cam_url}" alt="Webcam">
+    #           </a></td></tr>\n'''
+    #           # style="display: block; width: {http.settings.cam_width}%"
+
+    def _give_cam(self):
+        return f'''<div style="font-size: 110%; font-weight:bold;
+               width: {http.settings.cam_width}%">Cam</div>\n
+               <a href="{http.settings.cam_home}" title="Webcam homepage"
+               style="display: block; width: {http.settings.cam_width}%"
+               target="_blank">
+               <img src="{http.settings.cam_url}" alt="Webcam"></a>\n
+               '''
 
     def _give_env(self):
         # Environmental sensor
@@ -229,7 +258,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         if (len(http.settings.graph_durations) > 0) and http.db_graphable:
             if len(skip) == 0:
                 ret += '<tr><th>Graphs</th></tr>\n'
-            ret += '<tr><td colspan="2" style="text-align: center;">\n'
+            ret += '<tr><td colspan="2" style="text-align: center">\n'
             for duration in http.settings.graph_durations:
                 if duration != skip:
                     ret += f'&nbsp;<a href="./graphs?start=end-{duration}" '\
@@ -245,20 +274,26 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_links(self):
         # Links to the graph pages
         ret = f'{self._give_graphlinks()}'
-        # Links to the log and pin contol pages
+        # Links to the pin contol, cam show/hide and log pages
         ret += f'<tr><th>Server</th></tr>\n'
         if http.settings.web_show_control and (http.settings.button_pin > 0):
             _, onoff = http.button_control('status')
             state = 'On' if onoff else 'Off'
-            ret += f'<tr><td>\n'\
+            ret += f'<tr><td>{http.settings.button_label}:</td>\n'\
+                   f'<td style="text-align: right">'\
                    f'<a href="./{http.settings.button_url}" '\
                    f'title="{http.settings.button_label} status and control page">'\
-                   f'{http.settings.button_label}</a></td>\n'
-            ret += f'<td style="text-align: right">{state}</td>\n'\
+                   f'{state}</a></td></tr>\n'
+        if http.settings.cam_url:
+            action = 'Hide' if http.show_cam else 'Show'
+            ret += f'<tr><td>Cam view:</td>\n'\
+                   f'<td style="text-align: right">'\
+                   f'<a href="./cam_toggle" title="Toggle cam view">'\
+                   f'{action}</a></td></tr>\n'
 
-        ret += f'<tr><td>\n'\
-               f'<a href="./log" title="Open log in a new page" target="_blank">'\
-               f' Log</a></td></tr>\n'
+        ret += f'<tr><td colspan="2" style="text-align: center">\n'\
+               f'<br><a href="./log" title="Open log in a new page" target="_blank">'\
+               f'Action Log</a></td></tr>\n'
         return ret
 
     def _give_log(self, lines=25):
@@ -439,20 +474,21 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_timestamp()
             response += self._give_foot(refresh=60, scroll=True)
             self._write_dedented(response)
+        elif urlparse(self.path).path == '/cam_toggle':
+            http.show_cam = not http.show_cam
+            self.send_response(302)
+            self.send_header('Location','.')
+            self.end_headers()
         elif urlparse(self.path).path == '/':
             # Main Page
-            cam = parse_qs(urlparse(self.path).query).get('cam', None)
             exclude = parse_qs(urlparse(self.path).query).get('exclude', '')
             exclude = [item for sublist in exclude for item in sublist.split(',')]
             self._set_headers()
             response = self._give_head()
             if not "deco" in exclude:
                 response += f'<h2>{http.settings.name}</h2>\n'
-            if cam and http.settings.cam_url:
-                response += f'<a href="{http.settings.cam_home}" title="Webcam homepage" '\
-                        f'style="display: block; width: {http.settings.cam_width}%">'\
-                        f'<img src="{http.settings.cam_url}" alt="Webcam">'\
-                        f'</a><br>\n'
+            if not "cam" in exclude and http.settings.cam_url and http.show_cam:
+                response += self._give_cam()
             response += '<table>\n'
             if not "env" in exclude:
                 response += self._give_env()

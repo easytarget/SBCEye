@@ -82,7 +82,7 @@ class Settings:
         self.name = general.get("name")
         self.long_format = general.get("long_format")
         self.short_format = general.get("short_format")
-        self.log_hourly = general.getboolean("log_hourly")
+        self.log_daily = general.getboolean("log_daily")
         self.have_sensor = general.getboolean("sensor")
         self.have_screen = general.getboolean("screen")
         self.pin_state_names = tuple(general.get("pin_state_names").split(','))
@@ -93,6 +93,7 @@ class Settings:
         self.web_host = web.get("host")
         self.web_port = web.getint("port")
         self.web_sensor_name = web.get("sensor_name")
+        self.web_show_cam = web.getboolean("show_cam")
         self.web_allow_dump = web.getboolean("allow_dump")
         self.web_show_control = web.getboolean("show_control")
 
@@ -161,20 +162,15 @@ class Settings:
         self.animate_passes = animate.getint("passes")
         self.animate_speed = animate.getint("speed")
 
-        self.cam_url = None
+        self.cam_url, self.cam_home, self.cam_width = None, None, 0
         if "webcam" in config:
             cam = config["webcam"]
             self.cam_url = cam.get("url")
             self.cam_home = cam.get("home")
             self.cam_width = cam.getint("width")
 
-        # Optional [DEBUG] section can be enabled
-        #  If this section is present it changes the operation of
-        #  SIGINT (eg Ctrl-c) to restart the service, instead of exiting
-        # Currently has no other configurable items
-        if "debug" in config:
-            self.debug = True
-        else:
-            self.debug = False
+        debug = config["debug"]
+        self.debug_http = debug.getboolean("http")
+        self.debug_sigint = debug.getboolean("sigint")
 
         print("Settings loaded from configuration file successfully")
