@@ -55,7 +55,7 @@ Create the virtual environment and activate it
   - [This Video](https://www.youtube.com/watch?v=N5vscPTWKOk) and [This](https://www.youtube.com/watch?v=4jt9JPoIDpY) explain it quite well.
 
 ```console
-eye@sbc:~/SBCEye $ python3 -m virtualenv env
+eye@sbc:~/SBCEye $ python3 -m venv env
 
 eye@sbc:~/SBCEye $ source env/bin/activate
 
@@ -69,7 +69,7 @@ Now we install/upgrade the requirements
 (env) eye@sbc:~/SBCEye $ pip install --upgrade pip
 (env) eye@sbc:~/SBCEye $ pip install --upgrade wheel
 
-(env) eye@sbc:~/SBCEye $ pip install psutil schedule setproctitle rrdtool
+(env) eye@sbc:~/SBCEye $ pip install psutil schedule setproctitle rrdtool-bindings
 
 ; If you wish to control a gpio pin via a button or url you need to install RPi.GPIO
 ; - this is not necesscary if you just want to monitor (not control) pins.
