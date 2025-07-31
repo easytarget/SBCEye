@@ -51,7 +51,7 @@ class Pinreader:
             if this_pin_state != self.data[f"pin-{name}"]:
                 # Pin has changed state, store new state and log
                 self.data[f'pin-{name}'] = this_pin_state
-                logging.info(f'{name}: {self.state_names[this_pin_state]}')
+                logging.info(f'{name} (gpio-{pin}): {self.state_names[this_pin_state]}')
 
 def get_pin(pin):
     '''Read pin state, return an integer
