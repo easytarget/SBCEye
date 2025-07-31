@@ -7,6 +7,7 @@ Type=simple
 Restart=always
 WorkingDirectory=/home/eye/SBCEye/
 ExecStart=/home/eye/SBCEye/env/bin/python /home/eye/SBCEye/SBCEye.py
+SyslogIdentifier=SBCEye
 User=eye
 Group=eye
 
