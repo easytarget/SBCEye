@@ -96,4 +96,5 @@ def i2c_setup(screen, sensor):
                 print(failure)
                 print("We do not have a environmental sensor")
 
+    print(flush=True)
     return disp, bme280

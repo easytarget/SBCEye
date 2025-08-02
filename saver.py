@@ -2,6 +2,7 @@
 '''
 
 import time
+import logging
 
 class Saver:
     '''Saver class:
@@ -33,12 +34,15 @@ class Saver:
         if len(invert) == 1:
             self.invert = invert[0]
         if self.mode != 'off':
+            logging.info(f'Saver will {self.mode} display between: '\
+                    f'{start:02d}:00 and {end:02d}:00')
             print(f'Saver will {self.mode} display between: '\
-                    f'{start}:00 and {end}:00')
+                    f'{start:02d}:00 and {end:02d}:00',flush=True)
             if (start == end)\
                     or start not in range(0,23)\
                     or end not in range(0,23):
-                print('start/end times identical or out of range; disabling')
+                logging.warning('start/end times identical or out of range; disabling saver')
+                print('start/end times identical or out of range; disabling saver',flush=True)
                 self.mode = 'off'
             elif start < end:
                 self.saver_map = [False]*24
@@ -55,14 +59,14 @@ class Saver:
         '''Apply the desired state to the display'''
         if state:
             self.active = True
-            print('Saver activated')
+            print('Saver activated',flush=True)
             if self.mode == 'invert':
                 self.disp.invert(not self.invert)
             elif self.mode == 'blank':
                 self.disp.poweroff()
         else:
             self.active = False
-            print('Saver deactivated')
+            print('Saver deactivated',flush=True)
             if self.mode == 'invert':
                 self.disp.invert(self.invert)
             elif self.mode == 'blank':

@@ -100,7 +100,7 @@ class Animator:
 
         # Notify logs etc
         logging.info('Display configured and enabled')
-        print('Display configured and enabled')
+        print('Display configured and enabled',flush=True)
         self._splash()
 
 
@@ -237,7 +237,7 @@ def animate(settings, disp, queue):
 
     def die_with_dignity(*_):
         '''Exit cleanly (eg without stack trace) on a sigint/sigterm'''
-        print('Display animator process exiting')
+        print('Display animator process exiting',flush=True)
         sys_exit()
 
     signal(SIGTERM, die_with_dignity)
