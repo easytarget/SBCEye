@@ -181,29 +181,38 @@ class Robin:
         self.cache_age = s.rrd_interval
 
         # Notify
-        print('RRD database and cache configured and enabled')
+        print('RRD database and cache configured and enabled',flush=True)
         logging.info(f'RRD database is: {str(self.db_file)}')
 
 
-    def _backup(self):
+    def backup(self):
         '''Backup and rotate old backups'''
         if self.backup_count > 0:
             # Copy to a timestamped file
             self.write_updates()
             suffix = time.strftime("%Y-%m-%d.%H:%M:%S.xml.gz")
-            if not db_lock.acquire(blocking=True, timeout=600):
-                print('Error: Backup failed, could not acquire db lock within 600s')
-                return
             start = time.time()
-            with open(f'{self.db_file}', 'rb') as dbfile:
-                with gzip.GzipFile(
-                        f'{str(self.backup_path)}/{self.backup_name}.{suffix}',
-                        mode = 'wb', compresslevel = 6) as zipfile:
-                    zipfile.write(dbfile.read())
-            db_lock.release()
-            #logging.info(f'Database backup saved as: {self.backup_name}.{suffix}')
-            print(f'Database backup saved as: {self.backup_name}.{suffix} '\
-                    f'(took: {(time.time() - start):.2f}s)')
+            try:
+                backupfile = open(f'{str(self.backup_path)}/{self.backup_name}.{suffix}', 'wb')
+            except Exception as e:
+                logging.error(f'Database backup file write failed: {self.backup_name}.{suffix}\n{e}')
+                print(f'Database backup file write failed: {self.backup_name}.{suffix}\n{e}',flush=True)
+                return
+            else:
+                with backupfile:
+                    backupfile.write(self.dump())
+            size = os.stat(f'{str(self.backup_path)}/{self.backup_name}.{suffix}').st_size
+            if size == 0:
+                logging.error(f'Database backup failed: empty datafile returned')
+                print(f'Database backup failed: empty datafile returned',flush=True)
+                try:
+                    os.remove(f'{str(self.backup_path)}/{self.backup_name}.{suffix}')
+                except:
+                    pass   # ignore a failure here
+                return
+            logging.info(f'Database backup saved as: {self.backup_name}.{suffix} '\
+                         f'(size: {size}, took: {(time.time() - start):.2f}s)')
+            print(f'Database backup saved as: {self.backup_name}.{suffix}',flush=True)
 
             # Process old backups
             now = time.time()
@@ -222,38 +231,33 @@ class Robin:
                 else:
                     os.remove(f'{self.backup_path}/{name}')
                     #logging.info(f'Removed stale backup: {name}')
-                    print(f'Removed stale backup: {name}')
+                    print(f'Removed stale backup: {name}',flush=True)
 
     def start_backups(self):
         '''Add the backup schedule job'''
         # Start the backup schedule, using threads since it can run for some time
         if self.backup_count > 0:
-            schedule.every().day.at(self.backup_time).do(run_threaded, self._backup)
-
-
-    def dump_to_file(self, filename):
+            schedule.every().day.at(self.backup_time).do(run_threaded, self.backup)
 
 
     def dump(self):
         '''provide a gzipped dump of database'''
         dump_local.zipped = bytearray()
-        if self.rrdtool:
+        if self.rrdtool and self.gzip:
             self.write_updates()
-            print('Dump requested')
+            print('Dump requested',flush=True)
             if not db_lock.acquire(blocking=True, timeout=60):
-                print('Error: Dumping failed, could not acquire db lock within 60s')
+                print('Error: Dumping failed, could not acquire db lock within 60s',flush=True)
                 return dump_local.zipped
             dump_local.start = time.time()
-            dump = subprocess.check_output([self.rrdtool, 'dump', str(self.db_file)])
+            with subprocess.Popen([self.rrdtool, 'dump', str(self.db_file)], \
+                                  stdout=subprocess.PIPE) as dump_local.raw:
+                dump_local.zipped = subprocess.check_output(('gzip'), stdin=dump_local.raw.stdout)
             db_lock.release()
-            print(f'Dump is: {len(dump)} bytes raw and '\
-                    f'took {(time.time() - dump_local.start):.2f}s')
-            dump_local.start = time.time()
-            dump_local.zipped = gzip.compress(dump, compresslevel=6)
-            print(f'Dump compressed to {len(dump_local.zipped)} bytes '\
-                    f'in {(time.time() - dump_local.start):.2f}s')
+            print(f'Dump is: {len(dump_local.zipped)} bytes compressed, and '\
+                  f'took {(time.time() - dump_local.start):.2f}s',flush=True)
         else:
-            print('Dump requested but denied because commandline "rrdtool" unavailable')
+            print('Dump requested but denied because commandline "rrdtool" or "gzip" unavailable',flush=True)
         return dump_local.zipped
 
     def update(self, data):
@@ -271,11 +275,11 @@ class Robin:
         if len(self.cache) > 0:
             if not db_lock.acquire(blocking=True, timeout=self.cache_age):
                 print('Error: Data Write failed, could not acquire database '\
-                        f'lock within write period ({self.cache_age}s)')
+                        f'lock within write period ({self.cache_age}s)',flush=True)
                 return
             # check if cache was emptied in another thread while waiting for lock
             if len(self.cache) > 0:
-                # print(f'DB WRITE:len={len(self.cache)}')
+                # print(f'DB WRITE:len={len(self.cache)}',flush=True)
                 try:
                     rrdtool.update(
                             str(self.db_file),
@@ -285,7 +289,7 @@ class Robin:
                     self.cache = []
                 except rrdtool.OperationalError as rrd_error:
                     print("RRDTool update error:")
-                    print(rrd_error)
+                    print(rrd_error,flush=True)
             db_lock.release()
         self.last_write = time.time()
 
@@ -337,12 +341,12 @@ class Robin:
                 print(f'Graph generation failed:\n{graph_error}')
                 print(f'cmd: {graph_error.cmd}')
                 print(f'output: {graph_error.output}')
-                print(f'stdout: {graph_error.stderr}')
+                print(f'stdout: {graph_error.stderr}',flush=True)
 
             if len(graph_local.response) == 0:
-                print(f'Error: png file generation failed for : {graph} : {start}>>{end}')
+                print(f'Error: png file generation failed for : {graph} : {start}>>{end}',flush=True)
         else:
-            print(f'Error: No graph available for type: {graph}')
+            print(f'Error: No graph available for type: {graph}',flush=True)
         return graph_local.response
 
 def run_threaded(job_func):
