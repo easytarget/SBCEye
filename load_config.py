@@ -95,6 +95,7 @@ class Settings:
         self.web_sensor_name = web.get("sensor_name")
         self.web_show_cam = web.getboolean("show_cam")
         self.web_allow_dump = web.getboolean("allow_dump")
+        self.web_allow_backup = web.getboolean("allow_backup")
         self.web_show_control = web.getboolean("show_control")
 
         graph = config["graph"]

@@ -6,7 +6,6 @@
 import time
 from pathlib import Path
 import logging
-import gzip
 import subprocess
 import os
 from shutil import which
@@ -36,7 +35,6 @@ class Robin:
         self.graph_args["area_color"] = s.graph_area_color
         self.graph_args["area_depth"] = s.graph_area_depth
         self.half_height = s.graph_half_height
-
 
         # Sensor and system sources with limits (min,max)
         self.data_sources = {
@@ -166,12 +164,16 @@ class Robin:
                     str(self.db_file),
                     f"DS:{source}:GAUGE:60:{mini}:{maxi}")
 
-        # Disable dumping if rrdtool not in path
+        # Disable backup and dumping if rrdtool or gzip not in path
         self.rrdtool = which("rrdtool")
-        if self.rrdtool:
+        self.gzip = which("gzip")
+        if self.rrdtool and self.gzip:
             print(f'Commandline rrdtool: {self.rrdtool}')
+            print(f'Commandline gzip: {self.gzip}')
         else:
-            print('No commandline rrdtool available, ' + 'graphing and dumping disabled')
+            print('No commandline rrdtool and/or gzip available: backups disabled')
+            logging.warning('rrdtool or gzip not found: Disabling database backups')
+            self.backup_count = 0
 
         # Use a home-brew local cache
         self.cache = []
@@ -188,7 +190,7 @@ class Robin:
         if self.backup_count > 0:
             # Copy to a timestamped file
             self.write_updates()
-            suffix = time.strftime("%Y-%m-%d.%H:%M:%S.gz")
+            suffix = time.strftime("%Y-%m-%d.%H:%M:%S.xml.gz")
             if not db_lock.acquire(blocking=True, timeout=600):
                 print('Error: Backup failed, could not acquire db lock within 600s')
                 return
@@ -227,6 +229,10 @@ class Robin:
         # Start the backup schedule, using threads since it can run for some time
         if self.backup_count > 0:
             schedule.every().day.at(self.backup_time).do(run_threaded, self._backup)
+
+
+    def dump_to_file(self, filename):
+
 
     def dump(self):
         '''provide a gzipped dump of database'''

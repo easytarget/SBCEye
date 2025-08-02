@@ -35,7 +35,7 @@ def serve_http(settings, rrd, data, helpers):
     http.icon_file = 'favicon.ico'
     if not os.path.exists(http.icon_file):
         http.icon_file = f'{sys.path[0]}/{http.icon_file}'
-    if rrd.rrdtool:
+    if rrd.rrdtool and rrd.gzip:
         http.db_graphable = True
         if settings.web_allow_dump:
             logging.info("RRD database is dumpable via web")
@@ -43,7 +43,7 @@ def serve_http(settings, rrd, data, helpers):
         else:
             http.db_dumpable = False
     else:
-        logging.warning('Commandline rrdtool not found, '\
+        logging.warning('Commandline rrdtool or gzip not found, '\
                 'graphing and dumping functions are unavailable')
         http.db_dumpable = False
         http.db_graphable = False
@@ -157,15 +157,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 href="https://github.com/easytarget/SBCEye"
                 title="Project homepage on GitHub" target="_blank">
                 SBCEye</a></div>'''
-
-    #def _give_cam(self):
-    #    return f'''<tr><th>Cam</th></tr>\n
-    #           <tr><td colspan="2">
-    #           <a href="{http.settings.cam_home}" title="Webcam homepage"
-    #           target="_blank">
-    #           <img src="{http.settings.cam_url}" alt="Webcam">
-    #           </a></td></tr>\n'''
-    #           # style="display: block; width: {http.settings.cam_width}%"
 
     def _give_cam(self):
         return f'''<div style="font-size: 110%; font-weight:bold;
