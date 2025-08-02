@@ -42,9 +42,14 @@ def serve_http(settings, rrd, data, helpers):
             http.db_dumpable = True
         else:
             http.db_dumpable = False
+        if settings.web_allow_backup:
+            logging.info("RRD database can be triggered via web")
+            http.db_backupable = True
+        else:
+            http.db_backupable = False
     else:
         logging.warning('Commandline rrdtool or gzip not found, '\
-                'graphing and dumping functions are unavailable')
+                'graphing, backup and dumping functions are unavailable')
         http.db_dumpable = False
         http.db_graphable = False
     if settings.cam_url:
@@ -56,7 +61,7 @@ def serve_http(settings, rrd, data, helpers):
             f'on host {settings.web_host}')
     httpd.server_bind()
     address = f"http://{httpd.server_name}:{httpd.server_port}"
-    print(f"Webserver starting on : {address}")
+    print(f"Webserver starting on : {address}",flush=True)
     httpd.server_activate()
 
     def serve_forever(httpd):
@@ -457,6 +462,13 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_dump_portal()
             response += self._give_foot()
             self._write_dedented(response)
+        elif (urlparse(self.path).path == '/backup') and http.db_backupable:
+            # trigger a backup and notify
+            logging.info(f"RRD database backup triggered by {self.client_address[0]}")
+            self.send_response(302)
+            self.send_header('Location','log')
+            self.end_headers()
+            http.rrd.backup()
         elif urlparse(self.path).path == '/log':
             self._set_headers()
             response = self._give_head()
