@@ -163,12 +163,10 @@ class Settings:
         self.animate_passes = animate.getint("passes")
         self.animate_speed = animate.getint("speed")
 
-        self.cam_url, self.cam_home, self.cam_width = None, None, 0
+        self.cam_url = None
         if "webcam" in config:
             cam = config["webcam"]
             self.cam_url = cam.get("url")
-            self.cam_home = cam.get("home")
-            self.cam_width = cam.getint("width")
 
         debug = config["debug"]
         self.debug_http = debug.getboolean("http")

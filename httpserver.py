@@ -43,7 +43,7 @@ def serve_http(settings, rrd, data, helpers):
         else:
             http.db_dumpable = False
         if settings.web_allow_backup:
-            logging.info("RRD database can be triggered via web")
+            logging.info("RRD database backups can be triggered via web")
             http.db_backupable = True
         else:
             http.db_backupable = False
@@ -54,7 +54,6 @@ def serve_http(settings, rrd, data, helpers):
         http.db_graphable = False
     if settings.cam_url:
         logging.info(f"Webcam configured at: {settings.cam_url}")
-    http.show_cam = settings.web_show_cam
 
     # Start the server
     logging.info(f'HTTP server will bind to port {str(settings.web_port)} '\
@@ -263,7 +262,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 else:
                     ret += f'&nbsp;<span style="color: #BBBBBB;">{duration}</span>&nbsp;\n'
             if len(skip) > 0:
-                ret += '&nbsp;:&nbsp;&nbsp;<a href="./" title="Main page">Home</a>\n'
+                ret += '</td></tr>\n<tr><td colspan="2" style="text-align: center">'\
+                       '<a href="./" title="Main page">Home</a>\n'
             ret += '</td></tr>\n'
         return ret
 
@@ -271,24 +271,20 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # Links to the graph pages
         ret = f'{self._give_graphlinks()}'
         # Links to the pin contol, cam show/hide and log pages
-        ret += f'<tr><th>Server</th></tr>\n'
-        if http.settings.web_show_control and (http.settings.button_pin > 0):
+        ret += f'<tr><td colspan="2"></td></tr>\n'
+        if http.settings.web_show_control and (http.settings.button_out > 0):
             _, onoff = http.button_control('status')
             state = 'On' if onoff else 'Off'
-            ret += f'<tr><td>{http.settings.button_label}:</td>\n'\
-                   f'<td style="text-align: right">'\
+            ret += f'<tr><td colspan="2" style="text-align: center">'\
                    f'<a href="./{http.settings.button_url}" '\
                    f'title="{http.settings.button_label} status and control page">'\
-                   f'{state}</a></td></tr>\n'
+                   f'{http.settings.button_label}: {state}</a></td></tr>\n'
         if http.settings.cam_url:
-            action = 'Hide' if http.show_cam else 'Show'
-            ret += f'<tr><td>Cam view:</td>\n'\
-                   f'<td style="text-align: right">'\
-                   f'<a href="./cam_toggle" title="Toggle cam view">'\
-                   f'{action}</a></td></tr>\n'
-
+            ret += f'<tr><td colspan="2" style="text-align: center">'\
+                   f'<a href="{http.settings.cam_url}" title="Webcam view" target="_blank">'\
+                   f'Cam viewer</a></td></tr>\n'
         ret += f'<tr><td colspan="2" style="text-align: center">\n'\
-               f'<br><a href="./log" title="Open log in a new page" target="_blank">'\
+               f'<a href="./log" title="Open log in a new page" target="_blank">'\
                f'Action Log</a></td></tr>\n'
         return ret
 
@@ -477,11 +473,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_timestamp()
             response += self._give_foot(refresh=60, scroll=True)
             self._write_dedented(response)
-        elif urlparse(self.path).path == '/cam_toggle':
-            http.show_cam = not http.show_cam
-            self.send_response(302)
-            self.send_header('Location','.')
-            self.end_headers()
         elif urlparse(self.path).path == '/':
             # Main Page
             exclude = parse_qs(urlparse(self.path).query).get('exclude', '')
@@ -490,8 +481,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response = self._give_head()
             if not "deco" in exclude:
                 response += f'<h2>{http.settings.name}</h2>\n'
-            if not "cam" in exclude and http.settings.cam_url and http.show_cam:
-                response += self._give_cam()
             response += '<table>\n'
             if not "env" in exclude:
                 response += self._give_env()
