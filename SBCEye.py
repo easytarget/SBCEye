@@ -105,7 +105,7 @@ logging.info('CPU thermal device detected as: ' + cpu_thermal_device)
 #
 # Import, setup and return hardware drivers, or 'None' if setup fails
 
-disp, bme280 = i2c_setup(settings.have_screen, settings.have_sensor)
+disp, bme = i2c_setup(settings.have_screen, settings.have_sensor)
 
 if disp:
     disp.contrast(settings.display_contrast)
@@ -213,10 +213,11 @@ def update_system():
 def update_sensors():
     '''Get current environmental sensor data
     '''
-    if bme280:
-        data['env-temp'] = bme280.temperature
-        data['env-humi'] = bme280.relative_humidity
-        data['env-pres'] = bme280.pressure
+    if bme:
+        bme.update_sensor()
+        data['env-temp'] = bme.temperature
+        data['env-humi'] = bme.humidity
+        data['env-pres'] = bme.pressure
         # Failed pressure measurements really foul up the graph, skip
         if data['env-pres'] == 0:
             data['env-pres'] = 'U'
@@ -267,7 +268,7 @@ def handle_exit():
 if __name__ == '__main__':
 
     # Log sensor status
-    if bme280:
+    if bme:
         logging.info('Environmental sensor configured and enabled')
     elif settings.have_sensor:
         logging.warning('Environmental data configured but no sensor detected: '\

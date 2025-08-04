@@ -29,9 +29,9 @@ def i2c_setup(screen, sensor):
     # Start by trying to load the correct modules
     if screen or sensor:
         # I2C Comms
+        # Uses standard SMBUS lib (currently smbus2)
         try:
-            import busio
-            from board import SCL, SDA
+            import smbus2
         except ImportError as error:
             print(error)
             print("ERROR: I2C bus requirements not met")
@@ -48,9 +48,11 @@ def i2c_setup(screen, sensor):
 
     if sensor:
         # BME280 I2C Tepmerature Pressure and Humidity sensor
+        # Uses pimoroni library:
+        #  https://github.com/pimoroni/bme280-python
+        #  pip install pimoroni-bme280
         try:
-            #import adafruit_bme280
-            from adafruit_bme280 import basic as adafruit_bme280
+            import bme280
         except ImportError as error:
             print(error)
             print("ERROR: BME280 environment sensor requirements not met")
@@ -60,7 +62,7 @@ def i2c_setup(screen, sensor):
     if screen or sensor:
         try:
             # Create the I2C interface object
-            i2c = busio.I2C(SCL, SDA)
+            i2c = smbus2.SMBus(1)
             print('We have a I2C bus')
         except ValueError as error:
             print(error)
@@ -84,17 +86,11 @@ def i2c_setup(screen, sensor):
     if sensor:
         try:
             # Create the I2C BME280 sensor object
-            bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x76)
-            #bme280 = adafruit_bme280.adafruit_bme280_i2c(i2c, address=0x76)
-            print("BME280 sensor found with address 0x76")
+            bmeSensor = bme280.BME280(i2c_dev=i2c)
+            print("BME280 sensor found")
         except RuntimeError as error:
-            try:
-                bme280 = adafruit_bme280.Adafruit_BME280_I2C(i2c, address=0x77)
-                print("BME280 sensor found with address 0x77")
-            except RuntimeError as failure:
-                print(error)
-                print(failure)
-                print("We do not have a environmental sensor")
+            print(error)
+            print("We do not have a environmental sensor")
 
     print(flush=True)
-    return disp, bme280
+    return disp, bmeSensor
