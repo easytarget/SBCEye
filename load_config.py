@@ -26,6 +26,8 @@ class Settings:
 
     def __init__(self):
 
+        if sys.path[0] == '':
+            sys.path[0] = '.'
         self.my_version = check_output(["git", "describe", "--tags",
         "--always", "--dirty"], cwd=sys.path[0]).decode('ascii').strip()
 
@@ -108,6 +110,11 @@ class Settings:
         self.graph_area_depth = graph.get("area_depth")
         self.graph_half_height = graph.get("half_height").split(',')
 
+        self.links= {}
+        for name in config["links"]:
+            real = name.replace('_',' ')
+            self.links[real] = config.get("links",name)
+
         self.pin_map = {}
         for pin in config["pins"]:
             self.pin_map[pin] = config.getint("pins",pin)
@@ -115,17 +122,6 @@ class Settings:
         self.net_map = {}
         for host in config["ping"]:
             self.net_map[host] = config.get("ping",host)
-
-        button = config["button"]
-        self.button_out = button.getint("out")
-        self.button_pin = button.getint("pin")
-        self.button_url = button.get("url")
-        self.button_label = button.get("label")
-        self.button_hold = button.getfloat("hold")
-        if self.button_out == 0:
-            self.button_name = 'Undefined'
-        else:
-            self.button_name = f'gpio-{self.button_out}'
 
         intervals = config["intervals"]
         self.pin_interval = intervals.getint("pin")
@@ -163,10 +159,16 @@ class Settings:
         self.animate_passes = animate.getint("passes")
         self.animate_speed = animate.getint("speed")
 
-        self.cam_url = None
-        if "webcam" in config:
-            cam = config["webcam"]
-            self.cam_url = cam.get("url")
+        button = config["button"]
+        self.button_out = button.getint("out")
+        self.button_pin = button.getint("pin")
+        self.button_url = button.get("url")
+        self.button_label = button.get("label")
+        self.button_hold = button.getfloat("hold")
+        if self.button_out == 0:
+            self.button_name = 'Undefined'
+        else:
+            self.button_name = f'gpio-{self.button_out}'
 
         debug = config["debug"]
         self.debug_http = debug.getboolean("http")

@@ -52,8 +52,10 @@ def serve_http(settings, rrd, data, helpers):
                 'graphing, backup and dumping functions are unavailable')
         http.db_dumpable = False
         http.db_graphable = False
-    if settings.cam_url:
-        logging.info(f"Webcam configured at: {settings.cam_url}")
+
+    # Note the list of link targets
+    for link in settings.links:
+        logging.info(f"Web link '{link}' points to: {settings.links[link]}")
 
     # Start the server
     logging.info(f'HTTP server will bind to port {str(settings.web_port)} '\
@@ -279,10 +281,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                    f'<a href="./{http.settings.button_url}" '\
                    f'title="{http.settings.button_label} status and control page">'\
                    f'{http.settings.button_label}: {state}</a></td></tr>\n'
-        if http.settings.cam_url:
+        for link in http.settings.links:
             ret += f'<tr><td colspan="2" style="text-align: center">'\
-                   f'<a href="{http.settings.cam_url}" title="Webcam view" target="_blank">'\
-                   f'Cam viewer</a></td></tr>\n'
+                   f'<a href="{http.settings.links[link]}" title="Open {link} in a new tab" target="_blank">'\
+                   f'{link}</a></td></tr>\n'
         ret += f'<tr><td colspan="2" style="text-align: center">\n'\
                f'<a href="./log" title="Open log in a new page" target="_blank">'\
                f'Action Log</a></td></tr>\n'
