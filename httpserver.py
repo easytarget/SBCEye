@@ -314,9 +314,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <span style="font-size: 80%;">Latest {lines} lines shown</span>\n
                 </div>\n
                 <div><a href="./log?lines=25" title="show 25 lines">25</a>&nbsp;:
-                &nbsp;<a href="./log?lines=250" title="show 250 lines">250</a>&nbsp;:
-                &nbsp;<a href="./log?lines=2500" title="show 2500 lines">2500</a>&nbsp;:
-                &nbsp;<a href="./" title="Main page">Home</a></div>\n'''
+                <a href="./log?lines=250" title="show 250 lines">250</a>&nbsp;:
+                <a href="./log?lines=2500" title="show 2500 lines">2500</a></div>\n
+                <div><a href="./" title="Main page">Home</a></div>\n'''
         return ret
 
     def _give_graphs(self, start, end, stamp):
