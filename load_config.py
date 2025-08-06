@@ -26,6 +26,14 @@ class Settings:
 
     def __init__(self):
 
+        def hexint(instring):
+            ''' Helper function so we can use '0xNN' hex values for some inputs'''
+            try:
+                outint = int(instring)
+            except ValueError:
+                outint = int(instring, 16)
+            return outint
+
         if sys.path[0] == '':
             sys.path[0] = '.'
         self.my_version = check_output(["git", "describe", "--tags",
@@ -143,6 +151,12 @@ class Settings:
         self.rrd_backup_count = rrd.getint("backup_count")
         self.rrd_backup_age = int(abs(rrd.getfloat("backup_age")) * 86400)
         self.rrd_backup_time = rrd.get("backup_time")
+
+        bus = config["bus"]
+        self.bus_id = hexint(bus.get("bus_id"))
+        self.sensor_addr = hexint(bus.get("sensor_addr"))
+        self.screen_addr = hexint(bus.get("screen_addr"))
+        print("!!!!!!!!!!!!!!!!",self.bus_id,self.sensor_addr,self.screen_addr)
 
         display = config["display"]
         self.display_rotate = display.getboolean("rotate")

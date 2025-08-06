@@ -11,12 +11,15 @@ make better use of Importlib in overwatch.py.
 import importlib.util
 
 
-def i2c_setup(screen, sensor):
+def i2c_setup(screen, sensor, bus_id, sensor_addr, screen_addr):
     '''Import and start the I2C bus devices
 
     parameters:
-        screen: (bool) is screen enabled in config?
-        sensor: (bool) is environmental sensor (bme280) enabled in config?
+        screen:      (bool) is screen enabled in config?
+        sensor:      (bool) is environmental sensor (bme280) enabled in config?
+        bus_id:       (int) the I2C bus to use
+        sensor_addr: (int) the I2C address of the bme280 sensor
+        screen_addr: (int) the I2C address of the ssd1306 display
 
     returns:
         disp:   Display driverr object or None if failed
@@ -62,7 +65,7 @@ def i2c_setup(screen, sensor):
     if screen or sensor:
         try:
             # Create the I2C interface object
-            i2c = smbus2.SMBus(1)
+            i2c = smbus2.SMBus(bus_id)
             print('We have a I2C bus')
         except ValueError as error:
             print(error)
@@ -72,7 +75,8 @@ def i2c_setup(screen, sensor):
     if screen:
         try:
             # Create the I2C display object
-            disp = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
+            disp = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, screen_addr)   # < address not in correct position?
+            #disp = Adafruit_SSD1306.SSD1306Base(128,64,rst=None,i2c=i2c)
             print("SSD1306 i2c display found")
         except RuntimeError as error:
             disp = None
@@ -86,7 +90,7 @@ def i2c_setup(screen, sensor):
     if sensor:
         try:
             # Create the I2C BME280 sensor object
-            bmeSensor = bme280.BME280(i2c_dev=i2c)
+            bmeSensor = bme280.BME280(i2c_addr=sensor_addr, i2c_dev=i2c)
             print("BME280 sensor found")
         except RuntimeError as error:
             print(error)

@@ -105,7 +105,11 @@ logging.info('CPU thermal device detected as: ' + cpu_thermal_device)
 #
 # Import, setup and return hardware drivers, or 'None' if setup fails
 
-disp, bme = i2c_setup(settings.have_screen, settings.have_sensor)
+disp, bme = i2c_setup(settings.have_screen,
+                      settings.have_sensor,
+                      settings.bus_id,
+                      settings.sensor_addr,
+                      settings.screen_addr)
 
 if disp:
     disp.contrast(settings.display_contrast)
