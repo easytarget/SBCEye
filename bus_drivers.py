@@ -74,7 +74,7 @@ def i2c_setup(settings):
     if display:
         # for luma display rotation must be specified here,
         # (value from 0 to 3, rotating 90 degrees each step)
-        rotate = 0 if settings.display_rotate else 2
+        rotate = 2 if settings.display_rotate else 0
         try:
             # Create the display object
             disp = ssd1306(bus=i2c, address=settings.display_addr, rotate=rotate)

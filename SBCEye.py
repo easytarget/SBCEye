@@ -108,13 +108,13 @@ logging.info('CPU thermal device detected as: ' + cpu_thermal_device)
 disp, bme = i2c_setup(settings)
 
 if disp:
+    # display initialisation does a 'clear()' and 'show()'
     disp.contrast(settings.display_contrast)
-    #disp.fill(0)  # Blank asap in case we are showing garbage
-    disp.show()
 
 if settings.button_out > 0:
     try:
-        from RPi import GPIO
+        from gpio4 import GPIO_DEBUG_DISABLE
+        gpio = GPIO()
     except ImportError as e:
         print(e)
         print("ERROR: button & pin control requirements not met, features disabled")
@@ -157,20 +157,20 @@ def button_control(action="toggle"):
         ret = f'{settings.button_label} '
         pin = settings.button_out
         if action.lower() in ['toggle','invert','button']:
-            GPIO.output(pin, not GPIO.input(pin))
+            gpio.output(pin, not gpio.input(pin))
             ret += 'Toggled: '
         elif action.lower() in [settings.pin_state_names[1].lower(),'on','true']:
-            GPIO.output(pin,True)
+            gpio.output(pin,True)
             ret += 'Switched: '
         elif action.lower() in [settings.pin_state_names[0].lower(),'off','false']:
-            GPIO.output(pin,False)
+            gpio.output(pin,False)
             ret += 'Switched: '
         elif action.lower() in ['random','easter']:
-            GPIO.output(pin,random.choice([True, False]))
+            gpio.output(pin,random.choice([True, False]))
             ret += 'Randomly Switched: '
         else:
             ret += ': '
-        state = GPIO.input(pin)
+        state = gpio.input(pin)
         ret += settings.pin_state_names[state]
     else:
         state = False
@@ -182,7 +182,7 @@ def button_interrupt(*_):
     '''give a short delay, then re-read input to provide a minimum hold-down time
     and suppress false triggers from other gpio operations'''
     time.sleep(settings.button_hold)
-    if GPIO.input(settings.button_pin):
+    if gpio.input(settings.button_pin):
         logging.info('Button pressed')
         button_control()
 
@@ -275,13 +275,13 @@ if __name__ == '__main__':
 
     # Set button interrupt and output if we have a button and a pin to control
     if settings.button_out > 0:
-        GPIO.setmode(GPIO.BCM)  # Use BCM GPIO numbering
-        GPIO.setup(settings.button_out, GPIO.OUT)
+        gpio.setmode(GPIO.BCM)  # Use BCM GPIO numbering
+        gpio.setup(settings.button_out, GPIO.OUT)
         logging.info(f'Controllable pin ({settings.button_name}) enabled')
         if settings.button_pin > 0:
-            GPIO.setup(settings.button_pin, GPIO.IN)
+            gpio.setup(settings.button_pin, GPIO.IN)
             # Set up the button pin interrupt
-            GPIO.add_event_detect(settings.button_pin,
+            gpio.add_event_detect(settings.button_pin,
                     GPIO.RISING, button_interrupt,
                     bouncetime = int(settings.button_hold * 2000))
             logging.info('Button enabled')

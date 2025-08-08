@@ -60,7 +60,10 @@ class Animator:
         self.height = self.disp.height
         self.span   = self.width*2 + self.margin
 
-        self.display_rotate = settings.display_rotate
+        # Display rotation handled during display init
+        #self.display_rotate = settings.display_rotate
+
+        # How fast
         self.animate_speed = settings.animate_speed
 
         # Create image canvas (with mode '1' for 1-bit color)
@@ -110,13 +113,16 @@ class Animator:
 
     def _show(self, xpos=0):
         '''Put a specific area of the canvas onto display'''
-        if self.display_rotate:
-            self.disp.image(self.image.transform((self.width,self.height),
-                       Image.EXTENT,(xpos,0,xpos+self.width,self.height))
-                       .transpose(Image.ROTATE_180))
-        else:
-            self.disp.image(self.image.transform((self.width,self.height),
-                       Image.EXTENT,(xpos,0,xpos+self.width,self.height)))
+        # Display rotation handled during display init
+        #if self.display_rotate:
+        #    self.disp.image(self.image.transform((self.width,self.height),
+        #               Image.EXTENT,(xpos,0,xpos+self.width,self.height))
+        #               .transpose(Image.ROTATE_180))
+        #else:
+        #    self.disp.image(self.image.transform((self.width,self.height),
+        #                    Image.EXTENT,(xpos,0,xpos+self.width,self.height)))
+        self.disp.display(self.image.transform((self.width,self.height),
+                        Image.EXTENT,(xpos,0,xpos+self.width,self.height)))
         self.disp.show()
 
     def _slideout(self):
