@@ -47,7 +47,7 @@ class Animator:
     Handles starting the display and then displays the desired information
     screens according to user-defined 'frame' rate.
     Screens are 'slid' into place to provide a pleasing animation effect
-    A screensaver can be invoked to blank or invert the display as the user wishes
+    A screensaver can be invoked to blank the display as the user wishes
     '''
 
     def __init__(self, settings, disp, data):
@@ -93,7 +93,7 @@ class Animator:
 
         # Start saver
         saver_settings = (settings.saver_mode, settings.saver_on,
-                settings.saver_off, settings.display_invert)
+                settings.saver_off)
         self.screensaver = Saver(disp, saver_settings)
         self.screensaver.check()
         schedule.every().hour.at(":00").do(self.screensaver.check)

@@ -160,7 +160,6 @@ class Settings:
         display = config["display"]
         self.display_rotate = display.getboolean("rotate")
         self.display_contrast = display.getint("contrast")
-        self.display_invert = display.getboolean("invert")
 
         saver = config["saver"]
         self.saver_mode = saver.get("mode")

@@ -1,4 +1,4 @@
-'''Implements a screen saver/inverter for the SBCEye project
+'''Implements a screen saver for the SBCEye project
 '''
 
 import time
@@ -7,21 +7,17 @@ import logging
 class Saver:
     '''Saver class:
     Turns the display on/off between specified times
-    Can also invert the display as a form of burn-in protection
 
     modes:
         'off': Screensaver disabled
         'blank': Turn screen off
-        'invert': Invert the screen
 
     parameters:
         disp: display driver object
         settings: (tuple) consisting of:
-            mode:   (str)  One of 'off', 'blank', 'invert'
+            mode:   (str)  One of 'off', 'blank'
             start:  (int)  Start time, hour, 0-23
             end:    (int)  End time, hour, 0-23
-            invert: (bool) Base invert state for the display
-                           Optional, defaults to False
     '''
 
     active = False  # Current state
@@ -29,10 +25,7 @@ class Saver:
     def __init__(self, disp, settings):
 
         self.disp = disp
-        (self.mode, start, end, *invert) = settings
-        self.invert = False
-        if len(invert) == 1:
-            self.invert = invert[0]
+        (self.mode, start, end) = settings
         if self.mode != 'off':
             logging.info(f'Saver will {self.mode} display between: '\
                     f'{start:02d}:00 and {end:02d}:00')
@@ -59,17 +52,13 @@ class Saver:
         '''Apply the desired state to the display'''
         if state:
             self.active = True
-            print('Saver activated',flush=True)
-            if self.mode == 'invert':
-                self.disp.invert(not self.invert)
-            elif self.mode == 'blank':
+            if self.mode == 'blank':
+                print('Saver activated',flush=True)
                 self.disp.poweroff()
         else:
             self.active = False
-            print('Saver deactivated',flush=True)
-            if self.mode == 'invert':
-                self.disp.invert(self.invert)
-            elif self.mode == 'blank':
+            if self.mode == 'blank':
+                print('Saver deactivated',flush=True)
                 self.disp.poweron()
 
     def check(self):

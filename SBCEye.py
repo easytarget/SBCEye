@@ -109,7 +109,6 @@ disp, bme = i2c_setup(settings)
 
 if disp:
     disp.contrast(settings.display_contrast)
-    #disp.invert(settings.display_invert)
     #disp.fill(0)  # Blank asap in case we are showing garbage
     disp.show()
 
