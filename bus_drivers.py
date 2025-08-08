@@ -11,43 +11,42 @@ make better use of Importlib in overwatch.py.
 import importlib.util
 
 
-def i2c_setup(screen, sensor, bus_id, sensor_addr, screen_addr):
+def i2c_setup(settings):
     '''Import and start the I2C bus devices
 
     parameters:
-        screen:      (bool) is screen enabled in config?
-        sensor:      (bool) is environmental sensor (bme280) enabled in config?
-        bus_id:       (int) the I2C bus to use
-        sensor_addr: (int) the I2C address of the bme280 sensor
-        screen_addr: (int) the I2C address of the ssd1306 display
-
+        settings: settings oject (from load_config)
     returns:
         disp:   Display driverr object or None if failed
-        bme280: Sensor module object, or None if failed
+        bme: Sensor module object, or None if failed
     '''
 
+    # booleans
+    sensor = settings.have_sensor
+    display = settings.have_display
+    # objects to be returned if successful
     disp = None
-    bme280 = None
+    bme = None
 
     # Start by trying to load the correct modules
-    if screen or sensor:
+    if display or sensor:
         # I2C Comms
         # Uses standard SMBUS lib (currently smbus2)
         try:
             import smbus2
         except ImportError as error:
+            display = sensor = False
             print(error)
             print("ERROR: I2C bus requirements not met")
-            screen = sensor = False
 
-    if screen:
-        # I2C 128x64 OLED Display
+    if display:
+        # I2C OLED Display
         try:
-            import adafruit_ssd1306
+            from luma.oled.device import ssd1306
         except ImportError as error:
+            display = False
             print(error)
             print("ERROR: ssd1306 display requirements not met")
-            screen = False
 
     if sensor:
         # BME280 I2C Tepmerature Pressure and Humidity sensor
@@ -57,44 +56,47 @@ def i2c_setup(screen, sensor, bus_id, sensor_addr, screen_addr):
         try:
             import bme280
         except ImportError as error:
+            sensor = False
             print(error)
             print("ERROR: BME280 environment sensor requirements not met")
-            sensor = False
 
     # Now the actual device driver objects
-    if screen or sensor:
+    if display or sensor:
         try:
             # Create the I2C interface object
-            i2c = smbus2.SMBus(bus_id)
+            i2c = smbus2.SMBus(settings.bus_id)
             print('We have a I2C bus')
         except ValueError as error:
+            display = sensor = False
             print(error)
             print("No I2C bus, display and sensor functions will be disabled")
-            screen = sensor = False
 
-    if screen:
+    if display:
+        # for luma display rotation must be specified here,
+        # (value from 0 to 3, rotating 90 degrees each step)
+        rotate = 0 if settings.display_rotate else 2
         try:
-            # Create the I2C display object
-            disp = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, screen_addr)   # < address not in correct position?
-            #disp = Adafruit_SSD1306.SSD1306Base(128,64,rst=None,i2c=i2c)
+            # Create the display object
+            disp = ssd1306(bus=i2c, address=settings.display_addr, rotate=rotate)
             print("SSD1306 i2c display found")
         except RuntimeError as error:
             disp = None
             print(error)
             print("ERROR: SSD1306 i2c display failed to initialise, disabling")
 
-        if not importlib.util.find_spec("PIL"):
+        if not importlib.util.find_spec("luma"):
             disp = None
-            print("ERROR: PIL graphics module not found, disabling display")
+            print("ERROR: Luma library not found, disabling display")
 
     if sensor:
         try:
             # Create the I2C BME280 sensor object
-            bmeSensor = bme280.BME280(i2c_addr=sensor_addr, i2c_dev=i2c)
+            bme = bme280.BME280(i2c_addr=settings.sensor_addr, i2c_dev=i2c)
             print("BME280 sensor found")
         except RuntimeError as error:
+            bme = None
             print(error)
             print("We do not have a environmental sensor")
 
     print(flush=True)
-    return disp, bmeSensor
+    return disp, bme
