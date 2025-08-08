@@ -94,7 +94,7 @@ class Settings:
         self.short_format = general.get("short_format")
         self.log_daily = general.getboolean("log_daily")
         self.have_sensor = general.getboolean("sensor")
-        self.have_screen = general.getboolean("screen")
+        self.have_display = general.getboolean("display")
         self.pin_state_names = tuple(general.get("pin_state_names").split(','))
         if self.name == "":
             self.name = f'{os.uname().nodename}'
@@ -155,8 +155,7 @@ class Settings:
         bus = config["bus"]
         self.bus_id = hexint(bus.get("bus_id"))
         self.sensor_addr = hexint(bus.get("sensor_addr"))
-        self.screen_addr = hexint(bus.get("screen_addr"))
-        print("!!!!!!!!!!!!!!!!",self.bus_id,self.sensor_addr,self.screen_addr)
+        self.display_addr = hexint(bus.get("display_addr"))
 
         display = config["display"]
         self.display_rotate = display.getboolean("rotate")

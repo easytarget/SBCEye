@@ -105,16 +105,12 @@ logging.info('CPU thermal device detected as: ' + cpu_thermal_device)
 #
 # Import, setup and return hardware drivers, or 'None' if setup fails
 
-disp, bme = i2c_setup(settings.have_screen,
-                      settings.have_sensor,
-                      settings.bus_id,
-                      settings.sensor_addr,
-                      settings.screen_addr)
+disp, bme = i2c_setup(settings)
 
 if disp:
     disp.contrast(settings.display_contrast)
-    disp.invert(settings.display_invert)
-    disp.fill(0)  # Blank asap in case we are showing garbage
+    #disp.invert(settings.display_invert)
+    #disp.fill(0)  # Blank asap in case we are showing garbage
     disp.show()
 
 if settings.button_out > 0:
@@ -244,7 +240,7 @@ def daily():
 def handle_signal(sig, *_):
     '''Handle common signals'''
     if DISPLAY:
-        # clean up the screen process
+        # clean up the display process
         DISPLAY.join()
     if sig == SIGHUP:
         handle_restart()
@@ -306,7 +302,7 @@ if __name__ == '__main__':
         DISPLAY.start()
     else:
         DISPLAY = None
-        if settings.have_screen:
+        if settings.have_display:
             logging.warning('Display configured but did not initialise properly: '\
                     'Display features disabled')
 
