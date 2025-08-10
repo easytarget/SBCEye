@@ -123,6 +123,11 @@ class Settings:
             real = name.replace('_',' ')
             self.links[real] = config.get("links",name)
 
+        try:
+            self.gpio_chip = config.get("gpio","chip")
+        except configparser.NoOptionError:
+            self.gpio_chip = None
+
         self.pin_map = {}
         for pin in config["pins"]:
             self.pin_map[pin] = config.getint("pins",pin)
