@@ -54,12 +54,10 @@ class Saver:
             self.active = True
             if self.mode == 'blank':
                 print('Saver activated',flush=True)
-                self.disp.poweroff()
         else:
             self.active = False
             if self.mode == 'blank':
                 print('Saver deactivated',flush=True)
-                self.disp.poweron()
 
     def check(self):
         '''Check the current state vs the time, and apply changes as

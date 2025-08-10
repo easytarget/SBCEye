@@ -112,18 +112,14 @@ class Animator:
         self.draw.rectangle((0,0,self.span-1,self.height-1), outline=0, fill=0)
 
     def _show(self, xpos=0):
-        '''Put a specific area of the canvas onto display'''
-        # Display rotation handled during display init
-        #if self.display_rotate:
-        #    self.disp.image(self.image.transform((self.width,self.height),
-        #               Image.EXTENT,(xpos,0,xpos+self.width,self.height))
-        #               .transpose(Image.ROTATE_180))
-        #else:
-        #    self.disp.image(self.image.transform((self.width,self.height),
-        #                    Image.EXTENT,(xpos,0,xpos+self.width,self.height)))
-        self.disp.display(self.image.transform((self.width,self.height),
-                        Image.EXTENT,(xpos,0,xpos+self.width,self.height)))
-        self.disp.show()
+        '''Put a specific area of the canvas onto display,
+           or blank if the screensaver is active'''
+        if self.screensaver.active:
+            self.disp.hide()
+        else:
+            self.disp.display(self.image.transform((self.width,self.height),
+                              Image.EXTENT,(xpos,0,xpos+self.width,self.height)))
+            self.disp.show()
 
     def _slideout(self):
         '''Slide the display view across the canvas to animate between screens'''
@@ -217,7 +213,8 @@ class Animator:
     def _hourly(self):
         '''check screensaver and totally frivously do a spash screen once an hour'''
         self.screensaver.check()
-        self._splash()
+        if not self.screensaver.active:
+            self._splash()
 
 
 def animate(settings, disp, queue):
