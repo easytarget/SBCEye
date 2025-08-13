@@ -113,7 +113,7 @@ if disp:
 
 if settings.button_out > 0:
     try:
-        from gpio4 import GPIO_DEBUG_DISABLE
+        from gpio4 import GPIODEBUG
         gpio = GPIO()
     except ImportError as e:
         print(e)
@@ -275,14 +275,14 @@ if __name__ == '__main__':
 
     # Set button interrupt and output if we have a button and a pin to control
     if settings.button_out > 0:
-        gpio.setmode(GPIO.BCM)  # Use BCM GPIO numbering
-        gpio.setup(settings.button_out, GPIO.OUT)
+        gpio.setmode(gpio.BCM)  # Use BCM GPIO numbering
+        gpio.setup(settings.button_out, gpio.OUT)
         logging.info(f'Controllable pin ({settings.button_name}) enabled')
         if settings.button_pin > 0:
-            gpio.setup(settings.button_pin, GPIO.IN)
+            gpio.setup(settings.button_pin, gpio.IN)
             # Set up the button pin interrupt
             gpio.add_event_detect(settings.button_pin,
-                    GPIO.RISING, button_interrupt,
+                gpio.RISING, button_interrupt,
                     bouncetime = int(settings.button_hold * 2000))
             logging.info('Button enabled')
         if len(settings.button_url) > 0:
@@ -321,7 +321,7 @@ if __name__ == '__main__':
     net = Netreader((settings.net_map, settings.net_timeout), data)
 
     # GPIO Pin monitoring
-    pins = Pinreader((settings.pin_map, settings.pin_state_names), data)
+    pins = Pinreader((settings.gpio_chip, settings.pin_map, settings.pin_state_names), data)
 
     # RRD init now that the data{} structure is populated
     rrd = Robin(settings, data)
@@ -336,11 +336,12 @@ if __name__ == '__main__':
     register(handle_exit)
 
     # Schedule pin monitoring, database updates and logging events
+    schedule.every(settings.data_interval).seconds.do(update_data)
+    if pins.available:
+        print('DEBUG::: starting pinreader schedule')
+        schedule.every(settings.pin_interval).seconds.do(pins.update_pins)
     if settings.log_daily:
         schedule.every().day.at("00:00").do(daily)
-    schedule.every(settings.data_interval).seconds.do(update_data)
-    if len(settings.pin_map.keys()) > 0:
-        schedule.every(settings.pin_interval).seconds.do(pins.update_pins)
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedules and entering service loop")

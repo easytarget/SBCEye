@@ -7,10 +7,7 @@ provides:
 
 import os
 import logging
-
-GPIO_ROOT = '/sys/class/gpio'
-export_handle = f'{GPIO_ROOT}/export'
-unexport_handle = f'{GPIO_ROOT}/unexport'
+import gpiod
 
 class Pinreader:
     '''Read and update pin status
@@ -20,6 +17,7 @@ class Pinreader:
 
     parameters:
         settings: (tuple) consisting of:
+            chip: (str) path to the gpio chip device node, or None to disable
             map: (dict) pin names and BCM GPIO number
             state_names: (tuple) localised names for pin states (text,text)
         data: the main data{} dictionary, a key/value pair; 'pin-<name>=value'
@@ -31,21 +29,42 @@ class Pinreader:
 
     def __init__(self, settings, data):
         '''Setup and do initial reading'''
-        (self.map, self.state_names) = settings
+        (self._gpio_chip, self._map, self._state_names) = settings
         self.data = data
-        if not self.map:
-            print('No GPIO pins configured for monitoring')
+        self.available = False
+        if self._gpio_chip is None:
+            print('No GPIO chip specified in config, gpio monitoring disabled')
             return
-        for pin_name, pin_number in self.map.items():
+        if not gpiod.is_gpiochip_device(self._gpio_chip):
+            print('ERROR: GPIO chip specified in config ({}) is not a libgpiod '\
+                  'compatible device, gpio monitoring disabled'.format(self._gpio_chip))
+            self._gpio_chip = None
+            return
+        self._lines = gpiod.Chip(self._gpio_chip).get_info().num_lines
+        print('GPIO chip is "{}" with {} lines'.format(self._gpio_chip, self._lines))
+        if not self._test_pins():
+            print('gpio monitoring disabled')
+            return
+        for pin_name, pin_number in self._map.items():
             data[f'pin-{pin_name}'] = get_pin(pin_number)
             logging.info(f'{pin_name}: {self.state_names[data[f"pin-{pin_name}"]]}')
         print('GPIO monitoring configured and logging enabled')
         logging.info('GPIO monitoring configured and logging enabled')
+        self.available = True
+
+    def _test_pins(self):
+        '''Check the pins listed in the pin map'''
+        # could check in range of the gpio chip device..
+        if len(self._map) == 0:
+            print('No valid GPIO pins listed in config, ', end='')
+            return False
+        return True
 
     def update_pins(self):
         '''Check if any pins have changed state, and log if so
         updates the main data{} dictionary with new state
         no parameters, no return'''
+        return   # <------------------------------------DEBUG
         for name, pin in self.map.items():
             this_pin_state =  get_pin(pin)
             if this_pin_state != self.data[f"pin-{name}"]:
@@ -53,26 +72,17 @@ class Pinreader:
                 self.data[f'pin-{name}'] = this_pin_state
                 logging.info(f'{name} (gpio-{pin}): {self.state_names[this_pin_state]}')
 
-def get_pin(pin):
-    '''Read pin state, return an integer
+        with gpiod.request_lines(
+            self.chip_path,
+            consumer="SBCEye-pinreader",
+            config={tuple(line_offsets): None},
+        ) as request:
+            vals = request.get_values()
+            print(vals, type(vals))
+            for offset, val in zip(line_offsets, vals):
+                if val == gpiod.line.Value.ACTIVE:
+                    print("{}={} ".format(offset, 'ON'), end="")
+                else:
+                    print("{}={} ".format(offset, 'OFF'), end="")
+            #print()
 
-    parameters:
-    pin: (int) the BCM gpio pin number
-
-    returns:
-    pin_state: (int) 0=low, 1=high
-    '''
-    gpio_handle = f'{GPIO_ROOT}/gpio{str(pin)}'
-    exported = os.path.isdir(gpio_handle)
-    if not exported:
-        export = os.open(export_handle, os.O_WRONLY)
-        os.write(export, bytes(str(pin), 'ascii'))
-        os.close(export)
-    value = os.open(f'{gpio_handle}/value', os.O_RDONLY)
-    ret = int(os.read(value,1))
-    os.close(value)
-    if not exported:
-        unexport = os.open(unexport_handle, os.O_WRONLY)
-        os.write(unexport, bytes(str(pin), 'ascii'))
-        os.close(unexport)
-    return int(ret)
