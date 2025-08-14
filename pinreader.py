@@ -40,49 +40,72 @@ class Pinreader:
                   'compatible device, gpio monitoring disabled'.format(self._gpio_chip))
             self._gpio_chip = None
             return
-        self._lines = gpiod.Chip(self._gpio_chip).get_info().num_lines
-        print('GPIO chip is "{}" with {} lines'.format(self._gpio_chip, self._lines))
-        if not self._test_pins():
-            print('gpio monitoring disabled')
+        self._num_lines = gpiod.Chip(self._gpio_chip).get_info().num_lines
+        print('GPIO chip is "{}" with {} lines'.format(self._gpio_chip, self._num_lines))
+        if not self._setup_pins():
+            print('No valid GPIO pins listed in config, gpio monitoring disabled')
             return
-        for pin_name, pin_number in self._map.items():
-            data[f'pin-{pin_name}'] = get_pin(pin_number)
-            logging.info(f'{pin_name}: {self.state_names[data[f"pin-{pin_name}"]]}')
-        print('GPIO monitoring configured and logging enabled')
-        logging.info('GPIO monitoring configured and logging enabled')
+        values = self._get_pins(self._pins)
+        if values is None:
+            print('GPIO pin states could not be read, gpio monitoring disabled')
+            return
+        for index, name, value in zip(self._pins, self._names, values):
+            data[f'pin-{name}'] = int(value)
+            logging.info('{} index {} configured as "{}", current value: {}'
+                        .format(self._gpio_chip, index, name, self._state_names[int(value)]))
+        print('GPIO monitoring active and logging enabled')
+        logging.info('GPIO monitoring active and logging enabled')
         self.available = True
 
-    def _test_pins(self):
-        '''Check the pins listed in the pin map'''
-        # could check in range of the gpio chip device..
-        if len(self._map) == 0:
-            print('No valid GPIO pins listed in config, ', end='')
+    def _setup_pins(self):
+        '''Check the pins listed in the pin map are validi and create lists'''
+        self._pins = []
+        self._names = []
+        for name, pin in self._map.items():
+            if pin > 0 and pin < self._num_lines:
+                self._pins.append(pin)
+                self._names.append(name)
+            else:
+                print('ERROR: gpio chip index ({}) for "{}" is out of range'.format(pin, name))
+        if len(self._pins) == 0:
             return False
         return True
+
+    def _get_pins(self, pins):
+        '''Get the value of all pins using gpiod, do not change pin state'''
+        values = []
+        try:
+            with gpiod.request_lines(
+                self._gpio_chip,
+                consumer="SBCEye-pinreader",
+                config={tuple(pins): None},
+            ) as request:
+                line_values = request.get_values()
+                for value in line_values:
+                    if value == gpiod.line.Value.ACTIVE:
+                        values.append(int(1))
+                    else:
+                        values.append(int(0))
+        except Exception as e:
+            print('Error getting pin values:\n{}'.format(e))
+            return None
+        return values
 
     def update_pins(self):
         '''Check if any pins have changed state, and log if so
         updates the main data{} dictionary with new state
         no parameters, no return'''
-        return   # <------------------------------------DEBUG
-        for name, pin in self.map.items():
-            this_pin_state =  get_pin(pin)
-            if this_pin_state != self.data[f"pin-{name}"]:
+        # Update current values list
+        values = self._get_pins(self._pins)
+        if values is None:
+            # The try:except in the system log should show the actual errors
+            # Some sort of warn/fail tracking might be needed if issues occcur here a lot.
+            logging.info('GPIO pin read failed (see syslog)')
+            return
+        # Now go through pins, store data and see what has changed
+        for index, name, value in zip(self._pins, self._names, values):
+            if value != self.data[f"pin-{name}"]:
                 # Pin has changed state, store new state and log
-                self.data[f'pin-{name}'] = this_pin_state
-                logging.info(f'{name} (gpio-{pin}): {self.state_names[this_pin_state]}')
-
-        with gpiod.request_lines(
-            self.chip_path,
-            consumer="SBCEye-pinreader",
-            config={tuple(line_offsets): None},
-        ) as request:
-            vals = request.get_values()
-            print(vals, type(vals))
-            for offset, val in zip(line_offsets, vals):
-                if val == gpiod.line.Value.ACTIVE:
-                    print("{}={} ".format(offset, 'ON'), end="")
-                else:
-                    print("{}={} ".format(offset, 'OFF'), end="")
-            #print()
-
+                self.data[f'pin-{name}'] = value
+                logging.info('{} ({}:{}): {}'.format(name, self._gpio_chip, index,
+                                                    self._state_names[int(value)]))
