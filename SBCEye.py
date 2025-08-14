@@ -3,7 +3,6 @@
 SBCEye:
 Animate the OLED display attached to my OctoPrint server with bme280 and system data
 Show, log and graph the environmental, system and gpio data via a web interface
-Give me a on/off button + url to control the bench lights via a GPIO pin
 
 !! DISPLAY, BME280 and GPIO functionality is CURRENTLY Raspberry PI only!
 - Needs to be made generic for other architectures
@@ -111,15 +110,6 @@ if disp:
     # display initialisation does a 'clear()' and 'show()'
     disp.contrast(settings.display_contrast)
 
-if settings.button_out > 0:
-    try:
-        from gpio4 import GPIODEBUG
-        gpio = GPIO()
-    except ImportError as e:
-        print(e)
-        print("ERROR: button & pin control requirements not met, features disabled")
-        settings.button_out = 0
-
 #
 # Local Classes, Globals
 
@@ -150,41 +140,6 @@ data["update-time"] = time.time() # time of last update
 
 #
 # Local functions
-
-def button_control(action="toggle"):
-    '''Set the controlled pin to a specified state'''
-    if settings.button_out > 0:
-        ret = f'{settings.button_label} '
-        pin = settings.button_out
-        if action.lower() in ['toggle','invert','button']:
-            gpio.output(pin, not gpio.input(pin))
-            ret += 'Toggled: '
-        elif action.lower() in [settings.pin_state_names[1].lower(),'on','true']:
-            gpio.output(pin,True)
-            ret += 'Switched: '
-        elif action.lower() in [settings.pin_state_names[0].lower(),'off','false']:
-            gpio.output(pin,False)
-            ret += 'Switched: '
-        elif action.lower() in ['random','easter']:
-            gpio.output(pin,random.choice([True, False]))
-            ret += 'Randomly Switched: '
-        else:
-            ret += ': '
-        state = gpio.input(pin)
-        ret += settings.pin_state_names[state]
-    else:
-        state = False
-        ret = 'Not supported, no output pin defined'
-    pins.update_pins()
-    return (ret, state)
-
-def button_interrupt(*_):
-    '''give a short delay, then re-read input to provide a minimum hold-down time
-    and suppress false triggers from other gpio operations'''
-    time.sleep(settings.button_hold)
-    if gpio.input(settings.button_pin):
-        logging.info('Button pressed')
-        button_control()
 
 def update_system():
     '''Get current environmental and system data, called on a schedule
@@ -273,25 +228,6 @@ if __name__ == '__main__':
         logging.warning('Environmental data configured but no sensor detected: '\
                 'Environment status and logging disabled')
 
-    # Set button interrupt and output if we have a button and a pin to control
-    if settings.button_out > 0:
-        gpio.setmode(gpio.BCM)  # Use BCM GPIO numbering
-        gpio.setup(settings.button_out, gpio.OUT)
-        logging.info(f'Controllable pin ({settings.button_name}) enabled')
-        if settings.button_pin > 0:
-            gpio.setup(settings.button_pin, gpio.IN)
-            # Set up the button pin interrupt
-            gpio.add_event_detect(settings.button_pin,
-                gpio.RISING, button_interrupt,
-                    bouncetime = int(settings.button_hold * 2000))
-            logging.info('Button enabled')
-        if len(settings.button_url) > 0:
-            logging.info(f'Web Button enabled on: /{settings.button_url}')
-        print(f'Button controllable pin ({settings.button_name}) configured and enabled; '\
-                f'(button=gpio-{settings.button_pin}, '\
-                f'label="{settings.button_label}", '\
-                f'url="{settings.button_url})"')
-
     # Display animation setup
     if disp:
         from animator import animate
@@ -327,7 +263,7 @@ if __name__ == '__main__':
     rrd = Robin(settings, data)
 
     # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(settings, rrd, data, (button_control,))
+    serve_http(settings, rrd, data)
 
     # Exit handlers (needed for rrd cache write on shutdown)
     signal(SIGTERM, handle_signal)

@@ -17,7 +17,7 @@ from threading import Thread
 # Logging
 import logging
 
-def serve_http(settings, rrd, data, helpers):
+def serve_http(settings, rrd, data):
     '''Spawns a http.server.HTTPServer in a separate thread on the given port'''
     handler = _BaseRequestHandler
     httpd = http.server.ThreadingHTTPServer((settings.web_host, settings.web_port), handler, False)
@@ -31,7 +31,6 @@ def serve_http(settings, rrd, data, helpers):
     http.settings = settings
     http.rrd = rrd
     http.data = data
-    http.button_control = helpers[0]
     http.icon_file = 'favicon.ico'
     if not os.path.exists(http.icon_file):
         http.icon_file = f'{sys.path[0]}/{http.icon_file}'
@@ -274,14 +273,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         # Links to the graph pages
         ret = f'{self._give_graphlinks()}'
         # Links to the pin contol, cam show/hide and log pages
-        ret += f'<tr><td colspan="2"></td></tr>\n'
-        if http.settings.web_show_control and (http.settings.button_out > 0):
-            _, onoff = http.button_control('status')
-            state = 'On' if onoff else 'Off'
-            ret += f'<tr><td colspan="2" style="text-align: center">'\
-                   f'<a href="./{http.settings.button_url}" '\
-                   f'title="{http.settings.button_label} status and control page">'\
-                   f'{http.settings.button_label}: {state}</a></td></tr>\n'
+        #ret += f'<tr><td colspan="2"></td></tr>\n'
         for link in http.settings.links:
             ret += f'<tr><td colspan="2" style="text-align: center">'\
                    f'<a href="{http.settings.links[link]}" title="Open {link} in a new tab" target="_blank">'\
@@ -418,33 +410,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 self._set_icon_headers()
                 with open(http.icon_file,'rb') as favicon:
                     self.wfile.write(favicon.read())
-        elif ((urlparse(self.path).path == '/' + http.settings.button_url)
-                and (len(http.settings.button_url) > 0)
-                and (http.settings.button_out > 0)):
-            # Web button control
-            parsed = parse_qs(urlparse(self.path).query).get('state', ['status'])
-            action = parsed[0]
-            if action != 'status':
-                logging.info(f'Web button triggered by: {self.client_address[0]}'\
-                            f' with action: {action}')
-            status, state = http.button_control(action)
-            self._set_headers()
-            response = self._give_head(f" :: {http.settings.button_label}")
-            response += f'<h2>{status}</h2>\n'
-            invert_state = http.settings.pin_state_names[not state]
-            response += f'''<div>
-                    <a href="./{http.settings.button_url}?state={invert_state}"
-                    title = "Switch {http.settings.button_name} {invert_state}">
-                    Switch {invert_state}</a>
-                    </div>\n'''
-            response += '<div style="padding-top: 1em;">\n'\
-                    '<a href="./" title="Main page">Home</a></div>\n'
-            response += self._give_timestamp()
-            response += '<script>\n'\
-                    'setTimeout(function(){location.replace(location.pathname);}, '\
-                    '60000);\n</script>\n'
-            response += self._give_foot()
-            self._write_dedented(response)
         elif (urlparse(self.path).path == '/dump_gz') and http.db_dumpable:
             # Raw dump download
             start = time.time()

@@ -106,7 +106,6 @@ class Settings:
         self.web_show_cam = web.getboolean("show_cam")
         self.web_allow_dump = web.getboolean("allow_dump")
         self.web_allow_backup = web.getboolean("allow_backup")
-        self.web_show_control = web.getboolean("show_control")
 
         graph = config["graph"]
         self.graph_durations = graph.get("durations").split(',')
@@ -175,17 +174,6 @@ class Settings:
         self.animate_passtime = animate.getint("passtime")
         self.animate_passes = animate.getint("passes")
         self.animate_speed = animate.getint("speed")
-
-        button = config["button"]
-        self.button_out = button.getint("out")
-        self.button_pin = button.getint("pin")
-        self.button_url = button.get("url")
-        self.button_label = button.get("label")
-        self.button_hold = button.getfloat("hold")
-        if self.button_out == 0:
-            self.button_name = 'Undefined'
-        else:
-            self.button_name = f'gpio-{self.button_out}'
 
         debug = config["debug"]
         self.debug_http = debug.getboolean("http")
