@@ -244,7 +244,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         if len(http.data.keys() & pinlist.keys()) > 0:
             ret += '<tr><th>GPIO</th></tr>\n'
             for item,name in pinlist.items():
-                em = 'style=" font-weight: bold; text-decoration: underline;"' if http.data[item] == 1 else ''
+                em = 'style=" font-weight: bold;"' if http.data[item] == 1 else ''
                 ret += f'<tr><td>{name}:</td><td style="text-align: right;">'\
                        f'<span {em}>{http.settings.pin_state_names[http.data[item]]}</span></td></tr>\n'
         return ret
