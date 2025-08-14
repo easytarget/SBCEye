@@ -338,7 +338,6 @@ if __name__ == '__main__':
     # Schedule pin monitoring, database updates and logging events
     schedule.every(settings.data_interval).seconds.do(update_data)
     if pins.available:
-        print('DEBUG::: starting pinreader schedule')
         schedule.every(settings.pin_interval).seconds.do(pins.update_pins)
     if settings.log_daily:
         schedule.every().day.at("00:00").do(daily)
