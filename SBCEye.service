@@ -1,3 +1,12 @@
+# (as root) Place this file in /etc/systemd/service/
+# run 'systemctl reload-daemon' then
+# 'systemctl enable --now SBCEye.service
+#
+# Note: assumes that SBCEye has it's own # user account ('eye')
+# with a homedir at '/home/eye', the SBCEye repo checked out as `/home/eye/SBCEye'
+# and that a virtual environment exists at '/home/eye/SBCEye/env'
+#  with the required libraries installed (see docs)
+
 [Unit]
 Description=SBCEye monitoring script
 After=multi-user.target
