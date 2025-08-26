@@ -1,3 +1,10 @@
+# OS requirements
+The core features of SBCEye (cpu/memory/disk/connectivity monitoring) should run on any Linux platform, I have tested it on Pi3 and Pi4 devices, plus my VisionFive2 (risc-v), mq-pro (single core and slow risc-v). The core also runs fine on two laptops and a desktop running both Fedora and Ubuntu, but is really optimised for SBC's, not workstations.
+
+The GPIO features use standard Linux libraries. But you will need to ensure GPIO and I2C pins are available on your platform (this is done via the device tree and device tree overlays):
+- PI: <------------ show howto in rpi-config
+- VF2: <----------- maybe example with DTO's
+
 # Installing in virtualenv
 * https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/
 
@@ -10,19 +17,30 @@ The install steps below will set SBCEye up using a separate user in a virtual en
 Start by making sure that you are running a fully updated OS install, have git, python3, python3-pip and python3-dev and lm-sensors installed, have created an 'eye' user and have cloned the repo to `~eye/SBCEye` eg:
 
 ```console
-; Install python and dependencies
+; Install python and dependencies 
 admin@sbc:~$ sudo apt update
 admin@sbc:~$ sudo apt install python3 python3-dev python3-pip git rrdtool librrd-dev lm-sensors
 
-; Only if you plan to use a SSD1306 OLED display:
-admin@sbc:~$ sudo apt install libjpeg-dev libopenjp2-7-dev libtiff-dev fonts-liberation
+; If you want to monitor GPIO pins
+admin@sbc:~$ sudo apt install gpiod
+
+; If you plan to use a I2C SSD1306 OLED display or BME280 environmental sensor
+admin@sbc:~$ sudo apt install i2c-tools
+
+; If you installed either `i2c-tools` or `gpiod` above I suggest rebooting at this point to ensure the services are running,
+
+; Only if you plan to use a screen :
+admin@sbc:~$ sudo apt install fonts-liberation       <-------------------   DEV changes ?? need: libjpeg-dev libopenjp2-7-dev libtiff-dev 
 
 ; Create a dedicate user account (and set bash as our shell)
 admin@sbc:~$ sudo useradd -m eye
 admin@sbc:~$ sudo usermod -s /bin/bash eye
 
-; If using either a screen, BME sensor or GPIO pin monitoring you must make sure the eye user is in the gpio group:
+; If using GPIO pin monitoring the eye user needs to be in the `gpio` group:
 admin@sbc:~$ sudo usermod -a -G gpio eye
+
+; If using a I2C screen or BME sensor the eye user needs to be in the `i2c` group:
+admin@sbc:~$ sudo usermod -a -G i2c eye
 
 ; Become the 'eye' user
 admin@sbc:~$ sudo su - eye
@@ -36,14 +54,6 @@ eye@sbc:~$ cd ~/SBCEye
 
 ### Install and Upgrade Requirements
 
-In the cloned repo upgrade our local (user) modules of `pip` and `virtualenv`
-```console
-eye@sbc:~/SBCEye $ pwd
-/home/eye/SBCEye
-eye@sbc:~/SBCEye $ python3 -m pip install --user --upgrade pip
-eye@sbc:~/SBCEye $ python3 -m pip install --user --upgrade virtualenv
-```
-
 Create the virtual environment and activate it
 - The virtual environment will be located at `/home/eye/SBCEye/env`
 - TL;DR: (Quick primer about Python Virtual Environments, if needed):
@@ -55,32 +65,37 @@ Create the virtual environment and activate it
   - [This Video](https://www.youtube.com/watch?v=N5vscPTWKOk) and [This](https://www.youtube.com/watch?v=4jt9JPoIDpY) explain it quite well.
 
 ```console
+; create the venv
 eye@sbc:~/SBCEye $ python3 -m venv env
 
-eye@sbc:~/SBCEye $ source env/bin/activate
+; activate it (can also do: 'source env/bin/activate') 
+eye@sbc:~/SBCEye $ . env/bin/activate
 
 (env) eye@sbc:~/SBCEye $ which python
 /home/eye/SBCEye/env/bin/python
 ```
 
-Now we install/upgrade the requirements
-- note there are some `apt install` commands to be run as root here too... I'll split them into the 'root prep' section, with distro-specific notes in the future.
+Now we install/upgrade the requirements into the virtual environment
 ```console
+; make sure our tooling is up-to-date
 (env) eye@sbc:~/SBCEye $ pip install --upgrade pip
 (env) eye@sbc:~/SBCEye $ pip install --upgrade wheel
 
+; Core libraries needed for all installs
 (env) eye@sbc:~/SBCEye $ pip install psutil schedule setproctitle rrdtool-bindings
 
-; If you wish to control a gpio pin via a button or url you need to install RPi.GPIO
-; - this is not necesscary if you just want to monitor (not control) pins.
-; RPi.GPIO is (currently, november'21) broken on BULLSEYE unless you use a pre-release. sigh. 
-(env) eye@sbc:~/SBCEye $ pip install RPi.GPIO==0.7.1a4
+; If you want to monitor GPIO pins:
+(env) eye@sbc:~/SBCEye $ pip install gpiod
+
+; If you have either a screen or sensor:
+(env) eye@sbc:~/SBCEye $ pip install smbus2
 
 ; Only if you plan to use a BME280 Temperature/Humidity/Pressure sensor:
-(env) eye@sbc:~/SBCEye $ pip install adafruit-circuitpython-bme280
+(env) eye@sbc:~/SBCEye $ pip install pimoroni_bme280
 
 ; Only if you plan to use a SSD1306 OLED display:
-(env) eye@sbc:~/SBCEye $ pip install adafruit-circuitpython-ssd1306 image
+(env) eye@sbc:~/SBCEye $ pip install luma.core luma.oled
+; This will take time since PIP needs to build some wheels (compile) some of the PIL graphics requirements.
 ```
 
 Copy the `defaults.ini` file to `config.ini` and edit as required.
@@ -113,15 +128,17 @@ admin@sbc:/home/eye/SBCEye $ sudo systemctl daemon-reload
 admin@sbc:/home/eye/SBCEye $ sudo systemctl enable --now SBCEye.service
 
 admin@sbc:/home/eye/SBCEye $ sudo systemctl status SBCEye.service
-● SBCEye.service - SBCEye monitoring for SBCs
-   Loaded: loaded (/etc/systemd/system/SBCEye.service; enabled; vendor preset: enabled)
-   Active: active (running) since Wed 2021-10-13 19:37:49 CEST; 10min ago
- Main PID: 20376 (python)
-    Tasks: 2 (limit: 4164)
-   CGroup: /system.slice/SBCEye.service
-           └─20376 /home/eye/SBCEye/env/bin/python /home/eye/SBCEye/SBCEye.py
+● SBCEye.service - SBCEye monitoring script
+     Loaded: loaded (/etc/systemd/system/SBCEye.service; enabled; preset: enabled)
+     Active: active (running) since Tue 2025-08-26 13:37:12 CEST; 2s ago
+   Main PID: 494328 (SBCEye: worksho)
+      Tasks: 8 (limit: 760)
+        CPU: 1.204s
+     CGroup: /system.slice/SBCEye.service
+             ├─494328 "SBCEye: workshop.pi3b"
+             └─494334 "SBCEye screen: workshop.pi3b"
 
-Oct 13 19:37:49 pi.easytarget.org systemd[1]: Started SBCEye script for PI Hat.
+; Note; The example above has a screen configured, and the screen process is shown running seperately (but in the same CGroup).
 ```
 
 ## Upgrading
