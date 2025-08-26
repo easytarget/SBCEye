@@ -41,6 +41,10 @@ def i2c_setup(settings):
 
     if display:
         # I2C OLED Display
+        # Uses the ssd1306 driver and libs from the luma libraries
+        #  https://github.com/rm-hull/luma.core
+        #  https://github.com/rm-hull/luma.oled
+        # pip install luma.core luma.oled
         try:
             from luma.oled.device import ssd1306
         except ImportError as error:
