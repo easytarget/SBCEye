@@ -3,6 +3,11 @@
 provides:
     Pinreader: A class to update and log the pin statuses
     get_pin(pin): reads a bcm gpio pin and returns it's raw value
+
+requires:
+    the python gpiod bindings
+    https://pypi.org/project/gpiod/
+    and gpiod system service running
 '''
 
 import os
