@@ -188,8 +188,8 @@ def daily():
     myself = os.path.basename(__file__)
     timestamp = time.strftime(settings.long_format)
     uptime = timedelta(seconds=int(time.time() - psutil.boot_time()))
-    logging.info(f'{settings.name} :: up {uptime}')
-    print(f'{myself} :: {timestamp} :: {settings.name} :: up {uptime}',flush=True)
+    logging.info(f'{settings.name} :: system uptime {uptime}')
+    print(f'{myself} :: {timestamp} :: {settings.name} :: system uptime {uptime}',flush=True)
 
 def handle_signal(sig, *_):
     '''Handle common signals'''
