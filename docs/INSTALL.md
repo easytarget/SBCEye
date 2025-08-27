@@ -1,14 +1,15 @@
-# OS requirements
-The core features of SBCEye (cpu/memory/disk/connectivity monitoring) should run on any Linux platform, I have tested it on Pi3 and Pi4 devices, plus my VisionFive2 (risc-v), mq-pro (single core and slow risc-v). The core also runs fine on two laptops and a desktop running both Fedora and Ubuntu, but is really optimised for SBC's, not workstations.
+# Host system requirements
+The core features of SBCEye (cpu/memory/disk/connectivity monitoring) should run on any *modern* **Linux** platform, I have tested it on Pi3 and Pi4 devices, plus my VisionFive2 (risc-v), mq-pro (single core and slow risc-v). It also runs fine on a fedora based laptop, but is really optimised for SBC's, not workstations.
 
 The GPIO features use standard Linux libraries. But you will need to ensure GPIO and I2C pins are available on your platform (this is done via the device tree and device tree overlays):
 - PI: <------------ show howto in rpi-config
 - VF2: <----------- maybe example with DTO's
 
-# Installing in virtualenv
+# Python
+This guide uses a Python virtual environment for the install, your host system needs Python 3.9 (or later) and the venv module, these should be installed by default on most systems, or available in the repositories for you distribution.
 * https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/
 
-## Supporteed install method
+## Install Guide:
 
 The install steps below will set SBCEye up using a separate user in a virtual environment, and start it automatically via a system service. This provides some security and isolation but SBCEye is still not suitable for running on a public IP address. If you are familiar with Python then feel free to improvise on these instructions, but I wont be very helpful if it all goes wrong.
 
@@ -17,37 +18,42 @@ The install steps below will set SBCEye up using a separate user in a virtual en
 Start by making sure that you are running a fully updated OS install, have git, python3, python3-pip and python3-dev and lm-sensors installed, have created an 'eye' user and have cloned the repo to `~eye/SBCEye` eg:
 
 ```console
-; Install python and dependencies 
+# Install python and dependencies 
 admin@sbc:~$ sudo apt update
 admin@sbc:~$ sudo apt install python3 python3-dev python3-pip git rrdtool librrd-dev lm-sensors
+;or (RHEL) : sudo dnf install TODO
 
-; If you want to monitor GPIO pins
+# If you want to monitor GPIO pins
 admin@sbc:~$ sudo apt install gpiod
+;or (RHEL) : sudo dnf install TODO
 
-; If you plan to use a I2C SSD1306 OLED display or BME280 environmental sensor
+# If you plan to use a I2C SSD1306 OLED display or BME280 environmental sensor
 admin@sbc:~$ sudo apt install i2c-tools
+;or (RHEL) : sudo dnf install TODO
 
-; If you installed either `i2c-tools` or `gpiod` above I suggest rebooting at this point to ensure the services are running,
+# If you installed either `i2c-tools` or `gpiod` above I suggest rebooting
+#  at this point to ensure the services are running.
 
-; Only if you plan to use a screen :
-admin@sbc:~$ sudo apt install fonts-liberation       <-------------------   DEV changes ?? need: libjpeg-dev libopenjp2-7-dev libtiff-dev 
+# Only if you plan to use a screen :
+admin@sbc:~$ sudo apt install fonts-liberation
+;or (RHEL) : sudo dnf install TODO
 
-; Create a dedicate user account (and set bash as our shell)
+# Create a dedicate user account (and set bash as our shell)
 admin@sbc:~$ sudo useradd -m eye
 admin@sbc:~$ sudo usermod -s /bin/bash eye
 
-; If using GPIO pin monitoring the eye user needs to be in the `gpio` group:
+# If using GPIO pin monitoring the eye user needs to be in the `gpio` group:
 admin@sbc:~$ sudo usermod -a -G gpio eye
 
-; If using a I2C screen or BME sensor the eye user needs to be in the `i2c` group:
+# If using a I2C screen or BME280 sensor the eye user needs to be in the `i2c` group:
 admin@sbc:~$ sudo usermod -a -G i2c eye
 
-; Become the 'eye' user
+# Become the 'eye' user
 admin@sbc:~$ sudo su - eye
 
-; Clone the repo
+# Clone the repo
 eye@sbc:~$ git clone https://github.com/easytarget/SBCEye.git ~/SBCEye
-; Alternatively, if you do not use git and have downloaded a zip or tarball, you should unpack it to: ~/SBCEye
+;alternatively, if you have downloaded a .zip or tarball, unpack it to: ~/SBCEye
 
 eye@sbc:~$ cd ~/SBCEye
 ```
@@ -65,37 +71,40 @@ Create the virtual environment and activate it
   - [This Video](https://www.youtube.com/watch?v=N5vscPTWKOk) and [This](https://www.youtube.com/watch?v=4jt9JPoIDpY) explain it quite well.
 
 ```console
-; create the venv
+# create the venv
 eye@sbc:~/SBCEye $ python3 -m venv env
 
-; activate it (can also do: 'source env/bin/activate') 
+# activate it (can also do: 'source env/bin/activate') 
 eye@sbc:~/SBCEye $ . env/bin/activate
 
+# verify we are now using python from the environment
 (env) eye@sbc:~/SBCEye $ which python
 /home/eye/SBCEye/env/bin/python
+(env) eye@sbc:~/SBCEye $ python --version
+Python 3.11.2
 ```
 
 Now we install/upgrade the requirements into the virtual environment
 ```console
-; make sure our tooling is up-to-date
+# make sure our tooling is up-to-date
 (env) eye@sbc:~/SBCEye $ pip install --upgrade pip
 (env) eye@sbc:~/SBCEye $ pip install --upgrade wheel
 
-; Core libraries needed for all installs
+# Core libraries needed for all installs
 (env) eye@sbc:~/SBCEye $ pip install psutil schedule setproctitle rrdtool-bindings
 
-; If you want to monitor GPIO pins:
+# If you want to monitor GPIO pins:
 (env) eye@sbc:~/SBCEye $ pip install gpiod
 
-; If you have either a screen or sensor:
+# If you have either a screen or sensor:
 (env) eye@sbc:~/SBCEye $ pip install smbus2
 
-; Only if you plan to use a BME280 Temperature/Humidity/Pressure sensor:
+# Only if you plan to use a BME280 Temperature/Humidity/Pressure sensor:
 (env) eye@sbc:~/SBCEye $ pip install pimoroni_bme280
 
-; Only if you plan to use a SSD1306 OLED display:
+# Only if you plan to use a SSD1306 OLED display:
 (env) eye@sbc:~/SBCEye $ pip install luma.core luma.oled
-; This will take time since PIP needs to build some wheels (compile) some of the PIL graphics requirements.
+;This will take time since PIP needs to build (compile) wheels for some of the dependencies.
 ```
 
 Copy the `defaults.ini` file to `config.ini` and edit as required.
