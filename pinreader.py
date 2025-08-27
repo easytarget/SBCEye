@@ -12,7 +12,12 @@ requires:
 
 import os
 import logging
-import gpiod
+
+gpiod_available = True
+try:
+    import gpiod
+except ImportError as error:
+    gpiod_available = False
 
 class Pinreader:
     '''Read and update pin status
@@ -39,6 +44,10 @@ class Pinreader:
         self.available = False
         if self._gpio_chip is None:
             print('No GPIO chip specified in config, gpio monitoring disabled')
+            return
+        if not gpiod_available:
+            print('ERROR: GPIO chip specified but python gpiod library unavailable, '\
+	          'gpio monitoring disabled')
             return
         if not gpiod.is_gpiochip_device(self._gpio_chip):
             print('ERROR: GPIO chip specified in config ({}) is not a libgpiod '\
