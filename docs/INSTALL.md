@@ -21,7 +21,7 @@ Start by making sure that you are running a fully updated OS install, have git, 
 # Install python and dependencies 
 admin@sbc:~$ sudo apt update
 admin@sbc:~$ sudo apt install python3 python3-dev python3-pip git rrdtool librrd-dev lm-sensors
-;or (RHEL) : sudo dnf install TODO
+;or (RHEL) : sudo dnf install python3 python3-devel python3-pip git rrdtool lm_sensors  ??????? rrdtool-devel
 
 # If you want to monitor GPIO pins
 admin@sbc:~$ sudo apt install gpiod
