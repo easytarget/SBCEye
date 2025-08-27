@@ -134,7 +134,7 @@ class Robin:
                 mini = self.data_sources[source][0]
                 maxi = self.data_sources[source][1]
                 ds_list.append(f'DS:{source}:GAUGE:60:{mini}:{maxi}')
-                print(f" data source: {source} ({mini},{maxi})")
+                print(f" added data source: {source} ({mini},{maxi})")
             args = [str(self.db_file)]
             if source_file.is_file():
                 print(f'Importing from previous {source_file}')
@@ -159,7 +159,7 @@ class Robin:
             if not source in existing_sources:
                 mini = self.data_sources[source][0]
                 maxi = self.data_sources[source][1]
-                print(f"Adding: {source} ({mini},{maxi}) to {self.db_file}")
+                print(f"Added data source: {source} ({mini},{maxi}) to {self.db_file}")
                 rrdtool.tune(
                     str(self.db_file),
                     f"DS:{source}:GAUGE:60:{mini}:{maxi}")
