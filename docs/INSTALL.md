@@ -111,7 +111,6 @@ Copy the `defaults.ini` file to `config.ini` and edit as required.
 - See the comments in the file
 - The default configuration is sufficient for testing, but screens, sensors and GPIO settings need to be enabled in the settings
 - Some other parameters for the web server, logging and display can be set there too
-```
 
 Then test run with:
 
