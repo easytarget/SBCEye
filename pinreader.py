@@ -1,25 +1,20 @@
 import gpiod
-from dataclasses import dataclass
 from os import getpid
 from re import search
 
 # Needs gpiod bindings at V2.0 or later, standard debian12/bookworm is v1.6
-#  use a virtualenv and 'pip install --upgrade gpiod' in that.
+#  use a virtualenv and 'pip install --upgrade gpiod' as needed.
 if int(search('^[0-9]+', gpiod.__version__).group(0)) < 2:
-    raise ImportError('gpiod library version too low ({}), '\
-                      'pinreader requires gpiod version 2 or above'
+    raise ImportError('gpiod bindings library version too low ({}), '\
+                      'pinreader requires gpiod v2.x.x or later.'
                       .format(gpiod.__version__))
-@dataclass
-class PinInstance:
-    ''' Class used for a single pin instance '''
-    chip: None
-    line: None
-    consumer: None
-    direction: None
-    value: None
+'''
+PinInstance class
 
+'''
+class PinInstance:
     def __init__(self, chip, line):
-        self._pid = getpid()  # record PID of process that init'd the class
+        self._pid = getpid()  # record PID of process that called init()
         if not gpiod.is_gpiochip_device(chip):
             raise ValueError('\'{}\' is not a valid GPIO device'.format(chip))
         self.chip = chip
@@ -31,6 +26,10 @@ class PinInstance:
         info = self._chip.get_line_info(self.line)
         self.name = info.name
         self.get()
+
+    def __repr__(self):
+        return 'PinInstance(chip={} line={} consumer={} direction={} value={})'\
+               .format(self.chip, self.line, self.consumer, self.direction, self.value)
 
     def __str__(self):
         consumer = None if self.consumer is None else '\'{}\''.format(self.consumer)
@@ -60,8 +59,10 @@ class PinInstance:
             self.value = self._value()
         return self.value
 
-# use @dataclass to make immutable
-@dataclass(frozen=True)
+'''
+PinReader class (dict)
+
+'''
 class PinReader(dict):
     def __init__(self, pinlist, tolerant=False):
         super().__init__({})
@@ -82,7 +83,7 @@ class PinReader(dict):
                 ret += '{} = {} ({})\n'.format(line, value, pin.direction)
             else:
                 ret += '{} = n/a (\'{}\')\n'.format(line, pin.consumer)
-        return ret
+        return ret.rstrip('\n')
 
     def update(self):
         for line in super().keys():
@@ -144,7 +145,7 @@ if __name__ == "__main__":
 
     # little function to collate output
     def out():
-        return '{}: {}\n{}'.format(self, asctime(), pinstates)
+        return '{}: {}\n{}\n'.format(self, asctime(), pinstates)
 
     # Show initial output
     print(out(), end='')
