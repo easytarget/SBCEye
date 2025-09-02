@@ -25,7 +25,7 @@ admin@sbc:~$ sudo apt install python3 python3-dev python3-pip git rrdtool librrd
 
 # If you want to monitor GPIO pins
 admin@sbc:~$ sudo apt install gpiod
-;or (RHEL) : sudo dnf install TODO
+;or (RHEL) : sudo dnf install libgpiod libgpiod-utils
 
 # If you plan to use a I2C SSD1306 OLED display or BME280 environmental sensor
 admin@sbc:~$ sudo apt install i2c-tools
