@@ -118,22 +118,23 @@ class Settings:
         self.graph_half_height = graph.get("half_height").split(',')
 
         self.links= {}
-        for name in config["links"]:
+        links = config["links"]
+        for name in links:
             real = name.replace('_',' ')
-            self.links[real] = config.get("links",name)
+            self.links[real] = links.get(name)
 
-        try:
-            self.gpio_chip = config.get("gpio","chip")
-        except configparser.NoOptionError:
-            self.gpio_chip = None
 
-        self.pin_map = {}
-        for pin in config["pins"]:
-            self.pin_map[pin] = config.getint("pins",pin)
+        self.pinlist = {}
+        pins = config["pins"]
+        for pin in pins:
+            line = pins.get(pin).split(',')
+            self.pinlist[pin] = (line[0], int(line[1]))
+
 
         self.net_map = {}
-        for host in config["ping"]:
-            self.net_map[host] = config.get("ping",host)
+        ping = config["ping"]
+        for host in ping:
+            self.net_map[host] = ping.get(host)
 
         intervals = config["intervals"]
         self.pin_interval = intervals.getint("pin")
