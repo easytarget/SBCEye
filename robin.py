@@ -81,7 +81,7 @@ class Robin:
                     None, None, '%5.0lf', '%5.0lf /s', '--units-exponent','0'),
                 }
         # connectivity
-        for host in s.net_map.keys():
+        for host in s.netlist.keys():
             self.data_sources[f'net-{host}'] = ('0','U')
             self.graph_map[f'net-{host}'] = (f'{host} Ping, milliseconds',
                     '25', '0' ,'%3.0lf', '%3.1lf ms', '--alt-autoscale', '--units-exponent','0')

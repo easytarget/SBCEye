@@ -123,18 +123,16 @@ class Settings:
             real = name.replace('_',' ')
             self.links[real] = links.get(name)
 
-
         self.pinlist = {}
         pins = config["pins"]
         for pin in pins:
             line = pins.get(pin).split(',')
             self.pinlist[pin] = (line[0], int(line[1]))
 
-
-        self.net_map = {}
+        self.netlist = {}
         ping = config["ping"]
         for host in ping:
-            self.net_map[host] = ping.get(host)
+            self.netlist[host] = ping.get(host)
 
         intervals = config["intervals"]
         self.pin_interval = intervals.getint("pin")

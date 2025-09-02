@@ -272,7 +272,7 @@ if __name__ == '__main__':
                     'Display features disabled')
 
     print('Performing initial data update', end='')
-    if settings.net_map:
+    if settings.netlist:
         print(f' may take up to {settings.net_timeout}s if ping targets are down')
     else:
         print()
@@ -288,7 +288,7 @@ if __name__ == '__main__':
     pinmemory = setup_pins()
 
     # Network (ping) monitoring
-    net = Netreader((settings.net_map, settings.net_timeout), data)
+    net = Netreader((settings.netlist, settings.net_timeout), data)
 
     # RRD init now that the data{} structure is populated
     rrd = Robin(settings, data)
