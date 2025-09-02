@@ -1,125 +1,158 @@
-'''Really simple and direct reading of BCM GPIO pins
+import gpiod
+from dataclasses import dataclass
+from os import getpid
+from re import search
 
-provides:
-    Pinreader: A class to update and log the pin statuses
-    get_pin(pin): reads a bcm gpio pin and returns it's raw value
+# Needs gpiod bindings at V2.0 or later, standard debian12/bookworm is v1.6
+#  use a virtualenv and 'pip install --upgrade gpiod' in that.
+if int(search('^[0-9]+', gpiod.__version__).group(0)) < 2:
+    raise ImportError('gpiod library version too low ({}), '\
+                      'pinreader requires gpiod version 2 or above'
+                      .format(gpiod.__version__))
+@dataclass
+class PinInstance:
+    ''' Class used for a single pin instance '''
+    chip: None
+    line: None
+    consumer: None
+    direction: None
+    value: None
 
-requires:
-    the python gpiod bindings
-    https://pypi.org/project/gpiod/
-    and gpiod system service running
+    def __init__(self, chip, line):
+        self._pid = getpid()  # record PID of process that init'd the class
+        if not gpiod.is_gpiochip_device(chip):
+            raise ValueError('\'{}\' is not a valid GPIO device'.format(chip))
+        self.chip = chip
+        self._chip = gpiod.Chip(chip)
+        if line < 0 or line >= self._chip.get_info().num_lines:
+            raise ValueError('Requested line ({}) outside range for \'{}\' ({} lines)'
+                             .format(line, chip, self._chip.get_info().num_lines))
+        self.line = line
+        info = self._chip.get_line_info(self.line)
+        self.name = info.name
+        self.get()
+
+    def __str__(self):
+        consumer = None if self.consumer is None else '\'{}\''.format(self.consumer)
+        value = 'n/a' if self.value is None else self.value
+        return 'consumer: {}, value: {}'.format(consumer, value)
+
+    def _value(self):
+        try:
+            with self._chip.request_lines(consumer='pinstance-{}'.format(self._pid),
+                                          config={self.line: None}) as request:
+                val = request.get_values()[0]
+            return 1 if val == gpiod.line.Value.ACTIVE else 0
+        except:
+            # silently return None if the read fails
+            # - there are possible race conditions if this pin is simultaneously
+            #   accessed by another program (or instance of this class..) etc.
+            return None
+
+    def get(self):
+        line = self._chip.get_line_info(self.line)
+        self.direction = 'input' if line.direction == gpiod.line.Direction.INPUT else 'output'
+        if line.used:
+            self.consumer = line.consumer
+            self.value = None
+        else:
+            self.consumer = None
+            self.value = self._value()
+        return self.value
+
+# use @dataclass to make immutable
+@dataclass(frozen=True)
+class PinReader(dict):
+    def __init__(self, pinlist, tolerant=False):
+        super().__init__({})
+        for label in pinlist:
+            try:
+                super().__setitem__(label, PinInstance(pinlist[label][0], pinlist[label][1]))
+            except ValueError as e:
+                if not tolerant:
+                    raise ValueError('failed to set up pin \'{}\': {}'
+                                     .format(label, e))
+
+    def __str__(self):
+        ret = ''
+        for line in super().__iter__():
+            pin = super().__getitem__(line)
+            if pin.value is not None:
+                value = 'low' if pin.value == 0 else 'high'
+                ret += '{} = {} ({})\n'.format(line, value, pin.direction)
+            else:
+                ret += '{} = n/a (\'{}\')\n'.format(line, pin.consumer)
+        return ret
+
+    def update(self):
+        for line in super().keys():
+            super().__getitem__(line).get()
+
+'''
+    HELPER
 '''
 
-import os
-import logging
+def find_pins(device, regex, verbose=False):
+    if not gpiod.is_gpiochip_device(device):
+        raise ValueError('\'{}\' is not a valid GPIO device'.format(device))
+    pinlist = {}
+    with gpiod.Chip(device) as chip:
+        if verbose:
+            print('Searching for pins on \'{}\' that match regex: {}'
+                  .format(chip.path, regex))
+        for line in range(0, chip.get_info().num_lines):
+            name = chip.get_line_info(line).name
+            name = str(line) if name is None else name
+            if search(regex, name):
+                pinlist[name] = (chip.path, line)
+                if verbose:
+                    print(' adding: \'{}\' (line {})'.format(name, line))
+            elif verbose:
+                    print(' skipping: \'{}\' (line {})'.format(name, line))
+    return pinlist
 
-gpiod_available = True
-try:
-    import gpiod
-except ImportError as error:
-    gpiod_available = False
-
-class Pinreader:
-    '''Read and update pin status
-
-    Reads the currrent (boolean) status of a set of gipo pins defined in a dictionary
-    Updates the relevant entries in data{} and logs state changes
-
-    parameters:
-        settings: (tuple) consisting of:
-            chip: (str) path to the gpio chip device node, or None to disable
-            map: (dict) pin names and BCM GPIO number
-            state_names: (tuple) localised names for pin states (text,text)
-        data: the main data{} dictionary, a key/value pair; 'pin-<name>=value'
-            will be added to it and the vaue updated with pin state changes.
-
-    provides:
-        update_pins(): processes and updates the pins
+if __name__ == "__main__":
+    '''
+        DEMO
     '''
 
-    def __init__(self, settings, data):
-        '''Setup and do initial reading'''
-        (self._gpio_chip, self._map, self._state_names) = settings
-        self.data = data
-        self.available = False
-        if self._gpio_chip is None:
-            print('No GPIO chip specified in config, gpio monitoring disabled')
-            return
-        if not gpiod_available:
-            print('ERROR: GPIO chip specified but python gpiod library unavailable, '\
-	          'gpio monitoring disabled')
-            return
-        if not gpiod.is_gpiochip_device(self._gpio_chip):
-            print('ERROR: GPIO chip specified in config ({}) is not a libgpiod '\
-                  'compatible device, gpio monitoring disabled'.format(self._gpio_chip))
-            self._gpio_chip = None
-            return
-        self._num_lines = gpiod.Chip(self._gpio_chip).get_info().num_lines
-        print('GPIO chip is "{}" with {} lines'.format(self._gpio_chip, self._num_lines))
-        if not self._setup_pins():
-            print('No valid GPIO pins listed in config, gpio monitoring disabled')
-            return
-        values = self._get_pins(self._pins)
-        if values is None:
-            print('GPIO pin states could not be read, gpio monitoring disabled')
-            return
-        for index, name, value in zip(self._pins, self._names, values):
-            data[f'pin-{name}'] = int(value)
-            logging.info('{} index {} configured as "{}", current value: {}'
-                        .format(self._gpio_chip, index, name, self._state_names[int(value)]))
-        print('GPIO monitoring active and logging enabled')
-        logging.info('GPIO monitoring active and logging enabled')
-        self.available = True
+    from sys import argv
+    from time import asctime, sleep
+    from argparse import ArgumentParser
 
-    def _setup_pins(self):
-        '''Check the pins listed in the pin map are validi and create lists'''
-        self._pins = []
-        self._names = []
-        for name, pin in self._map.items():
-            if pin > 0 and pin < self._num_lines:
-                self._pins.append(pin)
-                self._names.append(name)
-            else:
-                print('ERROR: gpio chip index ({}) for "{}" is out of range'.format(pin, name))
-        if len(self._pins) == 0:
-            return False
-        return True
+    self = argv[0]
+    desc = 'Display GPIO pin states and value (if availabe) for matching pins '\
+           'on the specified gpio chip. Use \'gpioinfo <chip_path>\' to see available pins.'
+    elog = 'IMPORTANT: use regex wisely, DO NOT use a generic wildcard such as \'.*\'. '\
+           'Requesting pins that are used by the OS may cause conflicts. eg: reading the value '\
+           'of pins labelled \'SD_*\' can cause Disk I/O errors on Raspberry PI\'s.)'
+    parser = ArgumentParser(prog=self, description=desc, epilog=elog)
+    parser.add_argument("-i", "--interval", default=0, help="Interval between updates in seconds, default: 0 (run once)", type=float)
+    parser.add_argument("-c", "--chip", default="/dev/gpiochip0", help="GPIO chip device path, default: /dev/gpiochip0", type=str)
+    parser.add_argument("-r", "--regex", default="^GPIO[0-9]+$", help="RegEX to select pin names, default: ^GPIO[0-9]+$", type=str)
+    parser.add_argument("-v", "--verbose", action="store_true", help="Show chip and regex processing")
+    args = parser.parse_args()
 
-    def _get_pins(self, pins):
-        '''Get the value of all pins using gpiod, do not change pin state'''
-        values = []
-        try:
-            with gpiod.request_lines(
-                self._gpio_chip,
-                consumer="SBCEye-pinreader",
-                config={tuple(pins): None},
-            ) as request:
-                line_values = request.get_values()
-                for value in line_values:
-                    if value == gpiod.line.Value.ACTIVE:
-                        values.append(int(1))
-                    else:
-                        values.append(int(0))
-        except Exception as e:
-            print('Error getting pin values:\n{}'.format(e))
-            return None
-        return values
+    # Seach for pins using the device and regex determined above
+    pinlist = find_pins(args.chip, args.regex, args.verbose)
+    if len(pinlist) == 0:
+        print('No matching pins, exiting')
+        exit()
 
-    def update_pins(self):
-        '''Check if any pins have changed state, and log if so
-        updates the main data{} dictionary with new state
-        no parameters, no return'''
-        # Update current values list
-        values = self._get_pins(self._pins)
-        if values is None:
-            # The try:except in the system log should show the actual errors
-            # Some sort of warn/fail tracking might be needed if issues occcur here a lot.
-            logging.info('GPIO pin read failed (see syslog)')
-            return
-        # Now go through pins, store data and see what has changed
-        for index, name, value in zip(self._pins, self._names, values):
-            if value != self.data[f"pin-{name}"]:
-                # Pin has changed state, store new state and log
-                self.data[f'pin-{name}'] = value
-                logging.info('{} ({}:{}): {}'.format(name, self._gpio_chip, index,
-                                                    self._state_names[int(value)]))
+    # Instantiate the pinreader class on this list
+    pinstates = PinReader(pinlist)
+
+    # little function to collate output
+    def out():
+        return '{}: {}\n{}'.format(self, asctime(), pinstates)
+
+    # Show initial output
+    print(out(), end='')
+
+    # Now loop forever showing the values if needed
+    while args.interval != 0:
+        sleep(args.interval)
+        pinstates.update()
+        print("\033[F" * (len(pinstates) + 1), end='')
+        for line in out().split('\n')[:-1]:
+            print('\033[K{}'.format(line))
