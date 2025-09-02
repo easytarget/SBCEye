@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
     self = argv[0]
     desc = 'Display GPIO pin states and value (if availabe) for matching pins '\
-           'on the specified gpio chip. Use \'gpioinfo <chip_path>\' to see available pins.'
+           'on the specified gpio chip. Use \'gpioinfo\' to see available pins.'
     elog = 'IMPORTANT: use regex wisely, DO NOT use a generic wildcard such as \'.*\'. '\
            'Requesting pins that are used by the OS may cause conflicts. eg: reading the value '\
            'of pins labelled \'SD_*\' can cause Disk I/O errors on Raspberry PI\'s.)'

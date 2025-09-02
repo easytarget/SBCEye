@@ -53,7 +53,7 @@ from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
 from netreader import Netreader
-from pinreader import Pinreader
+from pinreader import PinReader
 from bus_drivers import i2c_setup
 
 # Re-nice to reduce blocking of other processes
@@ -142,8 +142,7 @@ data["update-time"] = time.time() # time of last update
 # Local functions
 
 def update_system():
-    '''Get current environmental and system data, called on a schedule
-    '''
+    '''Get current environmental and system data, called on a schedule'''
     data['sys-temp'] = psutil.sensors_temperatures()[cpu_thermal_device][0].current
     data['sys-load'] = psutil.getloadavg()[0]
     data["sys-freq"] = psutil.cpu_freq().current
@@ -165,8 +164,7 @@ def update_system():
     counter["sys-cpu-int"] = int_count
 
 def update_sensors():
-    '''Get current environmental sensor data
-    '''
+    '''Get current environmental sensor data'''
     if bme:
         bme.update_sensor()
         data['env-temp'] = bme.temperature
@@ -182,6 +180,38 @@ def update_data():
     update_system()
     net.update(data)
     rrd.update(data)
+
+def setup_pins():
+    '''collects pin data, logs setup and initial state, returns initial state'''
+    ret = {}
+    if not pins:
+        print('NO PINS!!!!!')        # <-  log this too
+    else:
+        for pin in pins:
+            if pins[pin].value is None:
+                print('pin: {}, unavailable, used as: {}'.format(pin, pins[pin].consumer))
+                data['pin-{}'.format(pin)] = 'U'
+            else:
+                print('pin: {}, {}, {}'.format(pin, pins[pin].direction,
+                                        settings.pin_state_names[pins[pin].value]))
+                data['pin-{}'.format(pin)] = pins[pin].value
+            ret[pin] = pins[pin].value
+    return ret
+
+def update_pins():
+    '''Updates pin data, and logs state changes,
+       called at different schedule to other updaters'''
+    pins.update()
+    for pin in pins:
+        if pins[pin].value != pinmemory[pin]:
+            if pins[pin].value is None:
+                print('pin: {}, unavailable, used as: {}'.format(pin, pins[pin].consumer))
+                data['pin-{}'.format(pin)] = 'U'
+            else:
+                print('pin: {}, {}, {}'.format(pin, pins[pin].direction,
+                                        settings.pin_state_names[pins[pin].value]))
+                data['pin-{}'.format(pin)] = pins[pin].value
+            pinmemory[pin] = pins[pin].value
 
 def daily():
     '''Remind everybody we are alive'''
@@ -253,11 +283,12 @@ if __name__ == '__main__':
     # Populate initial sensor data
     update_sensors()
 
+    # GPIO monitoring
+    pins = PinReader(settings.pinlist, tolerant=True)
+    pinmemory = setup_pins()
+
     # Network (ping) monitoring
     net = Netreader((settings.net_map, settings.net_timeout), data)
-
-    # GPIO Pin monitoring
-    pins = Pinreader((settings.gpio_chip, settings.pin_map, settings.pin_state_names), data)
 
     # RRD init now that the data{} structure is populated
     rrd = Robin(settings, data)
@@ -273,8 +304,8 @@ if __name__ == '__main__':
 
     # Schedule pin monitoring, database updates and logging events
     schedule.every(settings.data_interval).seconds.do(update_data)
-    if pins.available:
-        schedule.every(settings.pin_interval).seconds.do(pins.update_pins)
+    if pins:
+        schedule.every(settings.pin_interval).seconds.do(update_pins)
     if settings.log_daily:
         schedule.every().day.at("00:00").do(daily)
 
