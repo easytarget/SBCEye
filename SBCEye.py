@@ -53,7 +53,7 @@ from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
 from netreader import Netreader
-from pinreader import PinReader
+from gpioreader import GPIOReader
 from bus_drivers import i2c_setup
 
 # Re-nice to reduce blocking of other processes
@@ -273,7 +273,7 @@ if __name__ == '__main__':
 
     print('Performing initial data update', end='')
     if settings.netlist:
-        print(f' may take up to {settings.net_timeout}s if ping targets are down')
+        print(f' (may take up to {settings.net_timeout}s if ping targets are down)')
     else:
         print()
 
@@ -283,9 +283,8 @@ if __name__ == '__main__':
     # Populate initial sensor data
     update_sensors()
 
-    # GPIO monitoring
-    pins = PinReader(settings.pinlist, tolerant=True)
-    pinmemory = setup_pins()
+    # GPIO pin monitoring
+    gpio = GPIOReader(settings.pinlist, data)
 
     # Network (ping) monitoring
     net = Netreader((settings.netlist, settings.net_timeout), data)
@@ -304,8 +303,8 @@ if __name__ == '__main__':
 
     # Schedule pin monitoring, database updates and logging events
     schedule.every(settings.data_interval).seconds.do(update_data)
-    if pins:
-        schedule.every(settings.pin_interval).seconds.do(update_pins)
+    if gpio.available:
+        schedule.every(settings.pin_interval).seconds.do(gpio.update)
     if settings.log_daily:
         schedule.every().day.at("00:00").do(daily)
 
