@@ -8,11 +8,10 @@ import os
 import logging
 try:
     from pinreader import PinReader
-    reader = True
+    readerfail = None
 except ImportError as e:
-    print('Failed to import pinreader: {}\ngpio pin monitoring disabled'
-          .format(e))
-    reader = False
+    # remember why we failed, so it can be reported in log later.
+    readerfail = e
 
 class GPIOReader:
     '''Read and update GPIO pin status
@@ -35,18 +34,21 @@ class GPIOReader:
         self.available = False
         self.pinlist = pinlist
         self.data = data
-        if not reader:
-            print('GPIO pin reader not available, pin monitoring disabled')
-            return
         if not self.pinlist:
-            print('No GPIO pins configured for monitoring, pin monitoring disabled')
+            print('No GPIO pins configured for monitoring')
+            return
+        if readerfail:
+            print('GPIOD bindings could not be imported: {}\nPin monitoring disabled'
+                  .format(readerfail))
+            logging.warning('GPIO pins were specified but pinreader failed to import, see syslog')
+            logging.info('Pin monitoring disabled')
             return
         try:
             self.pins = PinReader(self.pinlist)
-        except ValueError as e:
+        except Exception as e:
             print('GPIO pin setup failed: {}\nPin monitoring disabled.'.format(e))
-            logging.warning('GPIO pins were specified but setup failed (see syslog), '\
-                            'pin monitoring disabled')
+            logging.warning('GPIO pins were specified but pin setup failed, see syslog')
+            logging.info('Pin monitoring disabled')
             return
         self.directions = {}
         self.consumers = {}

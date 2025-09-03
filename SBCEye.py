@@ -181,38 +181,6 @@ def update_data():
     net.update(data)
     rrd.update(data)
 
-def setup_pins():
-    '''collects pin data, logs setup and initial state, returns initial state'''
-    ret = {}
-    if not pins:
-        print('NO PINS!!!!!')        # <-  log this too
-    else:
-        for pin in pins:
-            if pins[pin].value is None:
-                print('pin: {}, unavailable, used as: {}'.format(pin, pins[pin].consumer))
-                data['pin-{}'.format(pin)] = 'U'
-            else:
-                print('pin: {}, {}, {}'.format(pin, pins[pin].direction,
-                                        settings.pin_state_names[pins[pin].value]))
-                data['pin-{}'.format(pin)] = pins[pin].value
-            ret[pin] = pins[pin].value
-    return ret
-
-def update_pins():
-    '''Updates pin data, and logs state changes,
-       called at different schedule to other updaters'''
-    pins.update()
-    for pin in pins:
-        if pins[pin].value != pinmemory[pin]:
-            if pins[pin].value is None:
-                print('pin: {}, unavailable, used as: {}'.format(pin, pins[pin].consumer))
-                data['pin-{}'.format(pin)] = 'U'
-            else:
-                print('pin: {}, {}, {}'.format(pin, pins[pin].direction,
-                                        settings.pin_state_names[pins[pin].value]))
-                data['pin-{}'.format(pin)] = pins[pin].value
-            pinmemory[pin] = pins[pin].value
-
 def daily():
     '''Remind everybody we are alive'''
     myself = os.path.basename(__file__)
@@ -293,7 +261,7 @@ if __name__ == '__main__':
     rrd = Robin(settings, data)
 
     # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(settings, rrd, data)
+    serve_http(settings, rrd, gpio.pins, data)
 
     # Exit handlers (needed for rrd cache write on shutdown)
     signal(SIGTERM, handle_signal)

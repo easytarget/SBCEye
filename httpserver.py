@@ -17,7 +17,7 @@ from threading import Thread
 # Logging
 import logging
 
-def serve_http(settings, rrd, data):
+def serve_http(settings, rrd, pins, data):
     '''Spawns a http.server.HTTPServer in a separate thread on the given port'''
     handler = _BaseRequestHandler
     httpd = http.server.ThreadingHTTPServer((settings.web_host, settings.web_port), handler, False)
@@ -30,6 +30,7 @@ def serve_http(settings, rrd, data):
     # there is probably a better way to do this, eg using a meta-class and inheritance
     http.settings = settings
     http.rrd = rrd
+    http.pins = pins
     http.data = data
     http.icon_file = 'favicon.ico'
     if not os.path.exists(http.icon_file):
@@ -215,18 +216,18 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_net(self):
         # Network Connectivity
         ret = ''
-        netlist = {}
+        targetlist = {}
         for key in http.data.keys():
             if key[0:4] == 'net-':
-                netlist[key] = key[4:]
-        if len(http.data.keys() & netlist.keys()) > 0:
+                targetlist[key] = key[4:]
+        if len(http.data.keys() & targetlist.keys()) > 0:
             ret += '<tr><th>Ping</th></tr>\n'
-            for item,name in netlist.items():
-                ret += f'<tr><td>{name}:</td><td style="text-align: right;">'
+            for item,name in targetlist.items():
+                ret += f'<tr><td title="{http.settings.netlist[name]}">{name}:</td>'
                 if http.data[item] == 'U':
-                    ret += 'Fail</td></tr>\n'
+                    ret += '<td style="text-align: right;">Fail</td></tr>\n'
                 else:
-                    ret += f'{http.data[item]:.1f}</td>'\
+                    ret += f'<td style="text-align: right;">{http.data[item]:.1f}</td>'\
                             '<td style="padding-left: 0;">'\
                             '<span style="font-size: 75%;"> ms</span>'\
                             '</td></tr>\n'
@@ -243,14 +244,14 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         if len(http.data.keys() & pinlist.keys()) > 0:
             ret += '<tr><th>GPIO</th></tr>\n'
             for item,name in pinlist.items():
+                ret += f'<tr><td title="{http.pins[name].chip}&nbsp;:&nbsp;{http.pins[name].line}">{name}:</td>'
                 if http.data[item] == 'U':
-                    em = 'style=" font-style: italic;"'
-                    ret += f'<tr><td>{name}:</td><td style="text-align: right;"><span {em}>'\
-                           f'n/a</span></td></tr>\n'
+                    ret += f'<td style="text-align: right;"><span style=" font-style: italic;">n/a</span></td>'\
+                           f'<td style="padding-left: 0.3em;"><span style="font-size: 75%;"> [{http.pins[name].consumer}]</span></td></tr>\n'
                 else:
                     em = 'style=" font-weight: bold;"' if http.data[item] == 1 else ''
-                    ret += f'<tr><td>{name}:</td><td style="text-align: right;"><span {em}>'\
-                           f'{http.settings.pin_state_names[http.data[item]]}</span></td></tr>\n'
+                    ret += f'<td style="text-align: right;"><span {em}>{http.settings.pin_state_names[http.data[item]]}</span></td>'\
+                           f'<td style="padding-left: 0.3em;"><span style="font-size: 75%;"> ({http.pins[name].direction})</span></td></tr>\n'
         return ret
 
     def _give_graphlinks(self, skip=""):
@@ -260,14 +261,14 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         if (len(http.settings.graph_durations) > 0) and http.db_graphable:
             if len(skip) == 0:
                 ret += '<tr><th>Graphs</th></tr>\n'
-            ret += '<tr><td colspan="2" style="text-align: center">\n'
+            ret += '<tr><td colspan="3" style="text-align: center; font-size: 86%;">\n'
             for duration in http.settings.graph_durations:
                 if duration != skip:
-                    ret += f'&nbsp;<a href="./graphs?start=end-{duration}" '\
+                    ret += f'<a href="./graphs?start=end-{duration}" '\
                            f'title="Graphs covering the last {duration} in time">'\
                            f'{duration}</a>&nbsp;\n'
                 else:
-                    ret += f'&nbsp;<span style="color: #BBBBBB;">{duration}</span>&nbsp;\n'
+                    ret += f'<span style="color: #BBBBBB;">{duration}</span>&nbsp;\n'
             if len(skip) > 0:
                 ret += '</td></tr>\n<tr><td colspan="2" style="text-align: center">'\
                        '<a href="./" title="Main page">Home</a>\n'
@@ -277,14 +278,13 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_links(self):
         # Links to the graph pages
         ret = f'{self._give_graphlinks()}'
-        # Links to the pin contol, cam show/hide and log pages
-        #ret += f'<tr><td colspan="2"></td></tr>\n'
+        # Configured links and log page
         for link in http.settings.links:
-            ret += f'<tr><td colspan="2" style="text-align: center">'\
+            ret += f'<tr><td colspan="3" style="text-align: center">'\
                    f'<a href="{http.settings.links[link]}" title="Open {link} in a new tab" target="_blank">'\
                    f'{link}</a></td></tr>\n'
-        ret += f'<tr><td colspan="2" style="text-align: center">\n'\
-               f'<a href="./log" title="Open log in a new page" target="_blank">'\
+        ret += f'<tr><td colspan="3" style="text-align: center">\n'\
+               f'<a href="./log" title="Open log in a new tab" target="_blank">'\
                f'Action Log</a></td></tr>\n'
         return ret
 
