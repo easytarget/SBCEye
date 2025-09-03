@@ -44,6 +44,7 @@ admin@sbc:~$ sudo usermod -s /bin/bash eye
 
 # If using GPIO pin monitoring the eye user needs to be in the `gpio` group:
 admin@sbc:~$ sudo usermod -a -G gpio eye
+; for Ubuntu/Debian this may fail, see note on gpio group creation and rules below.
 
 # If using a I2C screen or BME280 sensor the eye user needs to be in the `i2c` group:
 admin@sbc:~$ sudo usermod -a -G i2c eye
@@ -57,6 +58,22 @@ eye@sbc:~$ git clone https://github.com/easytarget/SBCEye.git ~/SBCEye
 
 eye@sbc:~$ cd ~/SBCEye
 ```
+
+#### If the `gpio` group does not exist..
+I experienced this on Ubuntu 24.04, other distros (Debiam?) may also be affected
+- I expect this is resolved in later releases, rpiOS and fedora already includes this. 
+```
+admin@sbc:~$ sudo groupadd -r gpio
+admin@sbc:~$ sudo usermod -a -G gpio eye
+admin@sbc:~$ vi /etc/udev/rules.d/99-gpiod-custom.rules
+```
+edit this new file so it contains:
+```
+# Custom Udev rule for gpiod
+SUBSYSTEM=="gpio", KERNEL=="gpiochip[0-9]*", GROUP="gpio", MODE="0660"
+```
+reboot and the new group and rules will be applied.
+- or do `sudo udevadm control --reload-rules && sudo udevadm trigger` and re-login to gain the group permissions
 
 ### Install and Upgrade Requirements
 
