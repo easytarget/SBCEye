@@ -33,6 +33,7 @@ class GPIOReader:
         '''Setup and do initial reading'''
         self.available = False
         self.pinlist = pinlist
+        self.pins = {}
         self.data = data
         if not self.pinlist:
             print('No GPIO pins configured for monitoring')
