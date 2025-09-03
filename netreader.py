@@ -32,9 +32,10 @@ class Netreader:
         if not self.list:
             print('No network addresses configured for monitoring')
             return
-        for name,_ in self.list.items():
+        for name, target in self.list.items():
             self.states[name] = "init"
             data[f'net-{name}'] = 'U'
+            print(f'Ping target \'{name}\': {target}')
         self.update(data)
         print('Network monitoring configured and logging enabled')
         logging.info('Network monitoring configured and logging enabled')
