@@ -102,5 +102,5 @@ def i2c_setup(settings):
             print(error)
             print("We do not have a environmental sensor")
 
-    print(flush=True)
+    print(flush=True, end='')
     return disp, bme
