@@ -28,13 +28,14 @@ class PinInstance:
         self.get()
 
     def __repr__(self):
-        return 'PinInstance(chip={} line={} consumer={} direction={} value={})'\
-               .format(self.chip, self.line, self.consumer, self.direction, self.value)
+        consumer = None if self.consumer is None else '\'{}\''.format(self.consumer)
+        return 'PinInstance(chip=\'{}\' line={} consumer={} direction=\'{}\' value={})'\
+               .format(self.chip, self.line, consumer, self.direction, self.value)
 
     def __str__(self):
         consumer = None if self.consumer is None else '\'{}\''.format(self.consumer)
-        value = 'n/a' if self.value is None else self.value
-        return 'consumer: {}, value: {}'.format(consumer, value)
+        return 'direction: {}, consumer: {}, value: {}'\
+               .format(self.direction, consumer, self.value)
 
     def _value(self):
         try:
