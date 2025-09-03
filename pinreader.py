@@ -18,7 +18,10 @@ class PinInstance:
         if not gpiod.is_gpiochip_device(chip):
             raise ValueError('\'{}\' is not a valid GPIO device'.format(chip))
         self.chip = chip
-        self._chip = gpiod.Chip(chip)
+        try:
+            self._chip = gpiod.Chip(chip)
+        except PermissionError as e:
+            raise PermissionError('Cannot access \'{}\': {}' .format(chip, e))
         if line < 0 or line >= self._chip.get_info().num_lines:
             raise ValueError('Requested line ({}) outside range for \'{}\' ({} lines)'
                              .format(line, chip, self._chip.get_info().num_lines))
