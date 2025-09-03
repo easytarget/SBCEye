@@ -90,7 +90,7 @@ class Robin:
         for name in s.pinlist.keys():
             self.data_sources[f'pin-{name}'] = ('0','1')
             self.graph_map[f'pin-{name}'] = (f'{name} Pin State, '\
-                    f'0 = {s.pin_state_names[0]}, 1 = {s.pin_state_names[1]}',
+                    f'0 = {s.pin_state_names[0]}, 1 = {s.pin_state_names[1]}, None = pin n/a',
                     '1', '0' ,'%3.1lf', '%3.0lf', '--alt-autoscale', '--units-exponent','0')
 
         # set the list of active and storable sources
