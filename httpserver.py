@@ -243,15 +243,20 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 pinlist[key] = key[4:]
         if len(http.data.keys() & pinlist.keys()) > 0:
             ret += '<tr><th>GPIO</th></tr>\n'
-            for item,name in pinlist.items():
-                ret += f'<tr><td title="{http.pins[name].chip}&nbsp;:&nbsp;{http.pins[name].line}">{name}:</td>'
+            for item, name in pinlist.items():
+                title = '{}:\n chip: {}\n line: {}\n direction: {}\n consumer: {}'.format(
+                            name, http.pins[name].chip, http.pins[name].line,
+                            http.pins[name].direction, http.pins[name].consumer)
+                ret += f'<tr><td title="{title}">{name}:</td>'
+                direction = ' ({})'.format(http.pins[name].direction) if http.settings.web_pin_info else ''
+                consumer = ' [{}]'.format(http.pins[name].consumer) if http.settings.web_pin_info else ''
                 if http.data[item] == 'U':
                     ret += f'<td style="text-align: right;"><span style=" font-style: italic;">n/a</span></td>'\
-                           f'<td style="padding-left: 0.3em;"><span style="font-size: 75%;"> [{http.pins[name].consumer}]</span></td></tr>\n'
+                           f'<td style="padding-left: 0.3em;"><span style="font-size: 75%;">{consumer}</span></td></tr>\n'
                 else:
                     em = 'style=" font-weight: bold;"' if http.data[item] == 1 else ''
                     ret += f'<td style="text-align: right;"><span {em}>{http.settings.pin_state_names[http.data[item]]}</span></td>'\
-                           f'<td style="padding-left: 0.3em;"><span style="font-size: 75%;"> ({http.pins[name].direction})</span></td></tr>\n'
+                           f'<td style="padding-left: 0.3em;"><span style="font-size: 75%;">{direction}</span></td></tr>\n'
         return ret
 
     def _give_graphlinks(self, skip=""):
