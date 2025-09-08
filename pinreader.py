@@ -9,70 +9,73 @@ if int(search('^[0-9]+', gpiod.__version__).group(0)) < 2:
                       'pinreader requires gpiod v2.x.x or later.'
                       .format(gpiod.__version__))
 '''
-PinInstance class
-
-'''
-class PinInstance:
-    def __init__(self, chip, line):
-        self._pid = getpid()  # record PID of process that called init()
-        if not gpiod.is_gpiochip_device(chip):
-            raise ValueError('\'{}\' is not a valid GPIO device'.format(chip))
-        self.chip = chip
-        try:
-            self._chip = gpiod.Chip(chip)
-        except PermissionError as e:
-            raise PermissionError('Cannot access \'{}\': {}' .format(chip, e))
-        if line < 0 or line >= self._chip.get_info().num_lines:
-            raise ValueError('Requested line ({}) outside range for \'{}\' ({} lines)'
-                             .format(line, chip, self._chip.get_info().num_lines))
-        self.line = line
-        info = self._chip.get_line_info(self.line)
-        self.name = info.name
-        self.get()
-
-    def __repr__(self):
-        consumer = None if self.consumer is None else '\'{}\''.format(self.consumer)
-        return 'PinInstance(chip=\'{}\' line={} consumer={} direction=\'{}\' value={})'\
-               .format(self.chip, self.line, consumer, self.direction, self.value)
-
-    def __str__(self):
-        consumer = None if self.consumer is None else '\'{}\''.format(self.consumer)
-        return 'direction: {}, consumer: {}, value: {}'\
-               .format(self.direction, consumer, self.value)
-
-    def _value(self):
-        try:
-            with self._chip.request_lines(consumer='pinstance-{}'.format(self._pid),
-                                          config={self.line: None}) as request:
-                val = request.get_values()[0]
-            return 1 if val == gpiod.line.Value.ACTIVE else 0
-        except:
-            # silently return None if the read fails
-            # - there are possible race conditions if this pin is simultaneously
-            #   accessed by another program (or instance of this class..) etc.
-            return None
-
-    def get(self):
-        line = self._chip.get_line_info(self.line)
-        self.direction = 'input' if line.direction == gpiod.line.Direction.INPUT else 'output'
-        if line.used:
-            self.consumer = line.consumer
-            self.value = None
-        else:
-            self.consumer = None
-            self.value = self._value()
-        return self.value
-
-'''
 PinReader class (dict)
-
 '''
+INPUT  = gpiod.line.Direction.INPUT
+ACTIVE  = gpiod.line.Value.ACTIVE
 class PinReader(dict):
+    '''
+    internal instance class
+    '''
+    class _instance:
+        def __init__(self, chip, line):
+            self._pid = getpid()  # record PID of process that called init()
+            if not gpiod.is_gpiochip_device(chip):
+                raise ValueError('\'{}\' is not a valid GPIO device'.format(chip))
+            self.chip = chip
+            try:
+                self._chip = gpiod.Chip(chip)
+            except PermissionError as e:
+                raise PermissionError('Cannot access \'{}\': {}' .format(chip, e))
+            if line < 0 or line >= self._chip.get_info().num_lines:
+                raise ValueError('Requested line ({}) outside range for \'{}\' ({} lines)'
+                                 .format(line, chip, self._chip.get_info().num_lines))
+            self.line = line
+            info = self._chip.get_line_info(self.line)
+            self.name = info.name
+            self.get()
+
+        def __repr__(self):
+            consumer = None if self.consumer is None else '\'{}\''.format(self.consumer)
+            return '_instance(chip=\'{}\' line={} consumer={} direction=\'{}\' value={})'\
+                   .format(self.chip, self.line, consumer, self.direction, self.value)
+
+        def __str__(self):
+            consumer = None if self.consumer is None else '\'{}\''.format(self.consumer)
+            return 'direction: {}, consumer: {}, value: {}'\
+                   .format(self.direction, consumer, self.value)
+
+        def _value(self):
+            try:
+                with self._chip.request_lines(consumer='pinreader-{}'.format(self._pid),
+                                              config={self.line: None}) as request:
+                    val = request.get_values()[0]
+                return 1 if val == ACTIVE else 0
+            except:
+                # silently return None if the read fails
+                # - there are possible race conditions if this pin is simultaneously
+                #   accessed by another program (or instance of this class..) etc.
+                return None
+
+        def get(self):
+            line = self._chip.get_line_info(self.line)
+            self.direction = 'input' if line.direction == INPUT else 'output'
+            if line.used:
+                self.consumer = line.consumer
+                self.value = None
+            else:
+                self.consumer = None
+                self.value = self._value()
+            return self.value
+
+    ''' class init() '''
     def __init__(self, pinlist, tolerant=False):
         super().__init__({})
         for label in pinlist:
             try:
-                super().__setitem__(label, PinInstance(pinlist[label][0], pinlist[label][1]))
+                super().__setitem__(label,
+                                    self._instance(pinlist[label][0],
+                                                pinlist[label][1]))
             except ValueError as e:
                 if not tolerant:
                     raise ValueError('failed to set up pin \'{}\': {}'
@@ -86,11 +89,13 @@ class PinReader(dict):
                 value = 'low' if pin.value == 0 else 'high'
                 ret += '{} = {} ({})\n'.format(line, value, pin.direction)
             else:
-                ret += '{} = n/a (\'{}\')\n'.format(line, pin.consumer)
+                ret += '{} = - (\'{}\')\n'.format(line, pin.consumer)
         return ret.rstrip('\n')
 
-    def update(self):
-        for line in super().keys():
+    def update(self, items=None):
+        items = [items] if type(items) == str else items
+        items = super().keys() if items is None else items
+        for line in items:
             super().__getitem__(line).get()
 
 '''

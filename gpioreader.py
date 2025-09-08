@@ -57,7 +57,7 @@ class GPIOReader:
             data[f'pin-{pin}'] = self._value_to_data(self.pins[pin].value)
             self.directions[pin] = self.pins[pin].direction
             self.consumers[pin] = self.pins[pin].consumer
-            print('Pin \'{}\': {}'.format(pin, repr(self.pins[pin])[12:-1]))
+            print('Pin \'{}\': {}'.format(pin, repr(self.pins[pin])[10:-1]))
             logging.info('Pin \'{}\': {}'.format(pin, repr(self.pins[pin])[12:-1]))
         print('GPIO monitoring configured and logging enabled')
         logging.info('GPIO monitoring configured and logging enabled')
