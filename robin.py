@@ -200,7 +200,7 @@ class Robin:
                 return
             else:
                 with backupfile:
-                    backupfile.write(self.dump())
+                    backupfile.write(self.dump(reason='Backup'))
             size = os.stat(f'{str(self.backup_path)}/{self.backup_name}.{suffix}').st_size
             if size == 0:
                 logging.error(f'Database backup failed: empty datafile returned')
@@ -240,12 +240,12 @@ class Robin:
             schedule.every().day.at(self.backup_time).do(run_threaded, self.backup)
 
 
-    def dump(self):
+    def dump(self, reason=''):
         '''provide a gzipped dump of database'''
         dump_local.zipped = bytearray()
         if self.rrdtool and self.gzip:
             self.write_updates()
-            print('Dump requested',flush=True)
+            print('Dump requested: {}'.format(reason),flush=True)
             if not db_lock.acquire(blocking=True, timeout=60):
                 print('Error: Dumping failed, could not acquire db lock within 60s',flush=True)
                 return dump_local.zipped

@@ -424,7 +424,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             # Raw dump download
             start = time.time()
             logging.info(f"RRD database dump requested by {self.client_address[0]}")
-            response = http.rrd.dump()
+            response = http.rrd.dump(reason=f'Web ({self.client_address[0]})')
             self._set_download_headers(len(response),
                     f'{http.settings.name}-rrd-{time.strftime("%Y%m%d-%H%M%S")}.xml.gz')
             self.wfile.write(response)
