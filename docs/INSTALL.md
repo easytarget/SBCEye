@@ -2,7 +2,7 @@
 The core features of SBCEye (cpu/memory/disk/connectivity monitoring) should run on any *modern* **Linux** platform, I have tested it on Pi3 and Pi4 devices, plus my VisionFive2 (risc-v), mq-pro (single core and slow risc-v). It also runs fine on a fedora based laptop, but is really optimised for SBC's, not workstations.
 
 The GPIO features use standard Linux libraries. But you will need to ensure GPIO and I2C pins are available on your platform (this is done via the device tree and device tree overlays):
-- PI: <------------ show howto in rpi-config
+- PI: To enable I2C you need to uncomment the line `dtparam=i2c_arm=on` near the top of the boot config file (`/boot/firmware/config.txt` on bookworm+), or you can use the `raspi-config` commandline utility's `Interface Options` -> `I2C` tool to enable). You can also use Overlays and other techniques to remap pins if doing advanced gpio; see: https://www.raspberrypi.com/documentation/computers/configuration.html : `Using Device Trees on Raspberry Pi`.
 - VF2: <----------- maybe example with DTO's
 
 # Python
