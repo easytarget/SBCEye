@@ -23,11 +23,6 @@ def get_device(chip, line):
         except Exception as e:
             raise ValueError('Failed to setup gpiochip (\'{}\') device:\n{}'
                   .format(chip, e))
-        # Test if the line is already used by another consumer
-        if device.get_line_info(line).used:
-            raise ValueError('Cannot acquire gpiochip \'{}\' line {}, '\
-                             'currently used by: \'{}\''
-                  .format(line,  device.get_line_info(self.line).consumer))
         return device
 
 # Input
@@ -53,7 +48,7 @@ class input_pin:
         self.chip = chip
         self.line = line
         self.consumer = consumer
-        self.bias = gpiod.line.Bias.DISABLED
+        self.bias = gpiod.line.Bias.AS_IS
         self.edge = gpiod.line.Edge.BOTH
         self.clock = gpiod.line.Clock.MONOTONIC
         self.debounce = 100
@@ -61,6 +56,10 @@ class input_pin:
         self.states = (gpiod.line.Value.INACTIVE, gpiod.line.Value.ACTIVE)
         # Get and test the device
         self.device = get_device(self.chip, self.line)
+        if self.device.get_line_info(line).used:
+            raise ValueError('Cannot acquire gpiochip \'{}\' line {}, '\
+                             'currently used by: \'{}\''
+                  .format(chip, line, self.device.get_line_info(line).consumer))
         # Create a request object for the input
         self.request = self.device.request_lines(
                             consumer=self.consumer,
@@ -96,8 +95,9 @@ class output_pin:
             lock (bool)
             verbose (bool)
         Provides:
-            set(value): sets the output value (int: 0 or 1)
-            get():      gets the output value (int: 0 or 1)
+            set(value): sets the output value (int: 0 or 1 for low/high)
+                        returns True if successful, False if output is unavailable
+            get():      gets the output value (int: 0, 1 or 2=unavailable)
     '''
     def __init__(self, chip, line, consumer, lock=False, verbose=False):
         self.chip = chip
@@ -107,10 +107,15 @@ class output_pin:
         self.states = (gpiod.line.Value.INACTIVE, gpiod.line.Value.ACTIVE)
         # Get and test the device
         self.device = get_device(self.chip, self.line)
-        # Create a request object if we are a consumer, otherwise None
+        # Create a request object as needed
         if lock:
+            if self.device.get_line_info(line).used:
+                raise ValueError('Cannot acquire gpiochip \'{}\' line {}, '\
+                                 'currently used by: \'{}\''
+                      .format(chip, line,  self.device.get_line_info(line).consumer))
             self.request = self.device.request_lines(consumer=self.consumer,
-                                config={self.line: gpiod.LineSettings(direction=gpiod.line.Direction.OUTPUT)})
+                            config={self.line: gpiod.LineSettings(
+                                    direction=gpiod.line.Direction.OUTPUT)})
         else:
             self.request = None
         if self.verbose:
@@ -121,29 +126,36 @@ class output_pin:
         if self.request:
             value = self.states.index(self.request.get_value(self.line))
         else:
-            with self.device.request_lines(
-                    consumer=self.consumer,
-                    config={self.line: None},
-                    ) as line:
-                value = self.states.index(line.get_value(self.line))
+            try:
+                with self.device.request_lines(
+                        consumer=self.consumer,
+                        config={self.line: None},
+                        ) as line:
+                    value = self.states.index(line.get_value(self.line))
+            except OSError:
+               value = 2   # 2 = unavailable
         return value
 
     def set(self, value):
         if self.request:
             self.request.set_value(self.line, self.states[value])
         else:
-            with self.device.request_lines(
-                    consumer=self.consumer,
-                    config={self.line: gpiod.LineSettings(direction=gpiod.line.Direction.OUTPUT)},
-                    ) as line:
-                line.set_value(self.line, self.states[value])
+            try:
+                with self.device.request_lines(
+                        consumer=self.consumer,
+                        config={self.line: gpiod.LineSettings(direction=gpiod.line.Direction.OUTPUT)},
+                        ) as line:
+                    line.set_value(self.line, self.states[value])
+            except OSError:
+                return False
+        return True
 
 # HTTP server
 import http.server
 from urllib.parse import urlparse
 from threading import Thread
 
-def serve_http(out, host='0.0.0.0', port=7090, off='off', on='on', toggle='toggle', debug=True):
+def serve_http(out, host='0.0.0.0', port=7090, states=('off', 'on', 'unavailable'), toggle='toggle', debug=False):
     '''Spawns a http.server.HTTPServer in a separate thread on the given port'''
     handler = _BaseRequestHandler
     httpd = http.server.ThreadingHTTPServer((host, port), handler, False)
@@ -153,8 +165,9 @@ def serve_http(out, host='0.0.0.0', port=7090, off='off', on='on', toggle='toggl
     http.out = out
     http.host = host
     http.port = port
-    http.states = (off, on)
+    http.states = states
     http.toggle = toggle
+    http.lastknown = ''
     http.debug = debug
     # Start the server
     httpd.server_bind()
@@ -193,11 +206,16 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         elif urlparse(self.path).path == '/{}'.format(http.toggle):
             http.out.set(1 - http.out.get())
         elif urlparse(self.path).path == '/':
-            pass
+            self.wfile.write(bytes(http.states[http.out.get()], 'utf-8'))
+            return
         else:
             self.send_error(404, 'No Match', 'Nothing matches the URL')
             return
-        self.wfile.write(bytes(http.states[http.out.get()], 'utf-8'))
+        state = http.states[http.out.get()]
+        self.wfile.write(bytes(state, 'utf-8'))
+        if state != http.lastknown:
+            print('{} : http ({}) : {}'.format(asctime(), self.client_address[0], state))
+            http.lastknown = state
 
 # Main
 if __name__ == '__main__':
@@ -208,25 +226,26 @@ if __name__ == '__main__':
     button_chip = '/dev/gpiochip0'
     button_line = 27
 
+    print('running: {}'.format(argv[0]))
+
     consumer = '{}-{}'.format(argv[0], getpid())
-    out = output_pin(output_chip, output_line, consumer, lock=False)
-    button = input_pin(button_chip, button_line, consumer)
+    out = output_pin(output_chip, output_line, consumer, lock=False, verbose=True)
+    button = input_pin(button_chip, button_line, consumer, verbose=True)
     looptime = timedelta(seconds=60)
+    outstates = ('off', 'on', 'unavailable')
 
     def flip():
         current = out.get()
         if current == 0:
             out.set(1)
-            return('lamp on')
-        else:
+        elif current == 1:
             out.set(0)
-            return('lamp off')
-
-    print('running: {}'.format(argv[0]))
+        return '{}'.format(outstates[out.get()])
 
     serve_http(out)
 
+    print('Initial output: {}'.format(outstates[out.get()]))
     while True:
         ev = button.event(timeout=looptime)
         if ev == 'rising':
-            print('{} : {}'.format(asctime(), flip()), flush=True)
+            print('{} : button : {}'.format(asctime(), flip()), flush=True)
