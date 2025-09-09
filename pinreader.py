@@ -51,7 +51,7 @@ class PinReader(dict):
                                               config={self.line: None}) as request:
                     val = request.get_values()[0]
                 return 1 if val == ACTIVE else 0
-            except:
+            except OSError:
                 # silently return None if the read fails
                 # - there are possible race conditions if this pin is simultaneously
                 #   accessed by another program (or instance of this class..) etc.
