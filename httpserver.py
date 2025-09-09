@@ -72,7 +72,7 @@ def serve_http(settings, rrd, pins, data):
             logging.info("Http Server closing down")
 
     thread = Thread(target=serve_forever, args=(httpd, ))
-    thread.setDaemon(True )
+    thread.daemon = True
     thread.start()
 
 
