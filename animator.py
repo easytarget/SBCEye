@@ -60,9 +60,6 @@ class Animator:
         self.height = self.disp.height
         self.span   = self.width*2 + self.margin
 
-        # Display rotation handled during display init
-        #self.display_rotate = settings.display_rotate
-
         # How fast
         self.animate_speed = settings.animate_speed
 
