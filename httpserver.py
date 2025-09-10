@@ -293,7 +293,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                f'Action Log</a></td></tr>\n'
         return ret
 
-    def _give_log(self, lines=25):
+    def _give_log(self, lines=32):
         # Combine and give last (lines) lines of log
         parsed_lines = parse_qs(urlparse(self.path).query).get('lines', None)
         if isinstance(parsed_lines, list):
@@ -303,8 +303,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             try:
                 lines = int(lines)
             except ValueError:
-                lines = int(100)
-        lines = max(1, min(lines, 250000))
+                lines = int(32)
+        lines = max(1, lines)
         # Use a shell one-liner used to extract the last {lines} of data from the logs
         # There is doubtless a more 'python' way to do this, but it is fast, cheap and works..
         log_command = \
@@ -316,9 +316,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <hr><pre>\n{log}</pre><hr>
                 <span style="font-size: 80%;">Latest {lines} lines shown</span>\n
                 </div>\n
-                <div><a href="./log?lines=25" title="show 25 lines">25</a>&nbsp;:
-                <a href="./log?lines=250" title="show 250 lines">250</a>&nbsp;:
-                <a href="./log?lines=2500" title="show 2500 lines">2500</a></div>\n
+                <div><a href="./log?lines=32" title="show 32 lines">32</a>&nbsp;:
+                <a href="./log?lines=320" title="show 320 lines">320</a>&nbsp;:
+                <a href="./log?lines=3200" title="show 3200 lines">3200</a></div>\n
                 <div><a href="./" title="Main page">Home</a></div>\n'''
         return ret
 
