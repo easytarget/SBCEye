@@ -1,9 +1,11 @@
 import gpiod
-
 from os import getpid
 from time import sleep, asctime
 from datetime import timedelta
 from re import search
+from threading import Thread
+import http.server
+from urllib.parse import urlparse
 
 # Needs gpiod bindings at V2.0 or later, standard debian12/bookworm is v1.6
 #  use a virtualenv and 'pip install --upgrade gpiod' as needed.
@@ -12,7 +14,7 @@ if int(search('^[0-9]+', gpiod.__version__).group(0)) < 2:
                       'pinreader requires gpiod v2.x.x or later.'
                       .format(gpiod.__version__))
 
-def get_device(chip, line):
+def _get_device(chip, line):
         ''' Common gpiochip+line setup '''
         # Test whether chip is a gpiochip
         if not gpiod.is_gpiochip_device(chip):
@@ -55,7 +57,7 @@ class input_pin:
         self.verbose = verbose
         self.states = (gpiod.line.Value.INACTIVE, gpiod.line.Value.ACTIVE)
         # Get and test the device
-        self.device = get_device(self.chip, self.line)
+        self.device = _get_device(self.chip, self.line)
         if self.device.get_line_info(line).used:
             raise ValueError('Cannot acquire gpiochip \'{}\' line {}, '\
                              'currently used by: \'{}\''
@@ -70,7 +72,7 @@ class input_pin:
                                         event_clock=self.clock,
                                         debounce_period=timedelta(milliseconds=self.debounce))})
         if self.verbose:
-            print('Configured: \'{}\':{} as input'
+            print('Configured: \'{}\':{} as input (locked)'
                 .format(self.chip, self.line))
 
     def event(self, timeout=0):
@@ -106,7 +108,7 @@ class output_pin:
         self.verbose = verbose
         self.states = (gpiod.line.Value.INACTIVE, gpiod.line.Value.ACTIVE)
         # Get and test the device
-        self.device = get_device(self.chip, self.line)
+        self.device = _get_device(self.chip, self.line)
         # Create a request object as needed
         if lock:
             if self.device.get_line_info(line).used:
@@ -143,19 +145,15 @@ class output_pin:
             try:
                 with self.device.request_lines(
                         consumer=self.consumer,
-                        config={self.line: gpiod.LineSettings(direction=gpiod.line.Direction.OUTPUT)},
+                        config={self.line: gpiod.LineSettings(
+                                    direction=gpiod.line.Direction.OUTPUT)},
                         ) as line:
                     line.set_value(self.line, self.states[value])
             except OSError:
                 return False
         return True
 
-# HTTP server
-import http.server
-from urllib.parse import urlparse
-from threading import Thread
-
-def serve_http(out, host='0.0.0.0', port=7090, states=('off', 'on', 'unavailable'), toggle='toggle', debug=False):
+def _serve_http(out, host, port, states, toggle, verbose, debug):
     '''Spawns a http.server.HTTPServer in a separate thread on the given port'''
     handler = _BaseRequestHandler
     httpd = http.server.ThreadingHTTPServer((host, port), handler, False)
@@ -167,12 +165,14 @@ def serve_http(out, host='0.0.0.0', port=7090, states=('off', 'on', 'unavailable
     http.port = port
     http.states = states
     http.toggle = toggle
-    http.lastknown = ''
+    http.verbose = verbose
     http.debug = debug
+    http.lastknown = http.states[http.out.get()]
     # Start the server
     httpd.server_bind()
     http.address = f"http://{httpd.server_name}:{httpd.server_port}"
-    print(f"http server: {http.address}",flush=True)
+    if http.verbose:
+        print(f"http server: {http.address}",flush=True)
     # Serve requests using threads
     httpd.server_activate()
     def serve_forever(httpd):
@@ -182,23 +182,27 @@ def serve_http(out, host='0.0.0.0', port=7090, states=('off', 'on', 'unavailable
     thread.daemon = True
     thread.start()
 
+''' Base request handler class for the http server '''
 class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
+    ''' suppress the http server log output '''
     def log_message(self, format, *args):
-        # This function suppresses the http server log output
         if http.debug:
             print(f'HTTP request:: {self.client_address[0]} : {args[0]} '\
                   f'({args[1]})',flush=True)
         return
 
+    ''' handle GET requests : this is where logic lives '''
     def do_GET(self):
-        '''Process requests and parse their options'''
-        self.send_response(200)
-        self.send_header("Content-type", "text/html")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Pragma", "no-cache")
-        self.send_header("Expires", "0")
-        self.end_headers()
+        def headers():
+            # common headers for non-error response
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+            self.end_headers()
+        # parse request and process
         if urlparse(self.path).path == '/{}'.format(http.states[0]):
             http.out.set(0)
         elif urlparse(self.path).path == '/{}'.format(http.states[1]):
@@ -206,46 +210,95 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         elif urlparse(self.path).path == '/{}'.format(http.toggle):
             http.out.set(1 - http.out.get())
         elif urlparse(self.path).path == '/':
-            self.wfile.write(bytes(http.states[http.out.get()], 'utf-8'))
-            return
+            # this could be expanded to a mini 'portal'
+            pass
         else:
             self.send_error(404, 'No Match', 'Nothing matches the URL')
             return
         state = http.states[http.out.get()]
+        headers()
         self.wfile.write(bytes(state, 'utf-8'))
-        if state != http.lastknown:
+        # only log if value changed
+        if state != http.lastknown and http.verbose:
             print('{} : http ({}) : {}'.format(asctime(), self.client_address[0], state))
-            http.lastknown = state
+        http.lastknown = state
+
+''' The pinpopper class itself '''
+class PinPopper:
+    def __init__(self, outpin, inpin=None, web=None,
+                 name='pinpopper',looptime=60,
+                 outstates=('off', 'on', 'unavailable'), toggle='toggle',
+                 lock=True, verbose=True, debug=False):
+        self._outpin = outpin
+        self._inpin = inpin
+        self._consumer = '{}-{}'.format(name, getpid())
+        if type(looptime) is not timedelta:
+            self._looptime = timedelta(seconds=int(looptime))
+        else:
+            self._looptime = loop
+        self._outstates = outstates
+        self._verbose = verbose
+
+        # Acquire the output pin
+        self._output = output_pin(outpin[0], outpin[1], self._consumer, lock, verbose)
+        # If input is specified; acquire it and start input handler thread
+        if self._inpin is not None:
+            self._input = input_pin(inpin[0], inpin[1], self._consumer, verbose)
+            inserve = Thread(target=self._serve_input, args=(verbose, ))
+            inserve.daemon = True
+            inserve.start()
+        # If http (host, port) is specified; start http server thread
+        if web is not None:
+            _serve_http(self._output, web[0], web[1],
+                        outstates, toggle, verbose, debug)
+        # Show initial state as required
+        if verbose:
+            print('Initial output: {}'.format(outstates[self._output.get()]))
+
+    ''' A simple function to invert the output '''
+    def _flip(self):
+        current = self._output.get()
+        if current == 0:
+            self._output.set(1)
+        elif current == 1:
+            self._output.set(0)
+
+    def _serve_input(self, verbose=True):
+        ''' loop (forever) waiting for and serving the input pin events '''
+        while True:
+            event = self._input.event(timeout=self._looptime)
+            if event == 'rising':
+                self._flip()
+                if self._verbose:
+                    print('{} : button : {}'.format(asctime(), self._outstates[self._output.get()]), flush=True)
+
+    def get(self):
+        return self._outstates[self._output.get()]
+
+    def set(self, action):
+        if action == self._outstates[0]:
+            self._output.set(0)
+        elif action == self._outstates[1]:
+            self._output.set(1)
+        elif action == 'toggle':
+            self._flip()
+        else:
+            raise ValueError('invalid action for output setting: {}'.format(action))
+        if self._verbose:
+            print('{} : set(\'{}\') : {}'.format(asctime(), action,
+                    self._outstates[self._output.get()]), flush=True)
 
 # Main
 if __name__ == '__main__':
     from sys import argv
     # demo
-    output_chip = '/dev/gpiochip0'
-    output_line = 7
-    button_chip = '/dev/gpiochip0'
-    button_line = 27
+    output = ('/dev/gpiochip0', 7)
+    button = ('/dev/gpiochip0', 27)
+    web = ('0.0.0.0', 7090)
+    name = argv[0]
 
-    print('running: {}'.format(argv[0]))
-
-    consumer = '{}-{}'.format(argv[0], getpid())
-    out = output_pin(output_chip, output_line, consumer, lock=False, verbose=True)
-    button = input_pin(button_chip, button_line, consumer, verbose=True)
-    looptime = timedelta(seconds=60)
-    outstates = ('off', 'on', 'unavailable')
-
-    def flip():
-        current = out.get()
-        if current == 0:
-            out.set(1)
-        elif current == 1:
-            out.set(0)
-        return '{}'.format(outstates[out.get()])
-
-    serve_http(out)
-
-    print('Initial output: {}'.format(outstates[out.get()]))
+    print('running: {}'.format(name))
+    popper = PinPopper(output, button, web, name, lock=False, verbose=True)
     while True:
-        ev = button.event(timeout=looptime)
-        if ev == 'rising':
-            print('{} : button : {}'.format(asctime(), flip()), flush=True)
+        print('{} : main loop'.format(asctime()))   # DEBUG..
+        sleep(600)
