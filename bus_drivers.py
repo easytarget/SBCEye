@@ -83,7 +83,7 @@ def i2c_setup(settings):
             # Create the display object
             disp = ssd1306(bus=i2c, address=settings.display_addr, rotate=rotate)
             print("SSD1306 i2c display found")
-        except RuntimeError as error:
+        except Exception as error:
             disp = None
             print(error)
             print("ERROR: SSD1306 i2c display failed to initialise, disabling")
@@ -94,13 +94,21 @@ def i2c_setup(settings):
 
     if sensor:
         try:
-            # Create the I2C BME280 sensor object
+            # Create the I2C BME280 sensor object and get initial readings
             bme = bme280.BME280(i2c_addr=settings.sensor_addr, i2c_dev=i2c)
-            print("BME280 sensor found")
-        except RuntimeError as error:
+        except Exception as error:
             bme = None
             print(error)
             print("We do not have a environmental sensor")
+
+        try:
+            # Try initial reading of sensor, bus errors can cause this to fail
+            bme.update_sensor()
+            print("BME280 sensor found")
+        except Exception as error:
+            bme = None
+            print(error)
+            print("Environmental sensor failed initial update, this may be due to bus errors")
 
     print(flush=True, end='')
     return disp, bme
