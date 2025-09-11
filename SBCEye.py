@@ -224,8 +224,7 @@ def handle_exit():
 if __name__ == '__main__':
 
     # Environmental sensor
-    if i2c:
-        bme = bme_setup(i2c, settings)
+    bme = bme_setup(i2c, settings) if i2c else None
     if bme:
         logging.info('Environmental sensor configured and enabled')
     elif settings.have_sensor:
@@ -233,8 +232,7 @@ if __name__ == '__main__':
                 'Environment status and logging disabled')
 
     # Display animation setup
-    if i2c:
-        disp = oled_setup(i2c, settings)
+    disp = oled_setup(i2c, settings) if i2c else None
     if disp:
         # display initialisation does a 'clear()' and 'show()'
         disp.contrast(settings.display_contrast)
