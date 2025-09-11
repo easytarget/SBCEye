@@ -253,6 +253,8 @@ class PinPopper:
         # Show initial state as required
         if verbose:
             print('Initial output: {}'.format(outstates[self._output.get()]))
+        else:
+            print(outstates[self._output.get()])
 
     ''' A simple function to invert the output '''
     def _flip(self):
