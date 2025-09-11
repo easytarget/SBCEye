@@ -54,7 +54,9 @@ from robin import Robin
 from httpserver import serve_http
 from netreader import Netreader
 from gpioreader import GPIOReader
-from bus_drivers import i2c_setup
+from i2c_bus import i2c_setup
+from bme_sensor import bme_setup
+from oled_display import oled_setup
 
 # Re-nice to reduce blocking of other processes
 os.nice(10)
@@ -104,16 +106,18 @@ logging.info('CPU thermal device detected as: ' + cpu_thermal_device)
 #
 # Import, setup and return hardware drivers, or 'None' if setup fails
 
-disp, bme = i2c_setup(settings)
-
-if disp:
-    # display initialisation does a 'clear()' and 'show()'
-    disp.contrast(settings.display_contrast)
+i2c = i2c_setup(settings)
 
 #
 # Local Classes, Globals
 
-display_queue = None  # will be set during
+# We override the dictionary class so that every time an item is
+# modified it sends a a message to the display queue.
+# This allows the display to run in a seperate process while keeping
+# it's local data copy updated in real-time.
+# The queue is initially disabled (type: None), and assigned as a
+# queue object only if the display is enabled and detected.
+display_queue = None
 class TheData(dict):
     '''Override the dictionary class to also send data to the queue for the display'''
     def __setitem__(self, item, value):
@@ -125,7 +129,7 @@ class TheData(dict):
             display_queue.put([item], None)
         super().__delitem__(item)
 
-# Use a (custom overridden) dictionary to store current readings
+# Use this overridden dictionary to store current readings
 data = TheData({})
 
 # Counters used for incremental data need pre-populating
@@ -219,15 +223,22 @@ def handle_exit():
 # The fun starts here:
 if __name__ == '__main__':
 
-    # Log sensor status
+    # Environmental sensor
+    if i2c:
+        bme = bme_setup(i2c, settings)
     if bme:
         logging.info('Environmental sensor configured and enabled')
     elif settings.have_sensor:
-        logging.warning('Environmental data configured but no sensor detected: '\
+        logging.warning('Environmental data configured but no sensor available: '\
                 'Environment status and logging disabled')
 
     # Display animation setup
+    if i2c:
+        disp = oled_setup(i2c, settings)
     if disp:
+        # display initialisation does a 'clear()' and 'show()'
+        disp.contrast(settings.display_contrast)
+
         from animator import animate
         display_queue = Queue()
         DISPLAY = Process(target=animate, args=(settings, disp, display_queue),
