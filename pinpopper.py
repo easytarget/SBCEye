@@ -36,6 +36,7 @@ class input_pin:
             chip  (str)
             line (int)
             consumer (string)
+            debounce (int) in ms
             verbose (bool)
         Provides:
             event(timeout):
@@ -46,31 +47,29 @@ class input_pin:
                           0 for immediate return or
                           None to wait indefinately
     '''
-    def __init__(self, chip, line, consumer, verbose=False):
+    def __init__(self, chip, line, consumer, debounce, verbose=False):
         self.chip = chip
         self.line = line
-        self.consumer = consumer
-        self.bias = gpiod.line.Bias.AS_IS
-        self.edge = gpiod.line.Edge.BOTH
-        self.clock = gpiod.line.Clock.MONOTONIC
-        self.debounce = 100
+        bias = gpiod.line.Bias.AS_IS
+        edge = gpiod.line.Edge.BOTH
+        clock = gpiod.line.Clock.MONOTONIC
+        debounce = timedelta(milliseconds=debounce)
         self.verbose = verbose
-        self.states = (gpiod.line.Value.INACTIVE, gpiod.line.Value.ACTIVE)
         # Get and test the device
-        self.device = _get_device(self.chip, self.line)
-        if self.device.get_line_info(line).used:
+        device = _get_device(self.chip, self.line)
+        if device.get_line_info(line).used:
             raise ValueError('Cannot acquire gpiochip \'{}\' line {}, '\
                              'currently used by: \'{}\''
-                  .format(chip, line, self.device.get_line_info(line).consumer))
+                  .format(chip, line, device.get_line_info(line).consumer))
         # Create a request object for the input
-        self.request = self.device.request_lines(
-                            consumer=self.consumer,
-                            config={self.line: gpiod.LineSettings(
+        self.request = device.request_lines(
+                                consumer=consumer,
+                                config={line: gpiod.LineSettings(
                                         direction=gpiod.line.Direction.INPUT,
-                                        bias=self.bias,
-                                        edge_detection=self.edge,
-                                        event_clock=self.clock,
-                                        debounce_period=timedelta(milliseconds=self.debounce))})
+                                        bias=bias,
+                                        edge_detection=edge,
+                                        event_clock=clock,
+                                        debounce_period=debounce)})
         if self.verbose:
             print('Configured: \'{}\':{} as input (locked)'
                 .format(self.chip, self.line))
@@ -84,7 +83,6 @@ class input_pin:
                         return 'rising'
                     elif event.event_type == gpiod.edge_event.EdgeEvent.Type.FALLING_EDGE:
                         return 'falling'
-        return None
 
 # Output
 class output_pin:
@@ -188,7 +186,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     ''' suppress the http server log output '''
     def log_message(self, format, *args):
         if http.debug:
-            print(f'HTTP request:: {self.client_address[0]} : {args[0]} '\
+            print(f'DEBUG: HTTP request:: {self.client_address[0]} : {args[0]} '\
                   f'({args[1]})',flush=True)
         return
 
@@ -226,24 +224,25 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 ''' The pinpopper class itself '''
 class PinPopper:
     def __init__(self, outpin, inpin=None, web=None,
-                 name='pinpopper',looptime=60,
-                 outstates=('off', 'on', 'unavailable'), toggle='toggle',
-                 lock=True, verbose=True, debug=False):
+                 name='pinpopper',
+                 outstates=('off', 'on', 'unavailable'),
+                 toggle='toggle',
+                 debounce=60,
+                 lock=True,
+                 verbose=True, debug=False):
         self._outpin = outpin
         self._inpin = inpin
         self._consumer = '{}-{}'.format(name, getpid())
-        if type(looptime) is not timedelta:
-            self._looptime = timedelta(seconds=int(looptime))
-        else:
-            self._looptime = loop
         self._outstates = outstates
+        self._toggle = toggle
+        self.cmdlist = (outstates[0], outstates[1], toggle)
         self._verbose = verbose
-
+        self._debug = debug
         # Acquire the output pin
         self._output = output_pin(outpin[0], outpin[1], self._consumer, lock, verbose)
         # If input is specified; acquire it and start input handler thread
         if self._inpin is not None:
-            self._input = input_pin(inpin[0], inpin[1], self._consumer, verbose)
+            self._input = input_pin(inpin[0], inpin[1], self._consumer, debounce, verbose)
             inserve = Thread(target=self._serve_input, args=(verbose, ))
             inserve.daemon = True
             inserve.start()
@@ -266,11 +265,12 @@ class PinPopper:
     def _serve_input(self, verbose=True):
         ''' loop (forever) waiting for and serving the input pin events '''
         while True:
-            event = self._input.event(timeout=self._looptime)
+            event = self._input.event(timeout=None)
             if event == 'rising':
                 self._flip()
                 if self._verbose:
-                    print('{} : button : {}'.format(asctime(), self._outstates[self._output.get()]), flush=True)
+                    print('{} : button : {}'.format(asctime(),
+                        self._outstates[self._output.get()]), flush=True)
 
     def get(self):
         return self._outstates[self._output.get()]
@@ -280,25 +280,44 @@ class PinPopper:
             self._output.set(0)
         elif action == self._outstates[1]:
             self._output.set(1)
-        elif action == 'toggle':
+        elif action == self._toggle:
             self._flip()
         else:
-            raise ValueError('invalid action for output setting: {}'.format(action))
+            # ignore invalid actions by default, unless debug is on.
+            if self._debug:
+                print('DEBUG: PinPopper: invalid action: \'{}\''.format(action))
         if self._verbose:
-            print('{} : set(\'{}\') : {}'.format(asctime(), action,
+            print('{} : set(\'{}\') : output = {}'.format(asctime(), action,
                     self._outstates[self._output.get()]), flush=True)
 
 # Main
 if __name__ == '__main__':
-    from sys import argv
     # demo
+    from sys import argv, stdin
+
     output = ('/dev/gpiochip0', 7)
     button = ('/dev/gpiochip0', 27)
     web = ('0.0.0.0', 7090)
     name = argv[0]
+    verbose = True
 
-    print('running: {}'.format(name))
-    popper = PinPopper(output, button, web, name, lock=False, verbose=True)
-    while True:
-        print('{} : main loop'.format(asctime()))   # DEBUG..
-        sleep(600)
+    popper = PinPopper(output, button, web, name, lock=False, verbose=verbose)
+
+    if verbose:
+        print('running: {}'.format(name))
+        print('available commands: {}'.format(popper.cmdlist))
+
+    # Now loop forever passing stdin commands to pinpopper.set()
+    with stdin as cmds:
+        while True:
+            cmd = cmds.readline().strip()
+            if cmd in popper.cmdlist:
+                popper.set(cmd)
+                if verbose:
+                    continue
+            if verbose:
+                print('{} : invalid action (\'{}\') : output = {}'
+                        .format(asctime(), cmd, popper.get()))
+            else:
+                print(popper.get())
+
