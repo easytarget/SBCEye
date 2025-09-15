@@ -89,7 +89,7 @@ class PinReader(dict):
                 value = 'low' if pin.value == 0 else 'high'
                 ret += '{} = {} ({})\n'.format(line, value, pin.direction)
             else:
-                ret += '{} = - (\'{}\')\n'.format(line, pin.consumer)
+                ret += '{} = - (\'{}\', {})\n'.format(line, pin.consumer, pin.direction)
         return ret.rstrip('\n')
 
     def update(self, items=None):
@@ -102,17 +102,18 @@ class PinReader(dict):
     HELPER
 '''
 
-def find_pins(device, regex, verbose=False):
+def find_pins(device, regex, prefix='AUTO', verbose=False):
     if not gpiod.is_gpiochip_device(device):
         raise ValueError('\'{}\' is not a valid GPIO device'.format(device))
+    num_lines = gpiod.Chip(device).get_info().num_lines
     pinlist = {}
     with gpiod.Chip(device) as chip:
         if verbose:
             print('Searching for pins on \'{}\' that match regex: {}'
                   .format(chip.path, regex))
-        for line in range(0, chip.get_info().num_lines):
+        for line in range(0, num_lines):
             name = chip.get_line_info(line).name
-            name = str(line) if name is None else name
+            name = '{}{}'.format(prefix, line) if name is None else name
             if search(regex, name):
                 pinlist[name] = (chip.path, line)
                 if verbose:
@@ -144,7 +145,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Seach for pins using the device and regex determined above
-    pinlist = find_pins(args.chip, args.regex, args.verbose)
+    pinlist = find_pins(args.chip, args.regex, verbose=args.verbose)
     if len(pinlist) == 0:
         print('No matching pins, exiting')
         exit()
