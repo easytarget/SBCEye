@@ -40,7 +40,7 @@ class input_pin:
             verbose (bool)
         Provides:
             event(timeout):
-                blocks and waits for events
+                blocks and waits with timeout for events
                 returns None if no event within timeout
                 returns a string with 'rising' or 'falling' otherwise
                 timeout = a timedelta object or
@@ -151,7 +151,7 @@ class output_pin:
                 return False
         return True
 
-def _serve_http(out, host, port, states, toggle, verbose, debug):
+def _serve_http(out, host, port, states, toggle, portal, refresh, verbose, debug):
     '''Spawns a http.server.HTTPServer in a separate thread on the given port'''
     handler = _BaseRequestHandler
     httpd = http.server.ThreadingHTTPServer((host, port), handler, False)
@@ -159,10 +159,10 @@ def _serve_http(out, host, port, states, toggle, verbose, debug):
     httpd.allow_reuse_address = True
     # Storing attributes in the http class itself is cheeky, but simple and effective.
     http.out = out
-    http.host = host
-    http.port = port
     http.states = states
     http.toggle = toggle
+    http.portal = portal
+    http.refresh = refresh
     http.verbose = verbose
     http.debug = debug
     http.lastknown = http.states[http.out.get()]
@@ -170,7 +170,7 @@ def _serve_http(out, host, port, states, toggle, verbose, debug):
     httpd.server_bind()
     http.address = f"http://{httpd.server_name}:{httpd.server_port}"
     if http.verbose:
-        print(f"http server: {http.address}",flush=True)
+        print(f"HTTP server: {http.address}",flush=True)
     # Serve requests using threads
     httpd.server_activate()
     def serve_forever(httpd):
@@ -192,30 +192,51 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     ''' handle GET requests : this is where logic lives '''
     def do_GET(self):
-        def headers():
-            # common headers for non-error response
+        def common_headers():
             self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-            self.send_header("Pragma", "no-cache")
-            self.send_header("Expires", "0")
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
+
+        def redirect():
+            common_headers()
+            self.send_header('refresh', '0; url=/')
             self.end_headers()
+
+        def getval():
+            # return current state and inverse
+            cur = alt = http.out.get()
+            if cur == 0:
+                alt = 1
+            elif cur == 1:
+                alt = 0
+            return cur, alt
+
         # parse request and process
         if urlparse(self.path).path == '/{}'.format(http.states[0]):
             http.out.set(0)
+            redirect()
+            return
         elif urlparse(self.path).path == '/{}'.format(http.states[1]):
             http.out.set(1)
+            redirect()
+            return
         elif urlparse(self.path).path == '/{}'.format(http.toggle):
-            http.out.set(1 - http.out.get())
-        elif urlparse(self.path).path == '/':
-            # this could be expanded to a mini 'portal'
-            pass
-        else:
+            http.out.set(getval()[1])
+            redirect()
+            return
+        elif urlparse(self.path).path != '/':
             self.send_error(404, 'No Match', 'Nothing matches the URL')
             return
-        state = http.states[http.out.get()]
-        headers()
-        self.wfile.write(bytes(state, 'utf-8'))
+        state, alt = getval()
+        state = http.states[state]
+        alt = http.states[alt]
+        common_headers()
+        self.send_header('refresh', '{}; url=/'.format(http.refresh))
+        self.end_headers()
+        self.wfile.write(bytes(http.portal.replace('__STATE__', state)\
+                                          .replace('__ALT__', alt)\
+                                          .replace('__NOW__', asctime()), 'utf-8'))
         # only log if value changed
         if state != http.lastknown and http.verbose:
             print('{} : http ({}) : {}'.format(asctime(), self.client_address[0], state))
@@ -225,17 +246,20 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 class PinPopper:
     def __init__(self, outpin, inpin=None, web=None,
                  name='pinpopper',
-                 outstates=('off', 'on', 'unavailable'),
+                 states=('off', 'on', 'unavailable'),
                  toggle='toggle',
-                 debounce=60,
+                 debounce=66,
+                 edge='rising',
+                 portal='__STATE__',
+                 refresh=60,
                  lock=True,
                  verbose=True, debug=False):
         self._outpin = outpin
         self._inpin = inpin
         self._consumer = '{}-{}'.format(name, getpid())
-        self._outstates = outstates
+        self._states = states
         self._toggle = toggle
-        self.cmdlist = (outstates[0], outstates[1], toggle)
+        self.cmdlist = (states[0], states[1], toggle)
         self._verbose = verbose
         self._debug = debug
         # Acquire the output pin
@@ -243,18 +267,18 @@ class PinPopper:
         # If input is specified; acquire it and start input handler thread
         if self._inpin is not None:
             self._input = input_pin(inpin[0], inpin[1], self._consumer, debounce, verbose)
-            inserve = Thread(target=self._serve_input, args=(verbose, ))
+            inserve = Thread(target=self._serve_input, args=(edge, verbose, ))
             inserve.daemon = True
             inserve.start()
         # If http (host, port) is specified; start http server thread
         if web is not None:
             _serve_http(self._output, web[0], web[1],
-                        outstates, toggle, verbose, debug)
+                        states, toggle, portal, refresh, verbose, debug)
         # Show initial state as required
         if verbose:
-            print('Initial output: {}'.format(outstates[self._output.get()]))
+            print('Initial output: {}'.format(states[self._output.get()]))
         else:
-            print(outstates[self._output.get()])
+            print(states[self._output.get()])
 
     ''' A simple function to invert the output '''
     def _flip(self):
@@ -264,23 +288,23 @@ class PinPopper:
         elif current == 1:
             self._output.set(0)
 
-    def _serve_input(self, verbose=True):
-        ''' loop (forever) waiting for and serving the input pin events '''
+    def _serve_input(self, edge, verbose):
+        '''service loop serving the input pin events (run in a thread)'''
         while True:
             event = self._input.event(timeout=None)
-            if event == 'rising':
+            if event == edge:
                 self._flip()
                 if self._verbose:
                     print('{} : button : {}'.format(asctime(),
-                        self._outstates[self._output.get()]), flush=True)
+                        self._states[self._output.get()]), flush=True)
 
     def get(self):
-        return self._outstates[self._output.get()]
+        return self._states[self._output.get()]
 
     def set(self, action):
-        if action == self._outstates[0]:
+        if action == self._states[0]:
             self._output.set(0)
-        elif action == self._outstates[1]:
+        elif action == self._states[1]:
             self._output.set(1)
         elif action == self._toggle:
             self._flip()
@@ -290,7 +314,7 @@ class PinPopper:
                 print('DEBUG: PinPopper: invalid action: \'{}\''.format(action))
         if self._verbose:
             print('{} : set(\'{}\') : output = {}'.format(asctime(), action,
-                    self._outstates[self._output.get()]), flush=True)
+                    self._states[self._output.get()]), flush=True)
 
 # Main
 if __name__ == '__main__':
@@ -300,14 +324,19 @@ if __name__ == '__main__':
     output = ('/dev/gpiochip0', 7)
     button = ('/dev/gpiochip0', 27)
     web = ('0.0.0.0', 7090)
-    name = argv[0]
+    name = 'Lamp'
+    states = ('Low', 'High', 'N/A')
+    toggle = 'Invert'
+    portal = '<body style="text-align: center;"><div>__NOW__</div>'\
+             '<h1>Lamp: __STATE__</h1><h3>'\
+             '<a href="./__ALT__">switch: __ALT__</a></h3></body>'
     verbose = True
 
-    popper = PinPopper(output, button, web, name, lock=False, verbose=verbose)
+    popper = PinPopper(output, button, web, name, states, toggle, portal=portal, lock=False, verbose=verbose)
 
     if verbose:
-        print('running: {}'.format(name))
-        print('available commands: {}'.format(popper.cmdlist))
+        print('Available commands: {}'.format(popper.cmdlist + ('exit',)))
+        print('Starting:: {}'.format(name))
 
     # Now loop forever passing stdin commands to pinpopper.set()
     with stdin as cmds:
@@ -315,11 +344,10 @@ if __name__ == '__main__':
             cmd = cmds.readline().strip()
             if cmd in popper.cmdlist:
                 popper.set(cmd)
-                if verbose:
-                    continue
-            if verbose:
-                print('{} : invalid action (\'{}\') : output = {}'
-                        .format(asctime(), cmd, popper.get()))
-            else:
-                print(popper.get())
+            elif cmd in ('exit', 'quit', 'bye'):
+                break
+            elif cmd and verbose:
+                print('{} : invalid action (\'{}\')'
+                        .format(asctime(), cmd))
+            print(popper.get())
 
