@@ -13,7 +13,7 @@ except ImportError as e:
     # remember why we failed, so it can be reported in log later.
     readerfail = e
 
-class GPIOReader:
+class GPIOHandler:
     '''Read and update GPIO pin status
 
     Reads the currrent (boolean) status of a set of gipo pins defined in a dictionary
@@ -22,14 +22,17 @@ class GPIOReader:
     parameters:
         pinlist: dictionary of pin definitions {label: (chip,index)} from config,
             this will be passed directly to the PinReader init.
+        outlist: dictionary of output enabled pins from the above list, and initial value
         data: the main data{} dictionary, a key/value pair; 'pin-<name>=value'
-            will be added to it and the vaue updated with pin state changes.
+            will be added to it and the value updated with pin state changes.
 
     provides:
-        update_pins(): processes and updates the pins
+        update(): processes and updates the pin data, logs state changes
+        set_pin(pin,value): attempts to set the output value of a pin
+                            - returns success/fail, used for web control
     '''
 
-    def __init__(self, pinlist, data):
+    def __init__(self, pinlist, outlist, data):
         '''Setup and do initial reading'''
         self.available = False
         self.pinlist = pinlist
@@ -59,6 +62,7 @@ class GPIOReader:
             self.consumers[pin] = self.pins[pin].consumer
             print('Pin \'{}\': {}'.format(pin, repr(self.pins[pin])[10:-1]))
             logging.info('Pin \'{}\': {}'.format(pin, repr(self.pins[pin])[12:-1]))
+        # Now set Output pins up
         print('GPIO monitoring configured and logging enabled')
         logging.info('GPIO monitoring configured and logging enabled')
         self.available = True
@@ -89,4 +93,29 @@ class GPIOReader:
             if len(log) != 0:
                 logging.info('Pin \'{}\' changed{}'.format(pin, log.rstrip(',')))
                 print('Pin \'{}\' changed{}'.format(pin, log.rstrip(',')))
+
+    def setPin(chip, line, value):
+        # chip:  (str) gpiod chip (path or identifier)
+        # line:  (int) Line offset on chip
+        # value: (int) 1 = Active, 0 = Inactive
+        if value == 0:
+            value = INACTIVE
+        elif value == 1:
+            value = ACTIVE
+        else:
+            raise ValueError('Invalid output value: {} ({})' .format(value, type(value)))
+        try:
+            with gpiod.Chip(chip).request_lines(
+                     consumer='pinwriter-{}'.format(getpid()),
+                     config={line: gpiod.LineSettings(
+                             direction = OUTPUT,
+                             output_value = value)},
+                     ) as request:
+                newval = request.get_values()[0]
+        except OSError as e:
+            # log a warning and return 'False' if the write fails
+            logging.warning('Could not set output value on pin {}:{} : {}'
+                            .format(chip, line, e))
+            return False
+        return True if newval == value else False
 

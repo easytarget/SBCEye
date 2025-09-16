@@ -53,7 +53,7 @@ from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
 from netreader import Netreader
-from gpioreader import GPIOReader
+from gpioreader import GPIOHandler
 from i2c_bus import i2c_setup
 from bme_sensor import bme_setup
 from oled_display import oled_setup
@@ -261,7 +261,7 @@ if __name__ == '__main__':
     update_sensors()
 
     # GPIO pin monitoring
-    gpio = GPIOReader(settings.pinlist, data)
+    gpio = GPIOHandler(settings.pinlist, settings.outlist, data)
 
     # Network (ping) monitoring
     net = Netreader((settings.netlist, settings.net_timeout), data)
