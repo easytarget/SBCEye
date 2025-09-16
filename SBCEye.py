@@ -53,7 +53,7 @@ from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
 from netreader import Netreader
-from gpioreader import GPIOHandler
+from gpiohandler import GPIOHandler
 from i2c_bus import i2c_setup
 from bme_sensor import bme_setup
 from oled_display import oled_setup
