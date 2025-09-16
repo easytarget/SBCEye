@@ -9,13 +9,13 @@ class Saver:
     Turns the display on/off between specified times
 
     modes:
-        'off': Screensaver disabled
+        'none': Screensaver disabled
         'blank': Turn screen off
 
     parameters:
         disp: display driver object
         settings: (tuple) consisting of:
-            mode:   (str)  One of 'off', 'blank'
+            mode:   (str)  One of 'none', 'blank'
             start:  (int)  Start time, hour, 0-23
             end:    (int)  End time, hour, 0-23
     '''
@@ -26,7 +26,7 @@ class Saver:
 
         self.disp = disp
         (self.mode, start, end) = settings
-        if self.mode != 'off':
+        if self.mode != 'none':
             logging.info(f'Saver will {self.mode} display between: '\
                     f'{start:02d}:00 and {end:02d}:00')
             print(f'Saver will {self.mode} display between: '\
