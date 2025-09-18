@@ -39,7 +39,6 @@ class GPIOHandler:
     parameters:
         pinlist: dictionary of pin definitions {label: (chip,index)} from config,
             this will be passed directly to the PinReader init.
-        outlist: dictionary of output enabled pins from the above list, and initial value
         data: the main data{} dictionary, a key/value pair; 'pin-<name>=value'
             will be added to it and the value updated with pin state changes.
 
@@ -49,7 +48,7 @@ class GPIOHandler:
                             - returns success/fail, used for web control
     '''
 
-    def __init__(self, pinlist, outlist, data):
+    def __init__(self, pinlist, data):
         '''Setup and do initial reading'''
         self.available = False
         self.pinlist = pinlist
@@ -78,19 +77,15 @@ class GPIOHandler:
             self.directions[pin] = self.pins[pin].direction
             self.consumers[pin] = self.pins[pin].consumer
             print('Pin \'{}\': {}'.format(pin, repr(self.pins[pin])[10:-1]))
-            logging.info('Pin \'{}\': {}'.format(pin, repr(self.pins[pin])[12:-1]))
+            logging.info('Pin \'{}\': {}'.format(pin, repr(self.pins[pin])[10:-1]))
         # Now set Output pins up
         print('GPIO monitoring configured and logging enabled')
         logging.info('GPIO monitoring configured and logging enabled')
         self.available = True
 
     def _value_to_data(self, value):
+        '''Records failed reads as 'U' (unavailable) for data{} entries'''
         return 'U' if value is None else int(value)
-
-    def update(self):
-        self.pins.update()
-        for pin in self.pins:
-            self._update_pin(pin)
 
     def _update_pin(self, pin):
         '''Check if pin has changed state, log changes and
@@ -113,11 +108,16 @@ class GPIOHandler:
             logging.info('Pin \'{}\' changed{}'.format(pin, log.rstrip(',')))
             print('Pin \'{}\' changed{}'.format(pin, log.rstrip(',')))
 
-    def setPin(self, label, value):
+    def update(self):
+        '''Update data{} dictionary for all pins'''
+        self.pins.update()
+        for pin in self.pins:
+            self._update_pin(pin)
+
+    def setPin(self, pin, value):
         '''Sets the pin to output mode and sets it's value.
         Parameters:
-            chip:  (str) gpiod chip (path or identifier)
-            line:  (int) Line offset on chip
+            pin: the pin name from config
             value: (int) 1 = Active, 0 = Inactive
         Returns:
             False if the output cannot be set.'''
@@ -128,13 +128,13 @@ class GPIOHandler:
         else:
             raise ValueError('Invalid output value: {} ({})'
                              .format(value, type(value)))
-        self.pins.update(label)
-        chip = self.pins[label].chip
-        line = self.pins[label].line
+        self.pins.update(pin)
+        chip = self.pins[pin].chip
+        line = self.pins[pin].line
         newval = None
-        if self.pins[label].consumer is not None:
+        if self.pins[pin].consumer is not None:
             logging.warning('Failed to set ouput on pin \'{}\', currently used by: \'{}\''
-                            .format(label, self.pins[label].consumer))
+                            .format(pin, self.pins[pin].consumer))
         else:
             try:
                 with gpiod.Chip(chip).request_lines(
@@ -148,7 +148,7 @@ class GPIOHandler:
                 # log a warning and return 'False' if the write fails
                 logging.warning('Could not set output value on pin {}:{} : {}'
                                 .format(chip, line, e))
-        self.pins.update(label)
-        self._update_pin(label)
+        self.pins.update(pin)
+        self._update_pin(pin)
         return True if newval == value else False
 
