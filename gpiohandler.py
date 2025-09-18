@@ -4,14 +4,31 @@ provides:
     GPIOReader: A class to update and log the pin statuses
 '''
 
-import os
+import gpiod
 import logging
+from os import getpid
+from re import search
 try:
     from pinreader import PinReader
     readerfail = None
 except ImportError as e:
     # remember why we failed, so it can be reported in log later.
     readerfail = e
+
+# Needs gpiod bindings at V2.0 or later, standard debian12/bookworm is v1.6
+#  use a virtualenv and 'pip install --upgrade gpiod' as needed.
+if int(search('^[0-9]+', gpiod.__version__).group(0)) < 2:
+    readerfail = 'gpiod bindings library version too low ({}), '\
+                      'pinreader requires gpiod v2.x.x or later.'\
+                      .format(gpiod.__version__)
+
+'''
+PinReader class (dict)
+'''
+OUTPUT  = gpiod.line.Direction.OUTPUT
+ACTIVE  = gpiod.line.Value.ACTIVE
+INACTIVE  = gpiod.line.Value.INACTIVE
+
 
 class GPIOHandler:
     '''Read and update GPIO pin status
@@ -71,51 +88,67 @@ class GPIOHandler:
         return 'U' if value is None else int(value)
 
     def update(self):
-        '''Check if any pins have changed state, and log if so
-        updates the main data{} dictionary with new state
-        no parameters, no return'''
         self.pins.update()
         for pin in self.pins:
-            log = ''
-            direction = self.pins[pin].direction
-            if direction != self.directions[pin]:
-                self.directions[pin] = direction
-                log += ' direction to: \'{}\','.format(direction)
-            consumer = self.pins[pin].consumer
-            if consumer != self.consumers[pin]:
-                self.consumers[pin] = consumer
-                consumer = None if consumer is None else '\'{}\''.format(consumer)
-                log += ' consumer to: {},'.format(consumer)
-            value = self.pins[pin].value
-            if self._value_to_data(value) != self.data[f'pin-{pin}']:
-                self.data[f'pin-{pin}'] = self._value_to_data(value)
-                log += ' value to: {},'.format(value)
-            if len(log) != 0:
-                logging.info('Pin \'{}\' changed{}'.format(pin, log.rstrip(',')))
-                print('Pin \'{}\' changed{}'.format(pin, log.rstrip(',')))
+            self._update_pin(pin)
 
-    def setPin(chip, line, value):
-        # chip:  (str) gpiod chip (path or identifier)
-        # line:  (int) Line offset on chip
-        # value: (int) 1 = Active, 0 = Inactive
+    def _update_pin(self, pin):
+        '''Check if pin has changed state, log changes and
+        update the data{} dictionary with new state'''
+        log = ''
+        direction = self.pins[pin].direction
+        if direction != self.directions[pin]:
+            self.directions[pin] = direction
+            log += ' direction to: \'{}\','.format(direction)
+        consumer = self.pins[pin].consumer
+        if consumer != self.consumers[pin]:
+            self.consumers[pin] = consumer
+            consumer = None if consumer is None else '\'{}\''.format(consumer)
+            log += ' consumer to: {},'.format(consumer)
+        value = self.pins[pin].value
+        if self._value_to_data(value) != self.data[f'pin-{pin}']:
+            self.data[f'pin-{pin}'] = self._value_to_data(value)
+            log += ' value to: {},'.format(value)
+        if len(log) != 0:
+            logging.info('Pin \'{}\' changed{}'.format(pin, log.rstrip(',')))
+            print('Pin \'{}\' changed{}'.format(pin, log.rstrip(',')))
+
+    def setPin(self, label, value):
+        '''Sets the pin to output mode and sets it's value.
+        Parameters:
+            chip:  (str) gpiod chip (path or identifier)
+            line:  (int) Line offset on chip
+            value: (int) 1 = Active, 0 = Inactive
+        Returns:
+            False if the output cannot be set.'''
         if value == 0:
             value = INACTIVE
         elif value == 1:
             value = ACTIVE
         else:
-            raise ValueError('Invalid output value: {} ({})' .format(value, type(value)))
-        try:
-            with gpiod.Chip(chip).request_lines(
-                     consumer='pinwriter-{}'.format(getpid()),
-                     config={line: gpiod.LineSettings(
-                             direction = OUTPUT,
-                             output_value = value)},
-                     ) as request:
-                newval = request.get_values()[0]
-        except OSError as e:
-            # log a warning and return 'False' if the write fails
-            logging.warning('Could not set output value on pin {}:{} : {}'
-                            .format(chip, line, e))
-            return False
+            raise ValueError('Invalid output value: {} ({})'
+                             .format(value, type(value)))
+        self.pins.update(label)
+        chip = self.pins[label].chip
+        line = self.pins[label].line
+        newval = None
+        if self.pins[label].consumer is not None:
+            logging.warning('Failed to set ouput on pin \'{}\', currently used by: \'{}\''
+                            .format(label, self.pins[label].consumer))
+        else:
+            try:
+                with gpiod.Chip(chip).request_lines(
+                         consumer='SBCEye-{}'.format(getpid()),
+                         config={line: gpiod.LineSettings(
+                                 direction = OUTPUT,
+                                 output_value = value)},
+                         ) as request:
+                    newval = request.get_values()[0]
+            except OSError as e:
+                # log a warning and return 'False' if the write fails
+                logging.warning('Could not set output value on pin {}:{} : {}'
+                                .format(chip, line, e))
+        self.pins.update(label)
+        self._update_pin(label)
         return True if newval == value else False
 
