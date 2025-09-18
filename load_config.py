@@ -130,10 +130,8 @@ class Settings:
             line = pins.get(pin).split(',')
             self.pinlist[pin] = (line[0], int(line[1]))
 
-        self.outlist = {}
         outpins = config["outpins"]
-        for pin in outpins:
-            self.outlist[pin] = outpins.getint(pin)
+        self.outpins = outpins.get('web').split(',')
 
         self.netlist = {}
         ping = config["ping"]
