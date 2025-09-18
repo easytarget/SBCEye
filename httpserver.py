@@ -249,10 +249,11 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                             http.pins[name].direction, http.pins[name].consumer)
                 ret += f'<tr><td title="{title}">{name}:</td>'
                 direction = ' ({})'.format(http.pins[name].direction) if http.settings.web_pin_info else ''
+                #consumer = '<span style="font-size: 80%;">{}</span>'.format(http.pins[name].consumer) if http.settings.web_pin_info else 'n/a'
                 consumer = ' [{}]'.format(http.pins[name].consumer) if http.settings.web_pin_info else ''
                 if http.data[item] == 'U':
                     ret += f'<td style="text-align: right;"><span style=" font-style: italic;">n/a</span></td>'\
-                           f'<td style="padding-left: 0.3em;"><span style="font-size: 75%;">{consumer}</span></td></tr>\n'
+                           f'<td style="padding-left: 0.3em;"><span style="font-size: 66%;">{consumer}</span></td></tr>\n'
                 else:
                     em = 'style=" font-weight: bold;"' if http.data[item] == 1 else ''
                     ret += f'<td style="text-align: right;"><span {em}>{http.settings.pin_state_names[http.data[item]]}</span></td>'\
