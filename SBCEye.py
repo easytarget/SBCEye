@@ -270,7 +270,7 @@ if __name__ == '__main__':
     rrd = Robin(settings, data)
 
     # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(settings, rrd, gpio.pins, data)
+    serve_http(settings, rrd, gpio, data)
 
     # Exit handlers (needed for rrd cache write on shutdown)
     signal(SIGTERM, handle_signal)

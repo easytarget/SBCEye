@@ -17,7 +17,7 @@ from threading import Thread
 # Logging
 import logging
 
-def serve_http(settings, rrd, pins, data):
+def serve_http(settings, rrd, gpio, data):
     '''Spawns a http.server.HTTPServer in a separate thread on the given port'''
     handler = _BaseRequestHandler
     httpd = http.server.ThreadingHTTPServer((settings.web_host, settings.web_port), handler, False)
@@ -30,7 +30,7 @@ def serve_http(settings, rrd, pins, data):
     # there is probably a better way to do this, eg using a meta-class and inheritance
     http.settings = settings
     http.rrd = rrd
-    http.pins = pins
+    http.pins = gpio.pins
     http.data = data
     http.icon_file = 'favicon.ico'
     if not os.path.exists(http.icon_file):
