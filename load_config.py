@@ -103,7 +103,6 @@ class Settings:
         self.web_host = web.get("host")
         self.web_port = web.getint("port")
         self.web_sensor_name = web.get("sensor_name")
-        self.web_pin_info = web.getboolean("pin_info")
         self.web_show_cam = web.getboolean("show_cam")
         self.web_allow_dump = web.getboolean("allow_dump")
         self.web_allow_backup = web.getboolean("allow_backup")
@@ -131,7 +130,8 @@ class Settings:
             self.pinlist[pin] = (line[0], int(line[1]))
 
         outpins = config["outpins"]
-        self.outpins = outpins.get('web').split(',')
+        self.outpins = map(str.strip, outpins.get('web').split(','))
+        self.outpins = self.outpins & self.pinlist.keys()
 
         self.netlist = {}
         ping = config["ping"]
