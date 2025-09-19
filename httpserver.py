@@ -95,7 +95,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def _redirect(self):
         self._common_headers()
-        self.send_header('refresh', '0; url=/')
+        self.send_header('refresh', '0; url=./')
         self.end_headers()
 
     def _set_headers(self):
@@ -171,15 +171,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 href="https://github.com/easytarget/SBCEye"
                 title="Project homepage on GitHub" target="_blank">
                 SBCEye</a></div>'''
-
-    def _give_cam(self):
-        return f'''<div style="font-size: 110%; font-weight:bold;
-               width: {http.settings.cam_width}%">Cam</div>\n
-               <a href="{http.settings.cam_home}" title="Webcam homepage"
-               style="display: block; width: {http.settings.cam_width}%"
-               target="_blank">
-               <img src="{http.settings.cam_url}" alt="Webcam"></a>\n
-               '''
 
     def _give_env(self):
         # Environmental sensor
@@ -265,7 +256,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 else:
                     em = 'font-weight: bold' if http.data[item] == 1 else ''
                     if name in http.settings.outpins:
-                        link = 'href="/{}" title="Pin Control" '\
+                        link = 'href="./{}" title="Pin Control" '\
                                'style="text-decoration: underline; {}"'.format(name, em)
                         ret += '<td style="text-align: right;"><a {}>{}</a></td>'\
                                 .format(link, http.settings.pin_state_names[http.data[item]])
@@ -462,7 +453,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             http.rrd.backup()
         elif urlparse(self.path).path == '/log':
             self._set_headers()
-            response = self._give_head()
+            response = self._give_head(" :: Logfile Viewer")
             response += f'<h2><a href="/" title="Home">{http.settings.name}</a> Log</h2>\n'
             response += self._give_log()
             response += self._give_timestamp()
@@ -495,7 +486,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                     .format(pin, parsed_action))
                 return
             self._set_headers()
-            response = self._give_head()
+            response = self._give_head(" :: Pin Control :: {}".format(pin))
             response += f'<h2><a href="/" title="Home">{http.settings.name}</a> Pin Control</h2>\n'
             response += f'<div style="font-size: 200%; ">{pin} : <span style="font-weight: bold">{http.settings.pin_state_names[http.gpio.pins[pin].value]}</span><hr></div>\n'
 
