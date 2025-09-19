@@ -25,6 +25,7 @@ if int(search('^[0-9]+', gpiod.__version__).group(0)) < 2:
 '''
 PinReader class (dict)
 '''
+INPUT  = gpiod.line.Direction.INPUT
 OUTPUT  = gpiod.line.Direction.OUTPUT
 ACTIVE  = gpiod.line.Value.ACTIVE
 INACTIVE  = gpiod.line.Value.INACTIVE
@@ -152,3 +153,28 @@ class GPIOHandler:
         self._update_pin(pin)
         return True if newval == value else False
 
+    def makeInput(self, pin):
+        '''Sets the pin to input mode and reads it's value to data{} dictionary.
+        Parameters:
+            pin: the pin name from config'''
+        self.pins.update(pin)
+        chip = self.pins[pin].chip
+        line = self.pins[pin].line
+        if self.pins[pin].consumer is not None:
+            logging.warning('Failed to set input mode on pin \'{}\', currently used by: \'{}\''
+                            .format(pin, self.pins[pin].consumer))
+        else:
+            try:
+                with gpiod.Chip(chip).request_lines(
+                         consumer='SBCEye-{}'.format(getpid()),
+                         config={line: gpiod.LineSettings(
+                                 direction = INPUT)},
+                         ) as request:
+                    _ = request.get_values()[0]
+            except OSError as e:
+                # log a warning and return 'False' if the write fails
+                logging.warning('Could not set input mode on pin {}:{} : {}'
+                                .format(chip, line, e))
+        self.pins.update(pin)
+        self._update_pin(pin)
+        return
