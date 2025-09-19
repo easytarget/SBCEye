@@ -30,7 +30,7 @@ def serve_http(settings, rrd, gpio, data):
     # there is probably a better way to do this, eg using a meta-class and inheritance
     http.settings = settings
     http.rrd = rrd
-    http.pins = gpio.pins
+    http.gpio = gpio
     http.data = data
     http.icon_file = 'favicon.ico'
     if not os.path.exists(http.icon_file):
@@ -87,12 +87,20 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         return
 
 
-    def _set_headers(self):
+    def _common_headers(self):
         self.send_response(200)
+        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+
+    def _redirect(self):
+        self._common_headers()
+        self.send_header('refresh', '0; url=/')
+        self.end_headers()
+
+    def _set_headers(self):
+        self._common_headers()
         self.send_header("Content-type", "text/html")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Pragma", "no-cache")
-        self.send_header("Expires", "0")
         self.end_headers()
 
     def _set_png_headers(self):
@@ -245,11 +253,11 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             ret += '<tr><th>GPIO</th></tr>\n'
             for item, name in pinlist.items():
                 title = '{}:\n chip: {}\n line: {}\n direction: {}\n consumer: {}'.format(
-                            name, http.pins[name].chip, http.pins[name].line,
-                            http.pins[name].direction, http.pins[name].consumer)
+                            name, http.gpio.pins[name].chip, http.gpio.pins[name].line,
+                            http.gpio.pins[name].direction, http.gpio.pins[name].consumer)
                 ret += f'<tr><td title="{title}">{name}:</td>'
-                direction = '({})'.format(http.pins[name].direction[:-3])
-                consumer = '{}'.format(http.pins[name].consumer)
+                direction = '({})'.format(http.gpio.pins[name].direction[:-3])
+                consumer = '{}'.format(http.gpio.pins[name].consumer)
                 if http.data[item] == 'U':
                     ret += '<td style="text-align: right;"><span style="font-size: 80%; '\
                            'font-style: italic;">{}</span></td>'.format(consumer)
@@ -468,10 +476,19 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             print(pin, parsed_action, action)
             if action == http.settings.pin_state_names[0].casefold():
                 print('turn OFF!')
+                http.gpio.setPin(pin, 0)
+                self._redirect()
+                return
             elif action == http.settings.pin_state_names[1].casefold():
                 print('turn ON!')
+                http.gpio.setPin(pin, 1)
+                self._redirect()
+                return
             elif action == 'input':
                 print('make INPUT!')
+                http.gpio.makeInput(pin)
+                self._redirect()
+                return
             elif parsed_action != '':
                 self.send_error(418, 'I\'m a {}, '\
                     'I do not know how to \'{}\''\
@@ -480,9 +497,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._set_headers()
             response = self._give_head()
             response += f'<h2><a href="/" title="Home">{http.settings.name}</a> Pin Control</h2>\n'
-            response += f'<div style="font-size: 200%; ">{pin} : <span style="font-weight: bold">{http.settings.pin_state_names[http.pins[pin].value]}</span><br></div>\n'
+            response += f'<div style="font-size: 200%; ">{pin} : <span style="font-weight: bold">{http.settings.pin_state_names[http.gpio.pins[pin].value]}</span><hr></div>\n'
 
-            response += '<div><hr>Current mode: {}</div><div><br></div>\n'.format(http.pins[pin].direction)
+            response += '<div>Current mode: {}</div><div><br></div>\n'.format(http.gpio.pins[pin].direction)
             response += '<div>Set <a href="?{0}" title="Set {1} output to {0}">{0}</a></div>\n'.format(http.settings.pin_state_names[0], pin)
             response += '<div>Set <a href="?{0}" title="Set {1} output to {0}">{0}</a></div>\n'.format(http.settings.pin_state_names[1], pin)
             response += '<div>Set mode to <a href="?input" title="Set {} mode to: input">input</a></div>\n'.format(pin)
