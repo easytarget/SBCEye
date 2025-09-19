@@ -248,16 +248,24 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                             name, http.pins[name].chip, http.pins[name].line,
                             http.pins[name].direction, http.pins[name].consumer)
                 ret += f'<tr><td title="{title}">{name}:</td>'
-                direction = ' ({})'.format(http.pins[name].direction) if http.settings.web_pin_info else ''
-                #consumer = '<span style="font-size: 80%;">{}</span>'.format(http.pins[name].consumer) if http.settings.web_pin_info else 'n/a'
-                consumer = ' [{}]'.format(http.pins[name].consumer) if http.settings.web_pin_info else ''
+                direction = '({})'.format(http.pins[name].direction[:-3])
+                consumer = '{}'.format(http.pins[name].consumer)
                 if http.data[item] == 'U':
-                    ret += f'<td style="text-align: right;"><span style=" font-style: italic;">n/a</span></td>'\
-                           f'<td style="padding-left: 0.3em;"><span style="font-size: 66%;">{consumer}</span></td></tr>\n'
+                    ret += '<td style="text-align: right;"><span style="font-size: 80%; '\
+                           'font-style: italic;">{}</span></td>'.format(consumer)
+                    direction = ''
                 else:
-                    em = 'style=" font-weight: bold;"' if http.data[item] == 1 else ''
-                    ret += f'<td style="text-align: right;"><span {em}>{http.settings.pin_state_names[http.data[item]]}</span></td>'\
-                           f'<td style="padding-left: 0.3em;"><span style="font-size: 75%;">{direction}</span></td></tr>\n'
+                    em = 'font-weight: bold' if http.data[item] == 1 else ''
+                    if name in http.settings.outpins:
+                        link = 'href="/{}" title="Pin Control" '\
+                               'style="text-decoration: underline; {}"'.format(name, em)
+                        ret += '<td style="text-align: right;"><a {}>{}</a></td>'\
+                                .format(link, http.settings.pin_state_names[http.data[item]])
+                    else:
+                        ret += '<td style="text-align: right;"><span style="{}">{}</span></td>'\
+                                .format(em, http.settings.pin_state_names[http.data[item]])
+                ret += '<td style="padding-left: 0.3em;"><span style="font-size: 75%;">'\
+                       '{}</span></td></tr>\n'.format(direction)
         return ret
 
     def _give_graphlinks(self, skip=""):
@@ -451,6 +459,17 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_log()
             response += self._give_timestamp()
             response += self._give_foot(refresh=60, scroll=True)
+            self._write_dedented(response)
+        elif urlparse(self.path).path[1:] in  http.settings.outpins:
+            pin = urlparse(self.path).path[1:]
+            parsed_action = urlparse(self.path).query
+            print(pin, parsed_action, type(parsed_action))
+            self._set_headers()
+            response = self._give_head()
+            response += f'<h2><a href="/" title="Home">{http.settings.name}</a> {pin}</h2>\n'
+            response += f'<div>{parsed_action}</div>\n'
+            response += self._give_timestamp()
+            response += self._give_foot(refresh=60)
             self._write_dedented(response)
         elif urlparse(self.path).path == '/':
             # Main Page
