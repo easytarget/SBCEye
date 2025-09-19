@@ -57,6 +57,10 @@ def serve_http(settings, rrd, gpio, data):
     for link in settings.links:
         logging.info(f"Web link '{link}' points to: {settings.links[link]}")
 
+    # Note the controllable pins
+    for pin in settings.outpins:
+        logging.info(f"Pin '{pin}' controllable via web ui")
+
     # Start the server
     logging.info(f'HTTP server will bind to port {str(settings.web_port)} '\
             f'on host {settings.web_host}')
@@ -464,21 +468,23 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             pin = urlparse(self.path).path[1:]
             parsed_action = urlparse(self.path).query
             action = parsed_action.casefold()
-            print(pin, parsed_action, action)
             if action == http.settings.pin_state_names[0].casefold():
-                print('turn OFF!')
                 http.gpio.setPin(pin, 0)
                 self._redirect()
+                logging.info('Pin \'{}\' set output: {} via web ({})'
+                             .format(pin, http.settings.pin_state_names[0], self.client_address[0]))
                 return
             elif action == http.settings.pin_state_names[1].casefold():
-                print('turn ON!')
                 http.gpio.setPin(pin, 1)
                 self._redirect()
+                logging.info('Pin \'{}\' set output: {} via web ({})'
+                             .format(pin, http.settings.pin_state_names[1], self.client_address[0]))
                 return
             elif action == 'input':
-                print('make INPUT!')
                 http.gpio.makeInput(pin)
                 self._redirect()
+                logging.info('Pin \'{}\' set to input mode via web ({})'
+                             .format(pin, self.client_address[0]))
                 return
             elif parsed_action != '':
                 self.send_error(418, 'I\'m a {}, '\
@@ -488,12 +494,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             self._set_headers()
             response = self._give_head(" :: Pin Control :: {}".format(pin))
             response += f'<h2><a href="/" title="Home">{http.settings.name}</a> Pin Control</h2>\n'
-            response += f'<div style="font-size: 200%; ">{pin} : <span style="font-weight: bold">{http.settings.pin_state_names[http.gpio.pins[pin].value]}</span><hr></div>\n'
-
-            response += '<div>Current mode: {}</div><div><br></div>\n'.format(http.gpio.pins[pin].direction)
-            response += '<div>Set <a href="?{0}" title="Set {1} output to {0}">{0}</a></div>\n'.format(http.settings.pin_state_names[0], pin)
-            response += '<div>Set <a href="?{0}" title="Set {1} output to {0}">{0}</a></div>\n'.format(http.settings.pin_state_names[1], pin)
-            response += '<div>Set mode to <a href="?input" title="Set {} mode to: input">input</a></div>\n'.format(pin)
+            response += f'<div style="font-size: 200%; ">{pin} : <span style="font-weight: bold">{http.settings.pin_state_names[http.gpio.pins[pin].value]}</span></div>\n'
+            response += '<div>Current mode: <span style="font-weight: bold">{}</span><hr></div>\n'.format(http.gpio.pins[pin].direction)
+            response += '<div><a href="?{0}" title="mode: output\nvalue: {0}">Set output: {0}</a></div>\n'.format(http.settings.pin_state_names[0], pin)
+            response += '<div><a href="?{0}" title="mode: output\nvalue: {0}">Set output: {0}</a></div>\n'.format(http.settings.pin_state_names[1], pin)
+            response += '<div><a href="?input" title="mode: input">Change mode to input and show value</a></div>\n'.format(pin)
+            response += '<div><br><a href="./" title="Main page">Home</a></div>\n'
             response += self._give_timestamp()
             response += self._give_foot(refresh=60)
             self._write_dedented(response)
