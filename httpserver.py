@@ -460,17 +460,36 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_timestamp()
             response += self._give_foot(refresh=60, scroll=True)
             self._write_dedented(response)
+
         elif urlparse(self.path).path[1:] in  http.settings.outpins:
             pin = urlparse(self.path).path[1:]
             parsed_action = urlparse(self.path).query
-            print(pin, parsed_action, type(parsed_action))
+            action = parsed_action.casefold()
+            print(pin, parsed_action, action)
+            if action == http.settings.pin_state_names[0].casefold():
+                print('turn OFF!')
+            elif action == http.settings.pin_state_names[1].casefold():
+                print('turn ON!')
+            elif action == 'input':
+                print('make INPUT!')
+            elif parsed_action != '':
+                self.send_error(418, 'I\'m a {}, '\
+                    'I do not know how to \'{}\''\
+                    .format(pin, parsed_action))
+                return
             self._set_headers()
             response = self._give_head()
-            response += f'<h2><a href="/" title="Home">{http.settings.name}</a> {pin}</h2>\n'
-            response += f'<div>{parsed_action}</div>\n'
+            response += f'<h2><a href="/" title="Home">{http.settings.name}</a> Pin Control</h2>\n'
+            response += f'<div style="font-size: 200%; ">{pin} : <span style="font-weight: bold">{http.settings.pin_state_names[http.pins[pin].value]}</span><br></div>\n'
+
+            response += '<div><hr>Current mode: {}</div><div><br></div>\n'.format(http.pins[pin].direction)
+            response += '<div>Set <a href="?{0}" title="Set {1} output to {0}">{0}</a></div>\n'.format(http.settings.pin_state_names[0], pin)
+            response += '<div>Set <a href="?{0}" title="Set {1} output to {0}">{0}</a></div>\n'.format(http.settings.pin_state_names[1], pin)
+            response += '<div>Set mode to <a href="?input" title="Set {} mode to: input">input</a></div>\n'.format(pin)
             response += self._give_timestamp()
             response += self._give_foot(refresh=60)
             self._write_dedented(response)
+
         elif urlparse(self.path).path == '/':
             # Main Page
             exclude = parse_qs(urlparse(self.path).query).get('exclude', '')
