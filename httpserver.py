@@ -368,6 +368,16 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 </div>
                 '''
 
+    def _give_pin_portal(self, pin):
+        ret = f'<h2><a href="/" title="Home">{http.settings.name}</a> Pin Control</h2>\n'
+        ret += f'<div style="font-size: 200%; ">{pin} : <span style="font-weight: bold">{http.settings.pin_state_names[http.gpio.pins[pin].value]}</span></div>\n'
+        ret += '<div>Current mode: <span style="font-weight: bold">{}</span><hr></div>\n'.format(http.gpio.pins[pin].direction)
+        ret += '<div><a href="?{0}" title="mode: output\nvalue: {0}">Set output: {0}</a></div>\n'.format(http.settings.pin_state_names[0], pin)
+        ret += '<div><a href="?{0}" title="mode: output\nvalue: {0}">Set output: {0}</a></div>\n'.format(http.settings.pin_state_names[1], pin)
+        ret += '<div><a href="?input" title="mode: input">Change mode to input and show value</a></div>\n'.format(pin)
+        ret += '<div><br><a href="./" title="Main page">Home</a></div>\n'
+        return ret
+
     def _write_dedented(self, html):
         # Strip leading whitespace and write
         response = re.sub(r'^\s*','', html, flags=re.MULTILINE)
@@ -463,7 +473,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_timestamp()
             response += self._give_foot(refresh=60, scroll=True)
             self._write_dedented(response)
-
         elif urlparse(self.path).path[1:] in  http.settings.outpins:
             pin = urlparse(self.path).path[1:]
             parsed_action = urlparse(self.path).query
@@ -493,17 +502,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 return
             self._set_headers()
             response = self._give_head(" :: Pin Control :: {}".format(pin))
-            response += f'<h2><a href="/" title="Home">{http.settings.name}</a> Pin Control</h2>\n'
-            response += f'<div style="font-size: 200%; ">{pin} : <span style="font-weight: bold">{http.settings.pin_state_names[http.gpio.pins[pin].value]}</span></div>\n'
-            response += '<div>Current mode: <span style="font-weight: bold">{}</span><hr></div>\n'.format(http.gpio.pins[pin].direction)
-            response += '<div><a href="?{0}" title="mode: output\nvalue: {0}">Set output: {0}</a></div>\n'.format(http.settings.pin_state_names[0], pin)
-            response += '<div><a href="?{0}" title="mode: output\nvalue: {0}">Set output: {0}</a></div>\n'.format(http.settings.pin_state_names[1], pin)
-            response += '<div><a href="?input" title="mode: input">Change mode to input and show value</a></div>\n'.format(pin)
-            response += '<div><br><a href="./" title="Main page">Home</a></div>\n'
+            response += self._give_pin_portal(pin)
             response += self._give_timestamp()
             response += self._give_foot(refresh=60)
             self._write_dedented(response)
-
         elif urlparse(self.path).path == '/':
             # Main Page
             exclude = parse_qs(urlparse(self.path).query).get('exclude', '')
