@@ -369,12 +369,23 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 '''
 
     def _give_pin_portal(self, pin):
-        ret = f'<h2><a href="/" title="Home">{http.settings.name}</a> Pin Control</h2>\n'
-        ret += f'<div style="font-size: 200%; ">{pin} : <span style="font-weight: bold">{http.settings.pin_state_names[http.gpio.pins[pin].value]}</span></div>\n'
-        ret += '<div>Current mode: <span style="font-weight: bold">{}</span><hr></div>\n'.format(http.gpio.pins[pin].direction)
-        ret += '<div><a href="?{0}" title="mode: output\nvalue: {0}">Set output: {0}</a></div>\n'.format(http.settings.pin_state_names[0], pin)
-        ret += '<div><a href="?{0}" title="mode: output\nvalue: {0}">Set output: {0}</a></div>\n'.format(http.settings.pin_state_names[1], pin)
-        ret += '<div><a href="?input" title="mode: input">Change mode to input and show value</a></div>\n'.format(pin)
+        ret = '<h2><a href="/" title="Home">{}</a> Pin Control</h2>\n'.format(http.settings.name)
+        ret += '<div style="font-size: 200%; ">{} : <span style="font-weight: bold">'.format(pin)
+        ret += '{}</span></div>\n'.format(http.settings.pin_state_names[http.gpio.pins[pin].value])
+        ret += '<div>Current mode: <span style="font-weight: bold">{}</span><hr></div>\n'\
+                .format(http.gpio.pins[pin].direction)
+        if http.gpio.pins[pin].direction == 'input':
+            for state in (0, 1):
+                ret += '<div><a href="?{0}" title="mode: output\nvalue: {0}">'\
+                       'Change mode to output and set: {0}</a></div>\n'\
+                       .format(http.settings.pin_state_names[state])
+        else:
+            state = 1 if http.gpio.pins[pin].value == 0 else 0
+            ret += '<div><a href="?{0}" title="mode: output\nvalue: {0}">'\
+                   'Set output: {0}</a></div>\n'\
+                   .format(http.settings.pin_state_names[state])
+            ret += '<div><a href="?input" title="mode: input">'\
+                   'Change mode to input and get value</a></div>\n'
         ret += '<div><br><a href="./" title="Main page">Home</a></div>\n'
         return ret
 
