@@ -372,7 +372,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         ret = '<h2><a href="/" title="Home">{}</a> Pin Control</h2>\n'.format(http.settings.name)
         ret += '<div style="font-size: 200%; ">{} : <span style="font-weight: bold">'.format(pin)
         ret += '{}</span></div>\n'.format(http.settings.pin_state_names[http.gpio.pins[pin].value])
-        ret += '<div>Current mode: <span style="font-weight: bold">{}</span><hr></div>\n'\
+        ret += '<div>mode: <span style="font-weight: bold">{}</span><hr></div>\n'\
                 .format(http.gpio.pins[pin].direction)
         if http.gpio.pins[pin].direction == 'input':
             for state in (0, 1):

@@ -55,7 +55,7 @@ class Robin:
         # Graphs and parameters
         self.graph_map = {
                 'env-temp': (f'{s.web_sensor_name} Temperature, \u00B0Centigrade',
-                    None, None, '%3.0lf\u00B0', '%3.1lf\u00B0C'),
+                    None, None, '%3.1lf\u00B0', '%3.1lf\u00B0C'),
                 'env-humi': (f'{s.web_sensor_name} Humidity, % percent',
                     None, None, '%3.0lf', '%3.0lf%%'),
                 'env-pres': (f'{s.web_sensor_name} Pressure, millibars',
