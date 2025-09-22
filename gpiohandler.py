@@ -8,12 +8,6 @@ import gpiod
 import logging
 from os import getpid
 from re import search
-try:
-    from pinreader import PinReader
-    readerfail = None
-except ImportError as e:
-    # remember why we failed, so it can be reported in log later.
-    readerfail = e
 
 # Needs gpiod bindings at V2.0 or later, standard debian12/bookworm is v1.6
 #  use a virtualenv and 'pip install --upgrade gpiod' as needed.
@@ -21,6 +15,9 @@ if int(search('^[0-9]+', gpiod.__version__).group(0)) < 2:
     readerfail = 'gpiod bindings library version too low ({}), '\
                       'pinreader requires gpiod v2.x.x or later.'\
                       .format(gpiod.__version__)
+else:
+    readerfail = None
+    from pinreader import PinReader
 
 '''
 PinReader class (dict)
