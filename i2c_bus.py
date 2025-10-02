@@ -17,7 +17,6 @@ def i2c_pin_consume(settings):
         return None
     chip = settings.bus_lock[0]
     lines = tuple(settings.bus_lock[1:])
-    print('==LOCK===',chip,lines)
     if not gpiod.is_gpiochip_device(chip):
         print('WARNING: Cannot lock I2C pins, \'{}\' is not a gpiodchip device'\
               .format(chip))
