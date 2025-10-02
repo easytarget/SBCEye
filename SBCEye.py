@@ -237,7 +237,7 @@ if __name__ == '__main__':
                 'Environment status and logging disabled')
 
     # Display animation setup
-    disp = oled_setup(i2c, settings) if i2c else None
+    disp = oled_setup(settings) if i2c else None
     if disp:
         # display initialisation does a 'clear()' and 'show()'
         disp.contrast(settings.display_contrast)

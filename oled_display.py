@@ -4,11 +4,11 @@
 
 import importlib.util
 
-def oled_setup(i2c, settings):
+def oled_setup(settings):
     '''Import and initialise ssd1306 library, return the display object
+    uses the 'luma' library, which in turn requires smbus2
 
     parameters:
-        i2c: i2c bus object
         settings: settings oject (from load_config)
     returns:
         disp: Display module object, or None if failed
@@ -33,7 +33,7 @@ def oled_setup(i2c, settings):
         rotate = 2 if settings.display_rotate else 0
         try:
             # Create the display object
-            disp = ssd1306(bus=i2c, address=settings.display_addr, rotate=rotate)
+            disp = ssd1306(rotate=rotate)
             print("SSD1306 i2c display found", flush=True)
         except Exception as error:
             print(error)
