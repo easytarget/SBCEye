@@ -62,7 +62,8 @@ from oled_display import oled_setup
 os.nice(10)
 
 # The setting class will also process the arguments
-settings = Settings()
+appname = sys.argv[0].removesuffix('.py')
+settings = Settings(appname)
 
 # Let the console know we are starting
 print("Starting SBCEye")
@@ -106,7 +107,7 @@ logging.info('CPU thermal device detected as: ' + cpu_thermal_device)
 #
 # Import, setup and return hardware drivers, or 'None' if setup fails
 
-i2c = i2c_setup(settings)
+i2c, bus_lock = i2c_setup(settings)
 
 #
 # Local Classes, Globals
@@ -211,11 +212,15 @@ def handle_restart():
     logging.info('Safe Restarting')
     print('Restart\n',flush=True)
     rrd.write_updates()
+    if bus_lock:
+        bus_lock.release()
     os.execv(sys.executable, ['python'] + sys.argv)
 
 def handle_exit():
     '''Ensure we write ipending data to the RRD database as we exit'''
     rrd.write_updates()
+    if bus_lock:
+        bus_lock.release()
     logging.info('Exiting')
     print('Graceful Exit\n',flush=True)
 

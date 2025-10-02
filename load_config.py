@@ -20,11 +20,12 @@ class Settings:
 
     No Methods
     Attributes:
+        appname: a short text identifier for the app
         Basically, look at the class and config.ini file, I'm not going
         to list and describe everything a second time here ;-)
     '''
 
-    def __init__(self):
+    def __init__(self,appname=None):
 
         def hexint(instring):
             ''' Helper function so we can use '0xNN' hex values for some inputs'''
@@ -81,10 +82,14 @@ class Settings:
                     print('\nERROR: Cannot find a configuration file, exiting')
                     sys.exit()
 
-
         config = configparser.RawConfigParser()
         config.optionxform = str
         config.read(config_file)
+
+        if appname:
+            self.identifier = '{}-{}'.format(appname, os.getpid())
+        else:
+            self.identifier = os.getpid()
 
         # Set attributes from .ini file
 
@@ -126,8 +131,8 @@ class Settings:
         self.pinlist = {}
         pins = config["pins"]
         for pin in pins:
-            line = pins.get(pin).split(',')
-            self.pinlist[pin] = (line[0], int(line[1]))
+            self.pinlist[pin] = pins.get(pin).split(',')
+            self.pinlist[pin][1] = int(self.pinlist[pin][1])
 
         outpins = config["outpins"]
         self.outpins = map(str.strip, outpins.get('web').split(','))
@@ -163,6 +168,7 @@ class Settings:
         self.bus_id = hexint(bus.get("bus_id"))
         self.sensor_addr = hexint(bus.get("sensor_addr"))
         self.display_addr = hexint(bus.get("display_addr"))
+        self.bus_lock = bus.get("lock").split(',')
 
         display = config["display"]
         self.display_rotate = display.getboolean("rotate")
