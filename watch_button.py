@@ -107,7 +107,7 @@ class buttonHandler:
 
     def _flip(self, pin):
         ''' A simple function to invert the output '''
-        current = self.gpio.pin[pin].get()
+        current = self.gpio.pins[pin].get()
         if current == 0:
             self.gpio.setPin(pin, 1)
         elif current == 1:
@@ -119,9 +119,8 @@ class buttonHandler:
             event = self.watched[pin].event()
             if event == edge:
                 self._flip(pin)
-                if self._verbose:
-                    print('{} : button : {}'.format(asctime(),
-                        self._states[self._output.get()]), flush=True)
+                print('Button toggle for pin \'{}\''.format(pin), flush=True)
+                logging.info('Button toggle for pin \'{}\''.format(pin))
 
 if __name__ == "__main__":
     from sys import exit
