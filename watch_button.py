@@ -65,12 +65,8 @@ class buttonHandler:
                 print('Configured: \'{}\':{} as input (locked)'
                     .format(self.chip, self.line))
 
-        def release(self):
-            self.request.release()
-            print('Released lock on input: \'{}\':{}'.format(self.chip, self.line))
-
         def event(self):
-            self.request.wait_edge_events(timeout=None):
+            self.request.wait_edge_events(timeout=None)
             event = self.request.read_edge_events(max_events=1)[0]
             if event.line_offset == self.line:
                 if event.event_type == RISING_EDGE:
