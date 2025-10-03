@@ -200,3 +200,9 @@ class Settings:
         self.debug_sigint = debug.getboolean("sigint")
 
         print("Settings loaded from configuration file successfully")
+
+if __name__ == "__main__":
+    from sys import exit
+    print('setting loader class for SBCEye, see inline docs')
+    exit()
+

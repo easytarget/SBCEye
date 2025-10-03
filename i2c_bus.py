@@ -64,3 +64,9 @@ def i2c_setup(settings):
             return None, None
         print('I2C bus found', flush=True)
     return i2c, lock
+
+if __name__ == "__main__":
+    from sys import exit
+    print('i2c bus object class for SBCEye, see inline docs')
+    exit()
+

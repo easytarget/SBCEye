@@ -174,3 +174,8 @@ class GPIOHandler:
         self.pins.update(pin)
         self._update_pin(pin)
         return
+
+if __name__ == "__main__":
+    from sys import exit
+    print('gpioHandler class for SBCEye, see inline docs')
+    exit()

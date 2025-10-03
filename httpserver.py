@@ -550,3 +550,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def do_HEAD(self):
         '''returns headers'''
         self._set_headers()
+
+if __name__ == "__main__":
+    from sys import exit
+    print('HTTPserver class for SBCEye, see inline docs')
+    exit()
+

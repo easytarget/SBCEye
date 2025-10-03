@@ -66,3 +66,9 @@ class Saver:
             hour = time.localtime()[3]
             if self.active != self.saver_map[hour]:
                 self._apply_state(self.saver_map[hour])
+
+if __name__ == "__main__":
+    from sys import exit
+    print('OLED screensaver class for SBCEye, see inline docs')
+    exit()
+

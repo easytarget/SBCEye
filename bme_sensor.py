@@ -44,3 +44,9 @@ def bme_setup(i2c, settings):
 
         print("BME280 sensor found", flush=True)
     return bme
+
+if __name__ == "__main__":
+    from sys import exit
+    print('bme280 sensor class for SBCEye, see inline docs')
+    exit()
+

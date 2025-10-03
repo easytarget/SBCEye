@@ -265,3 +265,8 @@ def animate(settings, disp, queue):
                 data.pop(key, None)
         schedule.run_pending()
         sleep(0.25)
+
+if __name__ == "__main__":
+    from sys import exit
+    print('animator class for SBCEye, see inline docs')
+    exit()

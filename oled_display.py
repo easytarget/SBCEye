@@ -45,5 +45,10 @@ def oled_setup(settings):
         if not importlib.util.find_spec("luma"):
             print("ERROR: Luma library not found, disabling display", flush=True)
             return None
-
     return disp
+
+if __name__ == "__main__":
+    from sys import exit
+    print('OLED display class for SBCEye, see inline docs')
+    exit()
+

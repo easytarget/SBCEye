@@ -102,5 +102,5 @@ class PinReader(dict):
 
 if __name__ == "__main__":
     from sys import exit
-    print('PinReader{} class, see inline docs')
+    print('PinReader{} class for SBCEye, see inline docs')
     exit()
