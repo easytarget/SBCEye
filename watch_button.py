@@ -1,7 +1,10 @@
 # Needs gpiod bindings at V2.0 or later, standard debian12/bookworm is v1.6
 #  use a virtualenv and 'pip install --upgrade gpiod' as needed.
 import gpiod
+import logging
 from datetime import timedelta
+from threading import Thread
+from os import getpid
 
 INPUT = gpiod.line.Direction.INPUT
 RISING_EDGE = gpiod.edge_event.EdgeEvent.Type.RISING_EDGE
@@ -66,6 +69,7 @@ class buttonHandler:
                     .format(self.chip, self.line))
 
         def event(self):
+            ''' (wait indefinately for and) return the first event in the queue '''
             self.request.wait_edge_events(timeout=None)
             event = self.request.read_edge_events(max_events=1)[0]
             if event.line_offset == self.line:
@@ -74,7 +78,53 @@ class buttonHandler:
                 elif event.event_type == FALLING_EDGE:
                     return 'falling'
 
-    def __init__(self, settings, gpio):
-        # take settings (and gpio object to flip value)
-        # start a thread for each watched button
-        pass
+    def __init__(self, buttons, gpio, consumer=str(getpid())):
+        ''' Creates button objects for all the specified pins
+            and spawns threads to monitor them and flip the pin
+            when the button is pressed '''
+        self.gpio = gpio
+        self.watched = {}
+        self._threads = {}
+        for button in buttons:
+            if button not in gpio.pins.keys():
+                print('Cannot configure button for undefined pin \'{}\'.'
+                      .format(button))
+                continue
+            debounce = 66 if len(buttons[button]) < 4 else buttons[button][3]
+            self.watched[button] = self._button(chip=buttons[button][0],
+                                                line=buttons[button][1],
+                                                consumer=consumer,
+                                                debounce=debounce)
+            self._threads[button] = Thread(target=self._serve_input,
+                                           args=(button, buttons[button][2]))
+            self._threads[button].daemon = True
+            self._threads[button].start()
+            print('Configured button for \'{}\' on {}:{} ({})'
+                  .format(button, buttons[button][0],
+                          buttons[button][1], buttons[button][2]))
+            logging.info('Configured button for \'{}\' on {}:{}'
+                  .format(button, buttons[button][0], buttons[button][1]))
+
+    def _flip(self, pin):
+        ''' A simple function to invert the output '''
+        current = self.gpio.pin[pin].get()
+        if current == 0:
+            self.gpio.setPin(pin, 1)
+        elif current == 1:
+            self.gpio.setPin(pin, 0)
+
+    def _serve_input(self, pin, edge):
+        '''service loop serving the input pin events (run in a thread)'''
+        while True:
+            event = self.watched[pin].event()
+            if event == edge:
+                self._flip(pin)
+                if self._verbose:
+                    print('{} : button : {}'.format(asctime(),
+                        self._states[self._output.get()]), flush=True)
+
+if __name__ == "__main__":
+    from sys import exit
+    print('ButtonWatcher class for SBCEye, see inline docs')
+    exit()
+
