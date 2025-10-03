@@ -138,6 +138,17 @@ class Settings:
         self.outpins = map(str.strip, outpins.get('web').split(','))
         self.outpins = self.outpins & self.pinlist.keys()
 
+        self.webpins = {}
+        webpins = config["webpins"]
+        for pin in webpins:
+            self.webpins[pin] = webpins.get(pin)
+
+        self.buttons = {}
+        buttons = config["buttons"]
+        for pin in buttons:
+            self.buttons[pin] = buttons.get(pin).split(',')
+            self.buttons[pin][1] = int(self.buttons[pin][1])
+
         self.netlist = {}
         ping = config["ping"]
         for host in ping:
