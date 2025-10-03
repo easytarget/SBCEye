@@ -40,13 +40,14 @@ import time
 import sys
 import logging
 import random
+import schedule
+import psutil
 from datetime import timedelta
 from logging.handlers import RotatingFileHandler
 from atexit import register
 from signal import signal, SIGTERM, SIGINT, SIGHUP
 from multiprocessing import Process, Queue
-import schedule
-import psutil
+from pathlib import Path
 
 # Local classes
 from load_config import Settings
@@ -62,8 +63,7 @@ from oled_display import oled_setup
 os.nice(10)
 
 # The setting class will also process the arguments
-appname = sys.argv[0].removesuffix('.py')
-settings = Settings(appname)
+settings = Settings(appname=Path(sys.argv[0]).stem)
 
 # Let the console know we are starting
 print("Starting SBCEye")
