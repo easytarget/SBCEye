@@ -266,7 +266,7 @@ if __name__ == '__main__':
     update_sensors()
 
     # GPIO pin monitoring
-    gpio = GPIOHandler(settings.pinlist, data)
+    gpio = GPIOHandler(settings.pinlist, settings.buttons, data, settings.identifier)
 
     # Network (ping) monitoring
     net = Netreader((settings.netlist, settings.net_timeout), data)

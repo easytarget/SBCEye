@@ -14,12 +14,12 @@ def _get_device(chip, line):
         ''' Common gpiochip+line setup '''
         # Test whether chip is a gpiochip
         if not gpiod.is_gpiochip_device(chip):
-            raise ValueError('Not a gpiochip device: \'{}\''.format(chip))
+            raise ValueError('Button setup: Not a gpiochip device: \'{}\''.format(chip))
         # Test we can use gpiochip
         try:
             device = gpiod.Chip(chip)
         except Exception as e:
-            raise ValueError('Failed to setup gpiochip (\'{}\') device:\n{}'
+            raise ValueError('Button setup: Failed to setup gpiochip (\'{}\') device:\n{}'
                   .format(chip, e))
         return device
 
@@ -35,25 +35,23 @@ class buttonHandler:
                 line (int)
                 consumer (string)
                 debounce (int) in ms
-                verbose (bool)
             Provides:
                 event():
                     blocks and waits for events
                     returns a string with 'rising' or 'falling' otherwise
         '''
-        def __init__(self, chip, line, consumer, debounce, verbose=False):
+        def __init__(self, chip, line, consumer, debounce):
             self.chip = chip
             self.line = line
             bias = gpiod.line.Bias.AS_IS
             edge = gpiod.line.Edge.BOTH
             clock = gpiod.line.Clock.MONOTONIC
             debounce = timedelta(milliseconds=debounce)
-            self.verbose = verbose
             # Get and test the device
             device = _get_device(self.chip, self.line)
             if device.get_line_info(line).used:
-                raise ValueError('Cannot acquire gpiochip \'{}\' line {}, '\
-                                 'currently used by: \'{}\''
+                raise ValueError('Button setup: Cannot acquire gpiochip \'{}\''\
+                                  'line {}; currently used by: \'{}\''
                       .format(chip, line, device.get_line_info(line).consumer))
             # Create a request object for the input
             self.request = device.request_lines(
@@ -64,9 +62,6 @@ class buttonHandler:
                                             edge_detection=edge,
                                             event_clock=clock,
                                             debounce_period=debounce)})
-            if self.verbose:
-                print('Configured: \'{}\':{} as input (locked)'
-                    .format(self.chip, self.line))
 
         def event(self):
             ''' (wait indefinately for and) return the first event in the queue '''
@@ -78,7 +73,7 @@ class buttonHandler:
                 elif event.event_type == FALLING_EDGE:
                     return 'falling'
 
-    def __init__(self, buttons, gpio, consumer=str(getpid())):
+    def __init__(self, buttons, gpio):
         ''' Creates button objects for all the specified pins
             and spawns threads to monitor them and flip the pin
             when the button is pressed '''
@@ -93,16 +88,16 @@ class buttonHandler:
             debounce = 66 if len(buttons[button]) < 4 else buttons[button][3]
             self.watched[button] = self._button(chip=buttons[button][0],
                                                 line=buttons[button][1],
-                                                consumer=consumer,
+                                                consumer=gpio._consumer,
                                                 debounce=debounce)
             self._threads[button] = Thread(target=self._serve_input,
                                            args=(button, buttons[button][2]))
             self._threads[button].daemon = True
             self._threads[button].start()
-            print('Configured button for \'{}\' on {}:{} ({})'
+            print('Button configured for \'{}\' on {}:{} ({})'
                   .format(button, buttons[button][0],
                           buttons[button][1], buttons[button][2]))
-            logging.info('Configured button for \'{}\' on {}:{}'
+            logging.info('Button configured for \'{}\' on {}:{}'
                   .format(button, buttons[button][0], buttons[button][1]))
 
     def _flip(self, pin):

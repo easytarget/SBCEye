@@ -18,6 +18,7 @@ if int(search('^[0-9]+', gpiod.__version__).group(0)) < 2:
 else:
     readerfail = None
     from pinreader import PinReader
+    from watch_button import buttonHandler
 
 '''
 PinReader class (dict)
@@ -46,12 +47,13 @@ class GPIOHandler:
                             - returns success/fail, used for web control
     '''
 
-    def __init__(self, pinlist, data):
+    def __init__(self, pinlist, buttons, data, consumer):
         '''Setup and do initial reading'''
         self.available = False
         self.pinlist = pinlist
         self.pins = {}
         self.data = data
+        self._consumer = consumer
         if not self.pinlist:
             print('No GPIO pins configured for monitoring')
             return
@@ -76,8 +78,9 @@ class GPIOHandler:
             self.consumers[pin] = self.pins[pin].consumer
             print('Pin \'{}\': {}'.format(pin, repr(self.pins[pin])[10:-1]))
             logging.info('Pin \'{}\': {}'.format(pin, repr(self.pins[pin])[10:-1]))
-        print('GPIO monitoring configured and logging enabled')
-        logging.info('GPIO monitoring configured and logging enabled')
+        self.buttons = buttonHandler(buttons, self)
+        print('GPIO monitoring configured')
+        logging.info('GPIO monitoring configured')
         self.available = True
 
     def _value_to_data(self, value):
@@ -135,7 +138,7 @@ class GPIOHandler:
         else:
             try:
                 with gpiod.Chip(chip).request_lines(
-                         consumer='SBCEye-{}'.format(getpid()),
+                         consumer=self._consumer,
                          config={line: gpiod.LineSettings(
                                  direction = OUTPUT,
                                  output_value = value)},
@@ -162,7 +165,7 @@ class GPIOHandler:
         else:
             try:
                 with gpiod.Chip(chip).request_lines(
-                         consumer='SBCEye-{}'.format(getpid()),
+                         consumer=self._conmsumer,
                          config={line: gpiod.LineSettings(
                                  direction = INPUT)},
                          ) as request:
