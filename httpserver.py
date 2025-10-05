@@ -12,6 +12,7 @@ import re
 # HTTP server
 import http.server
 from urllib.parse import urlparse, parse_qs
+from ipaddress import ip_address, ip_network
 from threading import Thread
 
 # Logging
@@ -58,8 +59,15 @@ def serve_http(settings, rrd, gpio, data):
         logging.info(f"Web link '{link}' points to: {settings.links[link]}")
 
     # Note the controllable pins
-    for pin in settings.outpins:
-        logging.info(f"Pin '{pin}' controllable via web ui")
+    for pin in list(settings.webpins):
+        if pin not in gpio.pins.keys():
+            print('Cannot configure web control for \'{}\', since it is not '\
+                  'in the pin list'.format(pin))
+            del settings.webpins[pin]
+        print('Pin \'{}\' controllable via web UI from: {}'\
+              .format(pin, settings.webpins[pin]))
+        logging.info('Pin \'{}\' controllable via web UI from: {}'\
+                     .format(pin, settings.webpins[pin]))
 
     # Start the server
     logging.info(f'HTTP server will bind to port {str(settings.web_port)} '\
@@ -78,7 +86,6 @@ def serve_http(settings, rrd, gpio, data):
     thread = Thread(target=serve_forever, args=(httpd, ))
     thread.daemon = True
     thread.start()
-
 
 class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     '''Handles each individual request in a new thread'''
@@ -259,7 +266,7 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                     direction = ''
                 else:
                     em = 'font-weight: bold' if http.data[item] == 1 else ''
-                    if name in http.settings.outpins:
+                    if name in http.settings.webpins.keys():
                         link = 'href="./{}" title="Pin Control" '\
                                'style="text-decoration: underline; {}"'.format(name, em)
                         ret += '<td style="text-align: right;"><a {}>{}</a></td>'\
@@ -368,23 +375,23 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 </div>
                 '''
 
-    def _give_pin_portal(self, pin):
+    def _give_pin_portal(self, pin, control):
         ret = '<h2><a href="/" title="Home">{}</a> Pin Control</h2>\n'.format(http.settings.name)
         ret += '<div style="font-size: 200%; ">{} : <span style="font-weight: bold">'.format(pin)
         ret += '{}</span></div>\n'.format(http.settings.pin_state_names[http.gpio.pins[pin].value])
         ret += '<div>mode: <span style="font-weight: bold">{}</span><hr></div>\n'\
                 .format(http.gpio.pins[pin].direction)
-        if http.gpio.pins[pin].direction == 'input':
+        if http.gpio.pins[pin].direction == 'input' and control:
             for state in (0, 1):
                 ret += '<div><a href="?{0}" title="mode: output\nvalue: {0}">'\
                        'Change mode to output and set: <span style='\
                        '"text-decoration: underline">{0}</span></a></div>\n'\
                        .format(http.settings.pin_state_names[state])
-        else:
-            state = 1 if http.gpio.pins[pin].value == 0 else 0
+        elif control:
+            newstate = 1 if http.gpio.pins[pin].value == 0 else 0
             ret += '<div><a href="?{0}" title="mode: output\nvalue: {0}">'\
                    'Set output: <span style="text-decoration: underline">{0}</span></a></div>\n'\
-                   .format(http.settings.pin_state_names[state])
+                   .format(http.settings.pin_state_names[newstate])
             ret += '<div><a href="?input" title="mode: input">'\
                    'Change mode to input and get <span style='\
                    '"text-decoration: underline">value</span></a></div>\n'
@@ -486,10 +493,20 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_timestamp()
             response += self._give_foot(refresh=60, scroll=True)
             self._write_dedented(response)
-        elif urlparse(self.path).path[1:] in  http.settings.outpins:
+        elif urlparse(self.path).path[1:] in http.settings.webpins.keys():
             pin = urlparse(self.path).path[1:]
             parsed_action = urlparse(self.path).query
             action = parsed_action.casefold()
+            allowed = False
+            for cidr in http.settings.webpins[pin]:
+                if ip_address(self.client_address[0]) in ip_network(cidr,strict=False):
+                    allowed = True
+            if not allowed and action != '':
+                self.send_error(403, 'Forbidden',
+                        'Your IP address is not permitted to control this pin')
+                print('Denied access to \'/{}\' from client at IP: {}'\
+                      .format(pin, self.client_address[0]))
+                return
             if action == http.settings.pin_state_names[0].casefold():
                 http.gpio.setPin(pin, 0)
                 self._redirect()
@@ -508,14 +525,14 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 logging.info('Pin \'{}\' set to input mode via web ({})'
                              .format(pin, self.client_address[0]))
                 return
-            elif parsed_action != '':
+            elif action != '':
                 self.send_error(418, 'I\'m a {}, '\
                     'I do not know how to \'{}\''\
                     .format(pin, parsed_action))
                 return
             self._set_headers()
             response = self._give_head(" :: Pin Control :: {}".format(pin))
-            response += self._give_pin_portal(pin)
+            response += self._give_pin_portal(pin, allowed)
             response += self._give_timestamp()
             response += self._give_foot(refresh=60)
             self._write_dedented(response)
