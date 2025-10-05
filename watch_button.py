@@ -85,11 +85,10 @@ class buttonHandler:
                 print('Cannot configure button for undefined pin \'{}\'.'
                       .format(button))
                 continue
-            debounce = 66 if len(buttons[button]) < 4 else buttons[button][3]
             self.watched[button] = self._button(chip=buttons[button][0],
                                                 line=buttons[button][1],
                                                 consumer=gpio._consumer,
-                                                debounce=debounce)
+                                                debounce=buttons[button][3])
             self._threads[button] = Thread(target=self._serve_input,
                                            args=(button, buttons[button][2]))
             self._threads[button].daemon = True
