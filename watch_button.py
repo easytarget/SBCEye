@@ -93,11 +93,12 @@ class buttonHandler:
                                            args=(button, buttons[button][2]))
             self._threads[button].daemon = True
             self._threads[button].start()
-            print('Button configured for \'{}\' on {}:{} ({})'
+            print('Pin \'{}\' button configured on \'{}\':{} ({})'
                   .format(button, buttons[button][0],
                           buttons[button][1], buttons[button][2]))
-            logging.info('Button configured for \'{}\' on {}:{}'
-                  .format(button, buttons[button][0], buttons[button][1]))
+            logging.info('Pin \'{}\' button configured on \'{}\':{} ({})'
+                         .format(button, buttons[button][0],
+                                 buttons[button][1], buttons[button][2]))
 
     def _flip(self, pin):
         ''' A simple function to invert the output '''
