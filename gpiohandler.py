@@ -165,7 +165,7 @@ class GPIOHandler:
         else:
             try:
                 with gpiod.Chip(chip).request_lines(
-                         consumer=self._conmsumer,
+                         consumer=self._consumer,
                          config={line: gpiod.LineSettings(
                                  direction = INPUT)},
                          ) as request:
