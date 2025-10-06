@@ -376,12 +376,24 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 '''
 
     def _give_pin_portal(self, pin, control):
+        print(http.gpio.pins[pin])
         ret = '<h2><a href="/" title="Home">{}</a> Pin Control</h2>\n'.format(http.settings.name)
-        ret += '<div style="font-size: 200%; ">{} : <span style="font-weight: bold">'.format(pin)
-        ret += '{}</span></div>\n'.format(http.settings.pin_state_names[http.gpio.pins[pin].value])
+        ret += '<div style="font-size: 200%; ">{}: <span style="font-weight: bold">'.format(pin)
+        if http.gpio.pins[pin].value is None:
+            ret += 'used</span></div>\n'.format(http.gpio.pins[pin].consumer)
+            ret += '<div>consumed by: \'<span style="font-weight: bold">'
+            ret += '{}\'</span></div>\n'\
+                   .format(http.gpio.pins[pin].consumer)
+            control = False
+        else:
+            ret += '{}</span></div>\n'\
+                   .format(http.settings.pin_state_names[http.gpio.pins[pin].value])
         ret += '<div>mode: <span style="font-weight: bold">{}</span><hr></div>\n'\
                 .format(http.gpio.pins[pin].direction)
-        if http.gpio.pins[pin].direction == 'input' and control:
+        if http.gpio.pins[pin].value is None:
+            ret += '<div style="color:#555555; font-size: 80%; font-weight: lighter">'\
+                   'Used pins cannot be controlled</div>'
+        elif http.gpio.pins[pin].direction == 'input' and control:
             for state in (0, 1):
                 ret += '<div><a href="?{0}" title="mode: output\nvalue: {0}">'\
                        'Change mode to output and set: <span style='\
@@ -395,6 +407,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             ret += '<div><a href="?input" title="mode: input">'\
                    'Change mode to input and get <span style='\
                    '"text-decoration: underline">value</span></a></div>\n'
+        else:
+            ret += '<div style="color:#555555; font-size: 80%; font-weight: lighter">'\
+                   'Client is not authorised to control pin</div>'
         ret += '<div><br><a href="./" title="Main page">Home</a></div>\n'
         return ret
 
@@ -497,11 +512,12 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             pin = urlparse(self.path).path[1:]
             parsed_action = urlparse(self.path).query
             action = parsed_action.casefold()
-            allowed = False
-            for cidr in http.settings.webpins[pin]:
-                if ip_address(self.client_address[0]) in ip_network(cidr,strict=False):
-                    allowed = True
-            if not allowed and action != '':
+            control = False
+            if http.gpio.pins[pin].value is not None:
+                for cidr in http.settings.webpins[pin]:
+                    if ip_address(self.client_address[0]) in ip_network(cidr,strict=False):
+                        control = True
+            if not control and action != '':
                 self.send_error(403, 'Forbidden',
                         'Your IP address is not permitted to control this pin')
                 print('Denied access to \'/{}\' from client at IP: {}'\
@@ -509,33 +525,30 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 return
             if action == http.settings.pin_state_names[0].casefold():
                 http.gpio.setPin(pin, 0)
-                self._redirect()
                 logging.info('Pin \'{}\' set output: {} via web ({})'
                              .format(pin, http.settings.pin_state_names[0], self.client_address[0]))
-                return
+                self._redirect()
             elif action == http.settings.pin_state_names[1].casefold():
                 http.gpio.setPin(pin, 1)
-                self._redirect()
                 logging.info('Pin \'{}\' set output: {} via web ({})'
                              .format(pin, http.settings.pin_state_names[1], self.client_address[0]))
-                return
+                self._redirect()
             elif action == 'input':
                 http.gpio.makeInput(pin)
-                self._redirect()
                 logging.info('Pin \'{}\' set to input mode via web ({})'
                              .format(pin, self.client_address[0]))
-                return
+                self._redirect()
             elif action != '':
                 self.send_error(418, 'I\'m a {}, '\
                     'I do not know how to \'{}\''\
                     .format(pin, parsed_action))
-                return
-            self._set_headers()
-            response = self._give_head(" :: Pin Control :: {}".format(pin))
-            response += self._give_pin_portal(pin, allowed)
-            response += self._give_timestamp()
-            response += self._give_foot(refresh=60)
-            self._write_dedented(response)
+            else:
+                self._set_headers()
+                response = self._give_head(" :: Pin Control :: {}".format(pin))
+                response += self._give_pin_portal(pin, control)
+                response += self._give_timestamp()
+                response += self._give_foot(refresh=60)
+                self._write_dedented(response)
         elif urlparse(self.path).path == '/':
             # Main Page
             exclude = parse_qs(urlparse(self.path).query).get('exclude', '')
