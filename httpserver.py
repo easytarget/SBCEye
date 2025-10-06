@@ -376,7 +376,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 '''
 
     def _give_pin_portal(self, pin, control):
-        print(http.gpio.pins[pin])
         ret = '<h2><a href="/" title="Home">{}</a> Pin Control</h2>\n'.format(http.settings.name)
         ret += '<div style="font-size: 200%; ">{}: <span style="font-weight: bold">'.format(pin)
         if http.gpio.pins[pin].value is None:
@@ -384,7 +383,6 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             ret += '<div>consumed by: \'<span style="font-weight: bold">'
             ret += '{}\'</span></div>\n'\
                    .format(http.gpio.pins[pin].consumer)
-            control = False
         else:
             ret += '{}</span></div>\n'\
                    .format(http.settings.pin_state_names[http.gpio.pins[pin].value])
@@ -392,8 +390,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 .format(http.gpio.pins[pin].direction)
         if http.gpio.pins[pin].value is None:
             ret += '<div style="color:#555555; font-size: 80%; font-weight: lighter">'\
-                   'Used pins cannot be controlled</div>'
-        elif http.gpio.pins[pin].direction == 'input' and control:
+                   'Pins used (consumed) by other processes cannot be controlled</div>'
+        elif control and http.gpio.pins[pin].direction == 'input':
             for state in (0, 1):
                 ret += '<div><a href="?{0}" title="mode: output\nvalue: {0}">'\
                        'Change mode to output and set: <span style='\
