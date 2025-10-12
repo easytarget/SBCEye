@@ -55,7 +55,7 @@ Embeddable Panels and Standalone Graphs
 ## Requires:
 * [Python3.7+](https://www.python.org/), [pip](https://pypi.org/project/pip/) and [virtualenv](https://pypi.org/project/virtualenv/)
 
-The [install guide](docs/INSTALL.md) covers installing these, and the rest of the requirements in a way that wont conflict with other python tools and versions on your system:
+The [install guide](INSTALL.md) covers installing these, and the rest of the requirements in a way that wont conflict with other python tools and versions on your system:
 * [Schedule](https://github.com/dbader/schedule)
 * [python RRDtool](https://pythonhosted.org/rrdtool/index.html)
 * [psutil](https://psutil.readthedocs.io/en/latest/)
@@ -67,7 +67,7 @@ For display:
 * [Liberation Fonts](https://en.wikipedia.org/wiki/Liberation_fonts)
 
 ## Install:
-This is covered in detail here: [docs/INSTALL.md](docs/INSTALL.md)
+This is covered in detail here: [INSTALL.md](INSTALL.md)
 - Install is done via a python virtual environment to avoid any conflicts with other Python installs (such as OctoPrint)
 
 ## Configuration
