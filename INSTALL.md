@@ -18,6 +18,11 @@ The install steps below will set SBCEye up using a separate user in a virtual en
 Start by making sure that you are running a fully updated OS install, have git, python3, python3-pip and python3-dev and lm-sensors installed, have created an 'eye' user and have cloned the repo to `~eye/SBCEye` eg:
 
 ```console
+# also: 
+# build-essentials (deb)
+# gcc  (zlib-ng-compat-devel, libjpeg-turbo-devel, for luma) (rhel)
+# I2C group on rhel?
+
 # Install python and dependencies 
 admin@sbc:~$ sudo apt update
 admin@sbc:~$ sudo apt install python3 python3-dev python3-pip git rrdtool librrd-dev lm-sensors
@@ -29,14 +34,14 @@ admin@sbc:~$ sudo apt install gpiod
 
 # If you plan to use a I2C SSD1306 OLED display or BME280 environmental sensor
 admin@sbc:~$ sudo apt install i2c-tools
-;or (RHEL) : sudo dnf install TODO
+;or (RHEL) : sudo dnf install i2c-tools
 
 # If you installed either `i2c-tools` or `gpiod` above I suggest rebooting
 #  at this point to ensure the services are running.
 
 # Only if you plan to use a screen :
 admin@sbc:~$ sudo apt install fonts-liberation
-;or (RHEL) : sudo dnf install TODO
+;or (RHEL) : sudo dnf install liberation-mono-fonts liberation-sans-fonts liberation-serif-fonts
 
 # Create a dedicate user account (and set bash as our shell)
 admin@sbc:~$ sudo useradd -m eye
