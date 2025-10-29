@@ -44,6 +44,7 @@ def i2c_setup(settings):
 
     # Load the correct modules, be graceful if that fails
     i2c = None
+    lock = None
     if settings.have_display or settings.have_sensor:
         # I2C Comms
         # Uses standard SMBUS lib (currently smbus2)
