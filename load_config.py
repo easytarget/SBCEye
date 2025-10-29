@@ -20,12 +20,23 @@ class Settings:
 
     No Methods
     Attributes:
+        appname: a short text identifier for the app
         Basically, look at the class and config.ini file, I'm not going
         to list and describe everything a second time here ;-)
     '''
 
-    def __init__(self):
+    def __init__(self,appname=None):
 
+        def hexint(instring):
+            ''' Helper function so we can use '0xNN' hex values for some inputs'''
+            try:
+                outint = int(instring)
+            except ValueError:
+                outint = int(instring, 16)
+            return outint
+
+        if sys.path[0] == '':
+            sys.path[0] = '.'
         self.my_version = check_output(["git", "describe", "--tags",
         "--always", "--dirty"], cwd=sys.path[0]).decode('ascii').strip()
 
@@ -71,10 +82,14 @@ class Settings:
                     print('\nERROR: Cannot find a configuration file, exiting')
                     sys.exit()
 
-
         config = configparser.RawConfigParser()
         config.optionxform = str
         config.read(config_file)
+
+        if appname:
+            self.identifier = '{}-{}'.format(appname, os.getpid())
+        else:
+            self.identifier = os.getpid()
 
         # Set attributes from .ini file
 
@@ -82,9 +97,9 @@ class Settings:
         self.name = general.get("name")
         self.long_format = general.get("long_format")
         self.short_format = general.get("short_format")
-        self.log_hourly = general.getboolean("log_hourly")
+        self.log_daily = general.getboolean("log_daily")
         self.have_sensor = general.getboolean("sensor")
-        self.have_screen = general.getboolean("screen")
+        self.have_display = general.getboolean("display")
         self.pin_state_names = tuple(general.get("pin_state_names").split(','))
         if self.name == "":
             self.name = f'{os.uname().nodename}'
@@ -93,8 +108,9 @@ class Settings:
         self.web_host = web.get("host")
         self.web_port = web.getint("port")
         self.web_sensor_name = web.get("sensor_name")
+        self.web_show_cam = web.getboolean("show_cam")
         self.web_allow_dump = web.getboolean("allow_dump")
-        self.web_show_control = web.getboolean("show_control")
+        self.web_allow_backup = web.getboolean("allow_backup")
 
         graph = config["graph"]
         self.graph_durations = graph.get("durations").split(',')
@@ -106,26 +122,34 @@ class Settings:
         self.graph_area_depth = graph.get("area_depth")
         self.graph_half_height = graph.get("half_height").split(',')
 
-        self.pin_map = {}
-        for pin in config["pins"]:
-            self.pin_map[pin] = config.getint("pins",pin)
+        self.links= {}
+        links = config["links"]
+        for name in links:
+            real = name.replace('_',' ')
+            self.links[real] = links.get(name)
 
-        self.net_map = {}
-        for host in config["ping"]:
-            self.net_map[host] = config.get("ping",host)
+        self.pinlist = {}
+        pins = config["pins"]
+        for pin in pins:
+            self.pinlist[pin] = pins.get(pin).split(',')
+            self.pinlist[pin][1] = int(self.pinlist[pin][1])
 
-        button = config["button"]
-        self.button_out = button.getint("out")
-        self.button_pin = button.getint("pin")
-        self.button_url = button.get("url")
-        self.button_hold = button.getfloat("hold")
-        if self.button_out == 0:
-            self.button_name = 'Undefined'
-        else:
-            self.button_name = f'gpio-{self.button_out}'
-            for name, pin in self.pin_map.items():
-                if pin == self.button_out:
-                    self.button_name = name
+        self.webpins = {}
+        webpins = config["webpins"]
+        for pin in webpins:
+            self.webpins[pin] = webpins.get(pin).split(',')
+
+        self.buttons = {}
+        buttons = config["buttons"]
+        for pin in buttons:
+            self.buttons[pin] = buttons.get(pin).split(',')
+            self.buttons[pin][1] = int(self.buttons[pin][1])
+            self.buttons[pin][3] = int(self.buttons[pin][3])
+
+        self.netlist = {}
+        ping = config["ping"]
+        for host in ping:
+            self.netlist[host] = ping.get(host)
 
         intervals = config["intervals"]
         self.pin_interval = intervals.getint("pin")
@@ -148,10 +172,15 @@ class Settings:
         self.rrd_backup_age = int(abs(rrd.getfloat("backup_age")) * 86400)
         self.rrd_backup_time = rrd.get("backup_time")
 
+        bus = config["bus"]
+        self.bus_id = hexint(bus.get("bus_id"))
+        self.sensor_addr = hexint(bus.get("sensor_addr"))
+        self.display_addr = hexint(bus.get("display_addr"))
+        self.bus_lock = bus.get("lock").split(',')
+
         display = config["display"]
         self.display_rotate = display.getboolean("rotate")
         self.display_contrast = display.getint("contrast")
-        self.display_invert = display.getboolean("invert")
 
         saver = config["saver"]
         self.saver_mode = saver.get("mode")
@@ -163,19 +192,14 @@ class Settings:
         self.animate_passes = animate.getint("passes")
         self.animate_speed = animate.getint("speed")
 
-        self.cam_url = None
-        if "webcam" in config:
-            cam = config["webcam"]
-            self.cam_url = cam.get("url")
-            self.cam_width = cam.getint("width", 50)
-
-        # Optional [DEBUG] section can be enabled
-        #  If this section is present it changes the operation of
-        #  SIGINT (eg Ctrl-c) to restart the service, instead of exiting
-        # Currently has no other configurable items
-        if "debug" in config:
-            self.debug = True
-        else:
-            self.debug = False
+        debug = config["debug"]
+        self.debug_http = debug.getboolean("http")
+        self.debug_sigint = debug.getboolean("sigint")
 
         print("Settings loaded from configuration file successfully")
+
+if __name__ == "__main__":
+    from sys import exit
+    print('setting loader class for SBCEye, see inline docs')
+    exit()
+

@@ -12,12 +12,13 @@ import re
 # HTTP server
 import http.server
 from urllib.parse import urlparse, parse_qs
+from ipaddress import ip_address, ip_network
 from threading import Thread
 
 # Logging
 import logging
 
-def serve_http(settings, rrd, data, helpers):
+def serve_http(settings, rrd, gpio, data):
     '''Spawns a http.server.HTTPServer in a separate thread on the given port'''
     handler = _BaseRequestHandler
     httpd = http.server.ThreadingHTTPServer((settings.web_host, settings.web_port), handler, False)
@@ -30,30 +31,50 @@ def serve_http(settings, rrd, data, helpers):
     # there is probably a better way to do this, eg using a meta-class and inheritance
     http.settings = settings
     http.rrd = rrd
+    http.gpio = gpio
     http.data = data
-    http.button_control = helpers[0]
     http.icon_file = 'favicon.ico'
     if not os.path.exists(http.icon_file):
         http.icon_file = f'{sys.path[0]}/{http.icon_file}'
-    if rrd.rrdtool:
+    if rrd.rrdtool and rrd.gzip:
         http.db_graphable = True
         if settings.web_allow_dump:
             logging.info("RRD database is dumpable via web")
             http.db_dumpable = True
         else:
             http.db_dumpable = False
+        if settings.web_allow_backup:
+            logging.info("RRD database backups can be triggered via web")
+            http.db_backupable = True
+        else:
+            http.db_backupable = False
     else:
-        logging.warning('Commandline rrdtool not found, '\
-                'graphing and dumping functions are unavailable')
+        logging.warning('Commandline rrdtool or gzip not found, '\
+                'graphing, backup and dumping functions are unavailable')
         http.db_dumpable = False
         http.db_graphable = False
+
+    # Note the list of link targets
+    for link in settings.links:
+        logging.info(f"Web link '{link}' points to: {settings.links[link]}")
+
+    # Note the controllable pins
+    for pin in list(settings.webpins):
+        if pin not in gpio.pins.keys():
+            print('Cannot configure web control for \'{}\', since it is not '\
+                  'in the pin list'.format(pin))
+            del settings.webpins[pin]
+        print('Pin \'{}\' controllable via web UI from: {}'\
+              .format(pin, settings.webpins[pin]))
+        logging.info('Pin \'{}\' controllable via web UI from: {}'\
+                     .format(pin, settings.webpins[pin]))
 
     # Start the server
     logging.info(f'HTTP server will bind to port {str(settings.web_port)} '\
             f'on host {settings.web_host}')
     httpd.server_bind()
     address = f"http://{httpd.server_name}:{httpd.server_port}"
-    print(f"Webserver starting on : {address}")
+    print(f"Webserver starting on : {address}",flush=True)
     httpd.server_activate()
 
     def serve_forever(httpd):
@@ -63,19 +84,34 @@ def serve_http(settings, rrd, data, helpers):
             logging.info("Http Server closing down")
 
     thread = Thread(target=serve_forever, args=(httpd, ))
-    thread.setDaemon(True )
+    thread.daemon = True
     thread.start()
-
 
 class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     '''Handles each individual request in a new thread'''
 
-    def _set_headers(self):
+    def log_message(self, format, *args):
+        # This function effectively suppresses the http server log output
+        if http.settings.debug_http:
+            print(f'HTTP request:: {self.client_address[0]} : {args[0]} '\
+                  f'({args[1]})',flush=True)
+        return
+
+
+    def _common_headers(self):
         self.send_response(200)
+        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+
+    def _redirect(self):
+        self._common_headers()
+        self.send_header('refresh', '0; url=./')
+        self.end_headers()
+
+    def _set_headers(self):
+        self._common_headers()
         self.send_header("Content-type", "text/html")
-        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-        self.send_header("Pragma", "no-cache")
-        self.send_header("Expires", "0")
         self.end_headers()
 
     def _set_png_headers(self):
@@ -190,18 +226,18 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def _give_net(self):
         # Network Connectivity
         ret = ''
-        netlist = {}
+        targetlist = {}
         for key in http.data.keys():
             if key[0:4] == 'net-':
-                netlist[key] = key[4:]
-        if len(http.data.keys() & netlist.keys()) > 0:
+                targetlist[key] = key[4:]
+        if len(http.data.keys() & targetlist.keys()) > 0:
             ret += '<tr><th>Ping</th></tr>\n'
-            for item,name in netlist.items():
-                ret += f'<tr><td>{name}:</td><td style="text-align: right;">'
+            for item,name in targetlist.items():
+                ret += f'<tr><td title="{http.settings.netlist[name]}">{name}:</td>'
                 if http.data[item] == 'U':
-                    ret += 'Fail</td></tr>\n'
+                    ret += '<td style="text-align: right;">Fail</td></tr>\n'
                 else:
-                    ret += f'{http.data[item]:.1f}</td>'\
+                    ret += f'<td style="text-align: right;">{http.data[item]:.1f}</td>'\
                             '<td style="padding-left: 0;">'\
                             '<span style="font-size: 75%;"> ms</span>'\
                             '</td></tr>\n'
@@ -217,9 +253,29 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 pinlist[key] = key[4:]
         if len(http.data.keys() & pinlist.keys()) > 0:
             ret += '<tr><th>GPIO</th></tr>\n'
-            for item,name in pinlist.items():
-                ret += f'<tr><td>{name}:</td><td style="text-align: right;">'\
-                       f'{http.settings.pin_state_names[http.data[item]]}</td></tr>\n'
+            for item, name in pinlist.items():
+                title = '{}:\n chip: {}\n line: {}\n direction: {}\n consumer: {}'.format(
+                            name, http.gpio.pins[name].chip, http.gpio.pins[name].line,
+                            http.gpio.pins[name].direction, http.gpio.pins[name].consumer)
+                ret += f'<tr><td title="{title}">{name}:</td>'
+                direction = '({})'.format(http.gpio.pins[name].direction[:-3])
+                consumer = '{}'.format(http.gpio.pins[name].consumer)
+                if http.data[item] == 'U':
+                    ret += '<td style="text-align: right;"><span style="font-size: 80%; '\
+                           'font-style: italic;">{}</span></td>'.format(consumer)
+                    direction = ''
+                else:
+                    em = 'font-weight: bold' if http.data[item] == 1 else ''
+                    if name in http.settings.webpins.keys():
+                        link = 'href="./{}" title="Pin Control" '\
+                               'style="text-decoration: underline; {}"'.format(name, em)
+                        ret += '<td style="text-align: right;"><a {}>{}</a></td>'\
+                                .format(link, http.settings.pin_state_names[http.data[item]])
+                    else:
+                        ret += '<td style="text-align: right;"><span style="{}">{}</span></td>'\
+                                .format(em, http.settings.pin_state_names[http.data[item]])
+                ret += '<td style="padding-left: 0.3em;"><span style="font-size: 75%;">'\
+                       '{}</span></td></tr>\n'.format(direction)
         return ret
 
     def _give_graphlinks(self, skip=""):
@@ -229,33 +285,34 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
         if (len(http.settings.graph_durations) > 0) and http.db_graphable:
             if len(skip) == 0:
                 ret += '<tr><th>Graphs</th></tr>\n'
-            ret += '<tr><td colspan="2" style="text-align: center;">\n'
+            ret += '<tr><td colspan="3" style="text-align: center; font-size: 86%;">\n'
             for duration in http.settings.graph_durations:
                 if duration != skip:
-                    ret += f'&nbsp;<a href="./graphs?start=end-{duration}" '\
+                    ret += f'<a href="./graphs?start=end-{duration}" '\
                            f'title="Graphs covering the last {duration} in time">'\
                            f'{duration}</a>&nbsp;\n'
                 else:
-                    ret += f'&nbsp;<span style="color: #BBBBBB;">{duration}</span>&nbsp;\n'
+                    ret += f'<span style="color: #BBBBBB;">{duration}</span>&nbsp;\n'
             if len(skip) > 0:
-                ret += '&nbsp;:&nbsp;&nbsp;<a href="./" title="Main page">Home</a>\n'
+                ret += '</td></tr>\n<tr><td colspan="2" style="text-align: center">'\
+                       '<a href="./" title="Main page">Home</a>\n'
             ret += '</td></tr>\n'
         return ret
 
     def _give_links(self):
-        # Link to the log and pin contol pages
-        ret = f'''{self._give_graphlinks()}
-                <tr><td colspan="2" style="text-align: center;">
-                <a href="./log" title="Open log in a new page" target="_blank">
-                Log</a>\n'''
-        if http.settings.web_show_control and (http.settings.button_pin > 0):
-            ret += f'&nbsp;&nbsp;<a href="./{http.settings.button_url}" '\
-                    f'title="{http.settings.button_name} status and control page">'\
-                    f'{http.settings.button_name}</a>\n'
-        ret += '</td></tr>\n'
+        # Links to the graph pages
+        ret = f'{self._give_graphlinks()}'
+        # Configured links and log page
+        for link in http.settings.links:
+            ret += f'<tr><td colspan="3" style="text-align: center">'\
+                   f'<a href="{http.settings.links[link]}" title="Open {link} in a new tab" target="_blank">'\
+                   f'{link}</a></td></tr>\n'
+        ret += f'<tr><td colspan="3" style="text-align: center">\n'\
+               f'<a href="./log" title="Open log in a new tab" target="_blank">'\
+               f'Action Log</a></td></tr>\n'
         return ret
 
-    def _give_log(self, lines=25):
+    def _give_log(self, lines=32):
         # Combine and give last (lines) lines of log
         parsed_lines = parse_qs(urlparse(self.path).query).get('lines', None)
         if isinstance(parsed_lines, list):
@@ -265,8 +322,8 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             try:
                 lines = int(lines)
             except ValueError:
-                lines = int(100)
-        lines = max(1, min(lines, 250000))
+                lines = int(32)
+        lines = max(1, lines)
         # Use a shell one-liner used to extract the last {lines} of data from the logs
         # There is doubtless a more 'python' way to do this, but it is fast, cheap and works..
         log_command = \
@@ -278,10 +335,10 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <hr><pre>\n{log}</pre><hr>
                 <span style="font-size: 80%;">Latest {lines} lines shown</span>\n
                 </div>\n
-                <div><a href="./log?lines=25" title="show 25 lines">25</a>&nbsp;:
-                &nbsp;<a href="./log?lines=250" title="show 250 lines">250</a>&nbsp;:
-                &nbsp;<a href="./log?lines=2500" title="show 2500 lines">2500</a>&nbsp;:
-                &nbsp;<a href="./" title="Main page">Home</a></div>\n'''
+                <div><a href="./log?lines=32" title="show 32 lines">32</a>&nbsp;:
+                <a href="./log?lines=320" title="show 320 lines">320</a>&nbsp;:
+                <a href="./log?lines=3200" title="show 3200 lines">3200</a></div>\n
+                <div><a href="./" title="Main page">Home</a></div>\n'''
         return ret
 
     def _give_graphs(self, start, end, stamp):
@@ -317,6 +374,42 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 <a href="./dump_gz" title = "Direct download link">Download</a>
                 </div>
                 '''
+
+    def _give_pin_portal(self, pin, control):
+        ret = '<h2><a href="/" title="Home">{}</a> Pin Control</h2>\n'.format(http.settings.name)
+        ret += '<div style="font-size: 200%; ">{}: <span style="font-weight: bold">'.format(pin)
+        if http.gpio.pins[pin].value is None:
+            ret += 'used</span></div>\n'.format(http.gpio.pins[pin].consumer)
+            ret += '<div>consumed by: \'<span style="font-weight: bold">'
+            ret += '{}\'</span></div>\n'\
+                   .format(http.gpio.pins[pin].consumer)
+        else:
+            ret += '{}</span></div>\n'\
+                   .format(http.settings.pin_state_names[http.gpio.pins[pin].value])
+        ret += '<div>mode: <span style="font-weight: bold">{}</span><hr></div>\n'\
+                .format(http.gpio.pins[pin].direction)
+        if http.gpio.pins[pin].value is None:
+            ret += '<div style="color:#555555; font-size: 80%; font-weight: lighter">'\
+                   'Pins used (consumed) by other processes cannot be controlled</div>'
+        elif control and http.gpio.pins[pin].direction == 'input':
+            for state in (0, 1):
+                ret += '<div><a href="?{0}" title="mode: output\nvalue: {0}">'\
+                       'Change mode to output and set: <span style='\
+                       '"text-decoration: underline">{0}</span></a></div>\n'\
+                       .format(http.settings.pin_state_names[state])
+        elif control:
+            newstate = 1 if http.gpio.pins[pin].value == 0 else 0
+            ret += '<div><a href="?{0}" title="mode: output\nvalue: {0}">'\
+                   'Set output: <span style="text-decoration: underline">{0}</span></a></div>\n'\
+                   .format(http.settings.pin_state_names[newstate])
+            ret += '<div><a href="?input" title="mode: input">'\
+                   'Change mode to input and get <span style='\
+                   '"text-decoration: underline">value</span></a></div>\n'
+        else:
+            ret += '<div style="color:#555555; font-size: 80%; font-weight: lighter">'\
+                   'Client is not authorised to control pin</div>'
+        ret += '<div><br><a href="./" title="Main page">Home</a></div>\n'
+        return ret
 
     def _write_dedented(self, html):
         # Strip leading whitespace and write
@@ -382,38 +475,11 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
                 self._set_icon_headers()
                 with open(http.icon_file,'rb') as favicon:
                     self.wfile.write(favicon.read())
-        elif ((urlparse(self.path).path == '/' + http.settings.button_url)
-                and (len(http.settings.button_url) > 0)
-                and (http.settings.button_out > 0)):
-            # Web button control
-            parsed = parse_qs(urlparse(self.path).query).get('state', ['status'])
-            action = parsed[0]
-            if action != 'status':
-                logging.info(f'Web button triggered by: {self.client_address[0]}'\
-                            f' with action: {action}')
-            status, state = http.button_control(action)
-            self._set_headers()
-            response = self._give_head(f" :: {http.settings.button_name}")
-            response += f'<h2>{status}</h2>\n'
-            invert_state = http.settings.pin_state_names[not state]
-            response += f'''<div>
-                    <a href="./{http.settings.button_url}?state={invert_state}"
-                    title = "Switch {http.settings.button_name} {invert_state}">
-                    Switch {invert_state}</a>
-                    </div>\n'''
-            response += '<div style="padding-top: 1em;">\n'\
-                    '<a href="./" title="Main page">Home</a></div>\n'
-            response += self._give_timestamp()
-            response += '<script>\n'\
-                    'setTimeout(function(){location.replace(location.pathname);}, '\
-                    '60000);\n</script>\n'
-            response += self._give_foot()
-            self._write_dedented(response)
         elif (urlparse(self.path).path == '/dump_gz') and http.db_dumpable:
             # Raw dump download
             start = time.time()
             logging.info(f"RRD database dump requested by {self.client_address[0]}")
-            response = http.rrd.dump()
+            response = http.rrd.dump(reason=f'Web ({self.client_address[0]})')
             self._set_download_headers(len(response),
                     f'{http.settings.name}-rrd-{time.strftime("%Y%m%d-%H%M%S")}.xml.gz')
             self.wfile.write(response)
@@ -425,26 +491,70 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
             response += self._give_dump_portal()
             response += self._give_foot()
             self._write_dedented(response)
+        elif (urlparse(self.path).path == '/backup') and http.db_backupable:
+            # trigger a backup and notify
+            logging.info(f"RRD database backup triggered by {self.client_address[0]}")
+            self.send_response(302)
+            self.send_header('Location','log')
+            self.end_headers()
+            http.rrd.backup()
         elif urlparse(self.path).path == '/log':
             self._set_headers()
-            response = self._give_head()
+            response = self._give_head(" :: Logfile Viewer")
             response += f'<h2><a href="/" title="Home">{http.settings.name}</a> Log</h2>\n'
             response += self._give_log()
             response += self._give_timestamp()
             response += self._give_foot(refresh=60, scroll=True)
             self._write_dedented(response)
+        elif urlparse(self.path).path[1:] in http.settings.webpins.keys():
+            pin = urlparse(self.path).path[1:]
+            parsed_action = urlparse(self.path).query
+            action = parsed_action.casefold()
+            control = False
+            if http.gpio.pins[pin].value is not None:
+                for cidr in http.settings.webpins[pin]:
+                    if ip_address(self.client_address[0]) in ip_network(cidr,strict=False):
+                        control = True
+            if not control and action != '':
+                self.send_error(403, 'Forbidden',
+                        'Your IP address is not permitted to control this pin')
+                print('Denied access to \'/{}\' from client at IP: {}'\
+                      .format(pin, self.client_address[0]))
+                return
+            if action == http.settings.pin_state_names[0].casefold():
+                http.gpio.setPin(pin, 0)
+                logging.info('Pin \'{}\' set output: {} via web ({})'
+                             .format(pin, http.settings.pin_state_names[0], self.client_address[0]))
+                self._redirect()
+            elif action == http.settings.pin_state_names[1].casefold():
+                http.gpio.setPin(pin, 1)
+                logging.info('Pin \'{}\' set output: {} via web ({})'
+                             .format(pin, http.settings.pin_state_names[1], self.client_address[0]))
+                self._redirect()
+            elif action == 'input':
+                http.gpio.makeInput(pin)
+                logging.info('Pin \'{}\' set to input mode via web ({})'
+                             .format(pin, self.client_address[0]))
+                self._redirect()
+            elif action != '':
+                self.send_error(418, 'I\'m a {}, '\
+                    'I do not know how to \'{}\''\
+                    .format(pin, parsed_action))
+            else:
+                self._set_headers()
+                response = self._give_head(" :: Pin Control :: {}".format(pin))
+                response += self._give_pin_portal(pin, control)
+                response += self._give_timestamp()
+                response += self._give_foot(refresh=60)
+                self._write_dedented(response)
         elif urlparse(self.path).path == '/':
             # Main Page
-            cam = parse_qs(urlparse(self.path).query).get('cam', None)
             exclude = parse_qs(urlparse(self.path).query).get('exclude', '')
             exclude = [item for sublist in exclude for item in sublist.split(',')]
             self._set_headers()
             response = self._give_head()
             if not "deco" in exclude:
                 response += f'<h2>{http.settings.name}</h2>\n'
-            if cam and http.settings.cam_url:
-                response += f'<img src="{http.settings.cam_url}" alt="Webcam" '\
-                        f'style="display: block; width: {http.settings.cam_width}%">\n'
             response += '<table>\n'
             if not "env" in exclude:
                 response += self._give_env()
@@ -468,3 +578,9 @@ class _BaseRequestHandler(http.server.BaseHTTPRequestHandler):
     def do_HEAD(self):
         '''returns headers'''
         self._set_headers()
+
+if __name__ == "__main__":
+    from sys import exit
+    print('HTTPserver class for SBCEye, see inline docs')
+    exit()
+

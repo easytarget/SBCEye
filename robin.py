@@ -6,7 +6,6 @@
 import time
 from pathlib import Path
 import logging
-import gzip
 import subprocess
 import os
 from shutil import which
@@ -37,7 +36,6 @@ class Robin:
         self.graph_args["area_depth"] = s.graph_area_depth
         self.half_height = s.graph_half_height
 
-
         # Sensor and system sources with limits (min,max)
         self.data_sources = {
                 'env-temp': ('-40','80'),
@@ -57,7 +55,7 @@ class Robin:
         # Graphs and parameters
         self.graph_map = {
                 'env-temp': (f'{s.web_sensor_name} Temperature, \u00B0Centigrade',
-                    None, None, '%3.0lf\u00B0', '%3.1lf\u00B0C'),
+                    None, None, '%3.1lf\u00B0', '%3.1lf\u00B0C'),
                 'env-humi': (f'{s.web_sensor_name} Humidity, % percent',
                     None, None, '%3.0lf', '%3.0lf%%'),
                 'env-pres': (f'{s.web_sensor_name} Pressure, millibars',
@@ -83,16 +81,16 @@ class Robin:
                     None, None, '%5.0lf', '%5.0lf /s', '--units-exponent','0'),
                 }
         # connectivity
-        for host in s.net_map.keys():
+        for host in s.netlist.keys():
             self.data_sources[f'net-{host}'] = ('0','U')
             self.graph_map[f'net-{host}'] = (f'{host} Ping, milliseconds',
                     '25', '0' ,'%3.0lf', '%3.1lf ms', '--alt-autoscale', '--units-exponent','0')
 
         # pins
-        for name in s.pin_map.keys():
+        for name in s.pinlist.keys():
             self.data_sources[f'pin-{name}'] = ('0','1')
             self.graph_map[f'pin-{name}'] = (f'{name} Pin State, '\
-                    f'0 = {s.pin_state_names[0]}, 1 = {s.pin_state_names[1]}',
+                    f'0 = {s.pin_state_names[0]}, 1 = {s.pin_state_names[1]}, None = pin n/a',
                     '1', '0' ,'%3.1lf', '%3.0lf', '--alt-autoscale', '--units-exponent','0')
 
         # set the list of active and storable sources
@@ -136,7 +134,7 @@ class Robin:
                 mini = self.data_sources[source][0]
                 maxi = self.data_sources[source][1]
                 ds_list.append(f'DS:{source}:GAUGE:60:{mini}:{maxi}')
-                print(f" data source: {source} ({mini},{maxi})")
+                print(f" added data source: {source} ({mini},{maxi})")
             args = [str(self.db_file)]
             if source_file.is_file():
                 print(f'Importing from previous {source_file}')
@@ -161,17 +159,21 @@ class Robin:
             if not source in existing_sources:
                 mini = self.data_sources[source][0]
                 maxi = self.data_sources[source][1]
-                print(f"Adding: {source} ({mini},{maxi}) to {self.db_file}")
+                print(f"Added data source: {source} ({mini},{maxi}) to {self.db_file}")
                 rrdtool.tune(
                     str(self.db_file),
                     f"DS:{source}:GAUGE:60:{mini}:{maxi}")
 
-        # Disable dumping if rrdtool not in path
+        # Disable backup and dumping if rrdtool or gzip not in path
         self.rrdtool = which("rrdtool")
-        if self.rrdtool:
+        self.gzip = which("gzip")
+        if self.rrdtool and self.gzip:
             print(f'Commandline rrdtool: {self.rrdtool}')
+            print(f'Commandline gzip: {self.gzip}')
         else:
-            print('No commandline rrdtool available, ' + 'graphing and dumping disabled')
+            print('No commandline rrdtool and/or gzip available: backups disabled')
+            logging.warning('rrdtool or gzip not found: Disabling database backups')
+            self.backup_count = 0
 
         # Use a home-brew local cache
         self.cache = []
@@ -179,29 +181,38 @@ class Robin:
         self.cache_age = s.rrd_interval
 
         # Notify
-        print('RRD database and cache configured and enabled')
+        print('RRD database and cache configured and enabled',flush=True)
         logging.info(f'RRD database is: {str(self.db_file)}')
 
 
-    def _backup(self):
+    def backup(self):
         '''Backup and rotate old backups'''
         if self.backup_count > 0:
             # Copy to a timestamped file
             self.write_updates()
-            suffix = time.strftime("%Y-%m-%d.%H:%M:%S.gz")
-            if not db_lock.acquire(blocking=True, timeout=600):
-                print('Error: Backup failed, could not acquire db lock within 600s')
-                return
+            suffix = time.strftime("%Y-%m-%d.%H:%M:%S.xml.gz")
             start = time.time()
-            with open(f'{self.db_file}', 'rb') as dbfile:
-                with gzip.GzipFile(
-                        f'{str(self.backup_path)}/{self.backup_name}.{suffix}',
-                        mode = 'wb', compresslevel = 6) as zipfile:
-                    zipfile.write(dbfile.read())
-            db_lock.release()
-            #logging.info(f'Database backup saved as: {self.backup_name}.{suffix}')
-            print(f'Database backup saved as: {self.backup_name}.{suffix} '\
-                    f'(took: {(time.time() - start):.2f}s)')
+            try:
+                backupfile = open(f'{str(self.backup_path)}/{self.backup_name}.{suffix}', 'wb')
+            except Exception as e:
+                logging.error(f'Database backup file write failed: {self.backup_name}.{suffix}\n{e}')
+                print(f'Database backup file write failed: {self.backup_name}.{suffix}\n{e}',flush=True)
+                return
+            else:
+                with backupfile:
+                    backupfile.write(self.dump(reason='Backup'))
+            size = os.stat(f'{str(self.backup_path)}/{self.backup_name}.{suffix}').st_size
+            if size == 0:
+                logging.error(f'Database backup failed: empty datafile returned')
+                print(f'Database backup failed: empty datafile returned',flush=True)
+                try:
+                    os.remove(f'{str(self.backup_path)}/{self.backup_name}.{suffix}')
+                except:
+                    pass   # ignore a failure here
+                return
+            logging.info(f'Database backup saved as: {self.backup_name}.{suffix} '\
+                         f'(size: {size}, took: {(time.time() - start):.2f}s)')
+            print(f'Database backup saved as: {self.backup_name}.{suffix}',flush=True)
 
             # Process old backups
             now = time.time()
@@ -220,34 +231,33 @@ class Robin:
                 else:
                     os.remove(f'{self.backup_path}/{name}')
                     #logging.info(f'Removed stale backup: {name}')
-                    print(f'Removed stale backup: {name}')
+                    print(f'Removed stale backup: {name}',flush=True)
 
     def start_backups(self):
         '''Add the backup schedule job'''
         # Start the backup schedule, using threads since it can run for some time
         if self.backup_count > 0:
-            schedule.every().day.at(self.backup_time).do(run_threaded, self._backup)
+            schedule.every().day.at(self.backup_time).do(run_threaded, self.backup)
 
-    def dump(self):
+
+    def dump(self, reason=''):
         '''provide a gzipped dump of database'''
         dump_local.zipped = bytearray()
-        if self.rrdtool:
+        if self.rrdtool and self.gzip:
             self.write_updates()
-            print('Dump requested')
+            print('Dump requested: {}'.format(reason),flush=True)
             if not db_lock.acquire(blocking=True, timeout=60):
-                print('Error: Dumping failed, could not acquire db lock within 60s')
+                print('Error: Dumping failed, could not acquire db lock within 60s',flush=True)
                 return dump_local.zipped
             dump_local.start = time.time()
-            dump = subprocess.check_output([self.rrdtool, 'dump', str(self.db_file)])
+            with subprocess.Popen([self.rrdtool, 'dump', str(self.db_file)], \
+                                  stdout=subprocess.PIPE) as dump_local.raw:
+                dump_local.zipped = subprocess.check_output(('gzip'), stdin=dump_local.raw.stdout)
             db_lock.release()
-            print(f'Dump is: {len(dump)} bytes raw and '\
-                    f'took {(time.time() - dump_local.start):.2f}s')
-            dump_local.start = time.time()
-            dump_local.zipped = gzip.compress(dump, compresslevel=6)
-            print(f'Dump compressed to {len(dump_local.zipped)} bytes '\
-                    f'in {(time.time() - dump_local.start):.2f}s')
+            print(f'Dump is: {len(dump_local.zipped)} bytes compressed, and '\
+                  f'took {(time.time() - dump_local.start):.2f}s',flush=True)
         else:
-            print('Dump requested but denied because commandline "rrdtool" unavailable')
+            print('Dump requested but denied because commandline "rrdtool" or "gzip" unavailable',flush=True)
         return dump_local.zipped
 
     def update(self, data):
@@ -265,11 +275,11 @@ class Robin:
         if len(self.cache) > 0:
             if not db_lock.acquire(blocking=True, timeout=self.cache_age):
                 print('Error: Data Write failed, could not acquire database '\
-                        f'lock within write period ({self.cache_age}s)')
+                        f'lock within write period ({self.cache_age}s)',flush=True)
                 return
             # check if cache was emptied in another thread while waiting for lock
             if len(self.cache) > 0:
-                # print(f'DB WRITE:len={len(self.cache)}')
+                # print(f'DB WRITE:len={len(self.cache)}',flush=True)
                 try:
                     rrdtool.update(
                             str(self.db_file),
@@ -279,7 +289,7 @@ class Robin:
                     self.cache = []
                 except rrdtool.OperationalError as rrd_error:
                     print("RRDTool update error:")
-                    print(rrd_error)
+                    print(rrd_error,flush=True)
             db_lock.release()
         self.last_write = time.time()
 
@@ -331,12 +341,12 @@ class Robin:
                 print(f'Graph generation failed:\n{graph_error}')
                 print(f'cmd: {graph_error.cmd}')
                 print(f'output: {graph_error.output}')
-                print(f'stdout: {graph_error.stderr}')
+                print(f'stdout: {graph_error.stderr}',flush=True)
 
             if len(graph_local.response) == 0:
-                print(f'Error: png file generation failed for : {graph} : {start}>>{end}')
+                print(f'Error: png file generation failed for : {graph} : {start}>>{end}',flush=True)
         else:
-            print(f'Error: No graph available for type: {graph}')
+            print(f'Error: No graph available for type: {graph}',flush=True)
         return graph_local.response
 
 def run_threaded(job_func):
@@ -344,3 +354,9 @@ def run_threaded(job_func):
     '''
     job_thread = Thread(target=job_func)
     job_thread.start()
+
+if __name__ == "__main__":
+    from sys import exit
+    print('robin (rrd handler) class for SBCEye, see inline docs')
+    exit()
+

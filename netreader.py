@@ -17,7 +17,7 @@ class Netreader:
 
     parameters:
         settings: (tuple) consisting of:
-            map: (dict) UI name and IP address/name
+            list: (dict) UI name and IP address/name
             timeout: (int) Timout in seconds
         data: the main data{} dictionary, a key/value pair; 'net-<name>=value'
             will be added to it and the vaue updated with pin state changes.
@@ -27,14 +27,15 @@ class Netreader:
     '''
     def __init__(self, settings, data):
         '''Setup and do initial reading'''
-        (self.map, self.timeout) = settings
+        (self.list, self.timeout) = settings
         self.states = {}
-        if not self.map:
+        if not self.list:
             print('No network addresses configured for monitoring')
             return
-        for name,_ in self.map.items():
+        for name, target in self.list.items():
             self.states[name] = "init"
             data[f'net-{name}'] = 'U'
+            print(f'Ping target \'{name}\': {target}')
         self.update(data)
         print('Network monitoring configured and logging enabled')
         logging.info('Network monitoring configured and logging enabled')
@@ -48,7 +49,7 @@ class Netreader:
             data: the main data{} dictionary
         no return
         '''
-        address = self.map[target]
+        address = self.list[target]
         key = f'net-{target}'
         (data[key], status) = ping_target(address,self.timeout)
         if status:
@@ -65,7 +66,7 @@ class Netreader:
     def update(self, data):
         '''Test each target in parallel via threads'''
         threadlist = []
-        for target,_ in self.map.items():
+        for target,_ in self.list.items():
             gatherer = threading.Thread(target=self._ping_runner, args=[target, data])
             gatherer.start()
             threadlist.append(gatherer)

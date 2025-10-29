@@ -3,7 +3,6 @@
 SBCEye:
 Animate the OLED display attached to my OctoPrint server with bme280 and system data
 Show, log and graph the environmental, system and gpio data via a web interface
-Give me a on/off button + url to control the bench lights via a GPIO pin
 
 !! DISPLAY, BME280 and GPIO functionality is CURRENTLY Raspberry PI only!
 - Needs to be made generic for other architectures
@@ -41,27 +40,30 @@ import time
 import sys
 import logging
 import random
+import schedule
+import psutil
 from datetime import timedelta
 from logging.handlers import RotatingFileHandler
 from atexit import register
 from signal import signal, SIGTERM, SIGINT, SIGHUP
 from multiprocessing import Process, Queue
-import schedule
-import psutil
+from pathlib import Path
 
 # Local classes
 from load_config import Settings
 from robin import Robin
 from httpserver import serve_http
 from netreader import Netreader
-from pinreader import Pinreader
-from bus_drivers import i2c_setup
+from gpiohandler import GPIOHandler
+from i2c_bus import i2c_setup
+from bme_sensor import bme_setup
+from oled_display import oled_setup
 
 # Re-nice to reduce blocking of other processes
 os.nice(10)
 
 # The setting class will also process the arguments
-settings = Settings()
+settings = Settings(appname=Path(sys.argv[0]).stem)
 
 # Let the console know we are starting
 print("Starting SBCEye")
@@ -78,7 +80,7 @@ logging.basicConfig(level=logging.INFO,
         datefmt=settings.short_format,
         handlers=[handler])
 
-# Older scheduler versions can log debug to 'INFO' not 'DEBUG', change threshold.
+# Older scheduler versions might log debug at wrong level, change threshold.
 schedule_logger = logging.getLogger('schedule')
 schedule_logger.setLevel(level=logging.WARN)
 
@@ -105,26 +107,18 @@ logging.info('CPU thermal device detected as: ' + cpu_thermal_device)
 #
 # Import, setup and return hardware drivers, or 'None' if setup fails
 
-disp, bme280 = i2c_setup(settings.have_screen, settings.have_sensor)
-
-if disp:
-    disp.contrast(settings.display_contrast)
-    disp.invert(settings.display_invert)
-    disp.fill(0)  # Blank asap in case we are showing garbage
-    disp.show()
-
-if settings.button_out > 0:
-    try:
-        from RPi import GPIO
-    except ImportError as e:
-        print(e)
-        print("ERROR: button & pin control requirements not met, features disabled")
-        settings.button_out = 0
+i2c, bus_lock = i2c_setup(settings)
 
 #
 # Local Classes, Globals
 
-display_queue = None  # will be set during
+# We override the dictionary class so that every time an item is
+# modified it sends a a message to the display queue.
+# This allows the display to run in a seperate process while keeping
+# it's local data copy updated in real-time.
+# The queue is initially disabled (type: None), and assigned as a
+# queue object only if the display is enabled and detected.
+display_queue = None
 class TheData(dict):
     '''Override the dictionary class to also send data to the queue for the display'''
     def __setitem__(self, item, value):
@@ -136,7 +130,7 @@ class TheData(dict):
             display_queue.put([item], None)
         super().__delitem__(item)
 
-# Use a (custom overridden) dictionary to store current readings
+# Use this overridden dictionary to store current readings
 data = TheData({})
 
 # Counters used for incremental data need pre-populating
@@ -152,44 +146,8 @@ data["update-time"] = time.time() # time of last update
 #
 # Local functions
 
-def button_control(action="toggle"):
-    '''Set the controlled pin to a specified state'''
-    if settings.button_out > 0:
-        ret = f'{settings.button_name} '
-        pin = settings.button_out
-        if action.lower() in ['toggle','invert','button']:
-            GPIO.output(pin, not GPIO.input(pin))
-            ret += 'Toggled: '
-        elif action.lower() in [settings.pin_state_names[1].lower(),'on','true']:
-            GPIO.output(pin,True)
-            ret += 'Switched: '
-        elif action.lower() in [settings.pin_state_names[0].lower(),'off','false']:
-            GPIO.output(pin,False)
-            ret += 'Switched: '
-        elif action.lower() in ['random','easter']:
-            GPIO.output(pin,random.choice([True, False]))
-            ret += 'Randomly Switched: '
-        else:
-            ret += ': '
-        state = GPIO.input(pin)
-        ret += settings.pin_state_names[state]
-    else:
-        state = False
-        ret = 'Not supported, no output pin defined'
-    pins.update_pins()
-    return (ret, state)
-
-def button_interrupt(*_):
-    '''give a short delay, then re-read input to provide a minimum hold-down time
-    and suppress false triggers from other gpio operations'''
-    time.sleep(settings.button_hold)
-    if GPIO.input(settings.button_pin):
-        logging.info('Button pressed')
-        button_control()
-
 def update_system():
-    '''Get current environmental and system data, called on a schedule
-    '''
+    '''Get current environmental and system data, called on a schedule'''
     data['sys-temp'] = psutil.sensors_temperatures()[cpu_thermal_device][0].current
     data['sys-load'] = psutil.getloadavg()[0]
     data["sys-freq"] = psutil.cpu_freq().current
@@ -211,12 +169,12 @@ def update_system():
     counter["sys-cpu-int"] = int_count
 
 def update_sensors():
-    '''Get current environmental sensor data
-    '''
-    if bme280:
-        data['env-temp'] = bme280.temperature
-        data['env-humi'] = bme280.relative_humidity
-        data['env-pres'] = bme280.pressure
+    '''Get current environmental sensor data'''
+    if bme:
+        bme.update_sensor()
+        data['env-temp'] = bme.temperature
+        data['env-humi'] = bme.humidity
+        data['env-pres'] = bme.pressure
         # Failed pressure measurements really foul up the graph, skip
         if data['env-pres'] == 0:
             data['env-pres'] = 'U'
@@ -228,22 +186,22 @@ def update_data():
     net.update(data)
     rrd.update(data)
 
-def hourly():
+def daily():
     '''Remind everybody we are alive'''
     myself = os.path.basename(__file__)
     timestamp = time.strftime(settings.long_format)
     uptime = timedelta(seconds=int(time.time() - psutil.boot_time()))
-    logging.info(f'{settings.name} :: up {uptime}')
-    print(f'{myself} :: {timestamp} :: {settings.name} :: up {uptime}')
+    logging.info(f'{settings.name} :: system uptime {uptime}')
+    print(f'{myself} :: {timestamp} :: {settings.name} :: system uptime {uptime}',flush=True)
 
 def handle_signal(sig, *_):
     '''Handle common signals'''
     if DISPLAY:
-        # clean up the screen process
+        # clean up the display process
         DISPLAY.join()
     if sig == SIGHUP:
         handle_restart()
-    elif sig == SIGINT and settings.debug:
+    elif sig == SIGINT and settings.debug_sigint:
         handle_restart()
     else:
         # calling sys.exit() will invoke handle_exit()
@@ -252,46 +210,38 @@ def handle_signal(sig, *_):
 def handle_restart():
     '''In-Place safe restart (re-reads config)'''
     logging.info('Safe Restarting')
-    print('Restart\n')
+    print('Restart\n',flush=True)
     rrd.write_updates()
+    if bus_lock:
+        bus_lock.release()
     os.execv(sys.executable, ['python'] + sys.argv)
 
 def handle_exit():
     '''Ensure we write ipending data to the RRD database as we exit'''
     rrd.write_updates()
+    if bus_lock:
+        bus_lock.release()
     logging.info('Exiting')
-    print('Graceful Exit\n')
+    print('Graceful Exit\n',flush=True)
 
 
 # The fun starts here:
 if __name__ == '__main__':
 
-    # Log sensor status
-    if bme280:
+    # Environmental sensor
+    bme = bme_setup(i2c, settings) if i2c else None
+    if bme:
         logging.info('Environmental sensor configured and enabled')
     elif settings.have_sensor:
-        logging.warning('Environmental data configured but no sensor detected: '\
+        logging.warning('Environmental data configured but no sensor available: '\
                 'Environment status and logging disabled')
 
-    # Set button interrupt and output if we have a button and a pin to control
-    if settings.button_out > 0:
-        GPIO.setmode(GPIO.BCM)  # Use BCM GPIO numbering
-        GPIO.setup(settings.button_out, GPIO.OUT)
-        logging.info(f'Controllable pin ({settings.button_name}) enabled')
-        if settings.button_pin > 0:
-            GPIO.setup(settings.button_pin, GPIO.IN)
-            # Set up the button pin interrupt
-            GPIO.add_event_detect(settings.button_pin,
-                    GPIO.RISING, button_interrupt,
-                    bouncetime = int(settings.button_hold * 2000))
-            logging.info('Button enabled')
-        if len(settings.button_url) > 0:
-            logging.info(f'Web Button enabled on: /{settings.button_url}')
-        print(f'Controllable pin ({settings.button_name}) configured and enabled; '\
-                f'(pin={settings.button_pin}, url="{settings.button_url})"')
-
     # Display animation setup
+    disp = oled_setup(settings) if i2c else None
     if disp:
+        # display initialisation does a 'clear()' and 'show()'
+        disp.contrast(settings.display_contrast)
+
         from animator import animate
         display_queue = Queue()
         DISPLAY = Process(target=animate, args=(settings, disp, display_queue),
@@ -299,13 +249,13 @@ if __name__ == '__main__':
         DISPLAY.start()
     else:
         DISPLAY = None
-        if settings.have_screen:
+        if settings.have_display:
             logging.warning('Display configured but did not initialise properly: '\
                     'Display features disabled')
 
     print('Performing initial data update', end='')
-    if settings.net_map:
-        print(f' may take up to {settings.net_timeout}s if ping targets are down')
+    if settings.netlist:
+        print(f' (may take up to {settings.net_timeout}s if ping targets are down)')
     else:
         print()
 
@@ -315,17 +265,17 @@ if __name__ == '__main__':
     # Populate initial sensor data
     update_sensors()
 
-    # Network (ping) monitoring
-    net = Netreader((settings.net_map, settings.net_timeout), data)
+    # GPIO pin monitoring
+    gpio = GPIOHandler(settings.pinlist, settings.buttons, data, settings.identifier)
 
-    # GPIO Pin monitoring
-    pins = Pinreader((settings.pin_map, settings.pin_state_names), data)
+    # Network (ping) monitoring
+    net = Netreader((settings.netlist, settings.net_timeout), data)
 
     # RRD init now that the data{} structure is populated
     rrd = Robin(settings, data)
 
     # Start the web server, it will fork into a seperate thread and run continually
-    serve_http(settings, rrd, data, (button_control,))
+    serve_http(settings, rrd, gpio, data)
 
     # Exit handlers (needed for rrd cache write on shutdown)
     signal(SIGTERM, handle_signal)
@@ -334,11 +284,11 @@ if __name__ == '__main__':
     register(handle_exit)
 
     # Schedule pin monitoring, database updates and logging events
-    if settings.log_hourly:
-        schedule.every().hour.at(":00").do(hourly)
     schedule.every(settings.data_interval).seconds.do(update_data)
-    if len(settings.pin_map.keys()) > 0:
-        schedule.every(settings.pin_interval).seconds.do(pins.update_pins)
+    if gpio.available:
+        schedule.every(settings.pin_interval).seconds.do(gpio.update)
+    if settings.log_daily:
+        schedule.every().day.at("00:00").do(daily)
 
     # We got this far... time to start the show
     logging.info("Init complete, starting schedules and entering service loop")

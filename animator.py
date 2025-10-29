@@ -47,7 +47,7 @@ class Animator:
     Handles starting the display and then displays the desired information
     screens according to user-defined 'frame' rate.
     Screens are 'slid' into place to provide a pleasing animation effect
-    A screensaver can be invoked to blank or invert the display as the user wishes
+    A screensaver can be invoked to blank the display as the user wishes
     '''
 
     def __init__(self, settings, disp, data):
@@ -60,7 +60,7 @@ class Animator:
         self.height = self.disp.height
         self.span   = self.width*2 + self.margin
 
-        self.display_rotate = settings.display_rotate
+        # How fast
         self.animate_speed = settings.animate_speed
 
         # Create image canvas (with mode '1' for 1-bit color)
@@ -93,14 +93,14 @@ class Animator:
 
         # Start saver
         saver_settings = (settings.saver_mode, settings.saver_on,
-                settings.saver_off, settings.display_invert)
+                settings.saver_off)
         self.screensaver = Saver(disp, saver_settings)
         self.screensaver.check()
         schedule.every().hour.at(":00").do(self.screensaver.check)
 
         # Notify logs etc
         logging.info('Display configured and enabled')
-        print('Display configured and enabled')
+        print('Display configured and enabled',flush=True)
         self._splash()
 
 
@@ -109,15 +109,14 @@ class Animator:
         self.draw.rectangle((0,0,self.span-1,self.height-1), outline=0, fill=0)
 
     def _show(self, xpos=0):
-        '''Put a specific area of the canvas onto display'''
-        if self.display_rotate:
-            self.disp.image(self.image.transform((self.width,self.height),
-                       Image.EXTENT,(xpos,0,xpos+self.width,self.height))
-                       .transpose(Image.ROTATE_180))
+        '''Put a specific area of the canvas onto display,
+           or blank if the screensaver is active'''
+        if self.screensaver.active:
+            self.disp.hide()
         else:
-            self.disp.image(self.image.transform((self.width,self.height),
-                       Image.EXTENT,(xpos,0,xpos+self.width,self.height)))
-        self.disp.show()
+            self.disp.display(self.image.transform((self.width,self.height),
+                              Image.EXTENT,(xpos,0,xpos+self.width,self.height)))
+            self.disp.show()
 
     def _slideout(self):
         '''Slide the display view across the canvas to animate between screens'''
@@ -211,7 +210,8 @@ class Animator:
     def _hourly(self):
         '''check screensaver and totally frivously do a spash screen once an hour'''
         self.screensaver.check()
-        self._splash()
+        if not self.screensaver.active:
+            self._splash()
 
 
 def animate(settings, disp, queue):
@@ -237,7 +237,7 @@ def animate(settings, disp, queue):
 
     def die_with_dignity(*_):
         '''Exit cleanly (eg without stack trace) on a sigint/sigterm'''
-        print('Display animator process exiting')
+        print('Display animator process exiting',flush=True)
         sys_exit()
 
     signal(SIGTERM, die_with_dignity)
@@ -265,3 +265,8 @@ def animate(settings, disp, queue):
                 data.pop(key, None)
         schedule.run_pending()
         sleep(0.25)
+
+if __name__ == "__main__":
+    from sys import exit
+    print('animator class for SBCEye, see inline docs')
+    exit()
